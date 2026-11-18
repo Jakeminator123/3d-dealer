@@ -1,0 +1,70 @@
+Ja, Jakob – med det mål du beskriver rekommenderar jag en ren ombyggnad med utvalt återbruk. Jag skulle bygga en ny, mindre grund för studion och det gemensamma arbetsflödet, och föra över de delar som redan löser viktiga problem.
+
+Jag har skrivit filen med granskningen, vad som bör följa med, mappförslag och en färdig ingångsprompt:
+Vad granskningen visar
+Jag granskade Dealer på 2e3967c, samt relevanta delar av Scoutgaming. Det finns konkreta skäl till att projektet kan kännas osammanhängande:
+- Kortplanen och spelet räknar fortfarande olika. Labbet använder den nya kameraberäkningen genom planCardQuad, medan spelets liggande kort fortfarande använder flatQuad. Det ger en tydlig förklaring till att kortens perspektiv kan skilja sig mellan vyerna. Kortplanen · Spelets kortplacering
+- Samma produktionsidé har olika genomföranden. Produktionskommandot kan välja en renderad dockfilm som referens, medan studions motsvarande funktion kräver en annan klassning. Verktygen kan alltså välja olika underlag. Produktionskommandot · Studions referensval
+- Vissa gamla metodval har blivit generella regler. Dealerstandarden föreskriver exempelvis fritt hängande armbågar, bestämda handkoordinater och specifika regler för området runt kroppen. Det är relevant för din fråga om skuggorna: en del av begränsningen är uttryckligen inbyggd i produktionsunderlaget. Dealerstandarden
+- Det finns också mycket att behålla. Menyn har redan samlats under bland annat Bordet, och Dealer har en fristående spelkärna med dokumenterat ursprung i Scoutgaming. Den delen bör granskas och återanvändas. Studions meny · Spelkärnans ursprung
+Min bedömning: att bara städa mappar räcker inte. Ombyggnaden behöver samla hur scen, ankare, beställningar och uppspelning fungerar.
+Det viktigaste att ändra i din prompt
+1. Precisera vad du menar med 3D
+- Ett 3D-bord, en sko och marker i GLB gör inte den filmade Paulina till en fullständig 3D-person.
+- En böjd videoyta kan ge en användbar presentation, men den återskapar inte osedda sidor av ansikte, händer och kropp.
+- Om du vill se henne trovärdigt från flera spelarplatser behöver ni tidigt prova vilken representation som klarar det: begränsad videokomposit, matchande filmer från flera vyer eller en animerad 3D-dealer.
+Detta är min tekniska slutsats utifrån hur representationerna fungerar: Three.js behandlar video som en textur och GLB som separat 3D-material. Three.js Docs
+
+Kravet bör vara: samma givning till plats 4 ska visas från en avsedd sidokamera innan ni producerar hela klippbanken.
+2. Behåll friheten i metodvalet – precisera resultatkraven
+Din formulering om ”ganska vaga referenser” behöver justeras.
+- Ge agenten frihet att välja teknik, komponenter och arbetsmetod.
+- Var tydlig om Paulinas identitet, kortstorlek, handkontakt, sko, kamera och ankare.
+- Låt gamla samtal vara bakgrundsmaterial med tydlig status.
+- Låt aktuella valda bilder och dina senaste instruktioner avgöra vad som gäller.
+Annars riskerar nästa agent att skapa ett nytt system utifrån egna tolkningar av samma oklarheter.
+3. Gör tre lager till en gemensam scen
+- Bakgrund, bord och dealer ska kunna bytas var för sig.
+- Kort, marker och sko ska vara egna objekt.
+- Händer ska kunna täcka kort; bordskanten ska kunna täcka kroppen; kontaktskuggor ska passa scenen.
+Labbet och casinot ska använda samma kamera, geometri och uppspelning. Det är den viktigaste arkitekturregeln.
+
+React Three Fiber passar bra för detta. Det är Reacts renderer för Three.js, så befintliga användbara Three.js-delar kan fortfarande återanvändas. React Three Fiber
+4. Håll isär tre olika saker
+Begrepp	Exempel
+Spelarplats	Jag spelar på plats 1.
+Utdelningsmål	Dealern lägger kortet på plats 4.
+Kameravy	Jag betraktar utdelningen från plats 1.
+
+
+Detta behöver vara separata begrepp i både kod och studio. Att byta kamera ska inte ändra kortets plats eller rörelsen som spelas.
+Vad jag skulle ta med och lämna kvar
+Ta med	Bygg om eller lämna utanför första versionen
+Befintlig spelkärna, sko och relevanta regeltester	Ny Blackjackmotor från grunden
+Betydelsen av Scoutgamings spelsignaler	Hela Scoutgaming med admin, databaser och drift
+Utvalda identitetsbilder och användbara filmer	Hela den historiska experimentbanken
+Bra geometrifunktioner, kortspår och masker	Flera parallella regler för kortstorlek och kamera
+Granskning, ursprung och exakta produktionsdata	Gamla promptvarianter som fortsatt aktiv kod
+Idén med ankare och klippövergångar	Manuellt dubblerade nodkartor och statuslistor
+En lokal studio med gemensam scen	Vercel, molnkopia, bot, lipsync och ljud i första etappen
+
+
+Ett nytt repo i en separat mapp är rimligt. Låt det gamla stå kvar som referens och importera endast det som behövs. Det ger en ren arbetsyta utan att fylla den med arkivkopior.
+Paulina, skuggorna och GLB-filerna
+- Tatueringarna: gör ett konkret referenspaket för Paulina, inklusive händerna. Att lägga till en mening i en prompt räcker inte om fel ankare används.
+- Skuggorna: behåll naturlig skuggning på kroppen. Bestäm separat hur skuggor från händer och armbågar ska möta bordet. Undvik både gamla mörka fläckar och dubbla kontaktskuggor.
+- GLB-materialet: behandla modellerna som kandidater. Dåliga modeller ska kunna ersättas med enkla, korrekt dimensionerade objekt.
+- En bild som start: det är ett bra användarflöde. Därefter behöver systemet skapa och granska ett stabilt identitets- och rörelseunderlag.
+Runway påpekar också att brister i exempelvis händer och ansikten i startbilden kan förstärkas i filmen. Bra ankare är därför en del av själva produktionsmetoden. Runway
+Första leveransen jag skulle beställa
+1. En liten lokal studio med Labbet och Casinot.
+2. Paulina, ett bord och en gemensam kamera- och koordinatmodell.
+3. Två givna kort där det första ligger kvar.
+4. Trovärdigt grepp, vridning, släpp och återgång.
+5. Samma förlopp via spelmotorn i Casinot.
+6. Samma givning granskad från en avsedd sidovy.
+Först därefter skulle jag utöka med fler platser och en större filmbank.
+
+En sista precisering i prompten gäller Runway: Dev MCP och MCP för generering i chatten är olika anslutningar. Appens produktionsväg behöver väljas uttryckligen, särskilt om du fortsätter med API-spåret. Studion bör också kunna importera och spela material utan en aktiv agentchatt. Runway Dev
+
+Den färdiga startprompten finns i avsnitt 11 i filen. Bedömningen här gäller koden; dina två lokala informationstexter, GLB-filer och senaste opushade material har jag inte kunnat granska.

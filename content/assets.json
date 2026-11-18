@@ -1,0 +1,1385 @@
+{
+  "schemaVersion": 1,
+  "about": "Varje fil under assets/ har en post här: vad den är, varifrån den kom och vilket omdöme den har fått. assets/ ligger utanför Git; den här filen är det som versionshanteras. En fil utan post hör inte hemma i assets/.",
+  "statuses": {
+    "att granska": "importerad eller nygjord, väntar på omdöme",
+    "godkänd": "ska användas; satt av Jakob, eller av en agent enligt AGENTS.md",
+    "granska igen": "Jakob vill ha den sedd över: han kan skriva varför, och en granskare rättar eller svarar",
+    "utgår": "ska inte användas; filen tas bort ur assets/ och posten stryks när Jakob har sagt ja"
+  },
+  "asksWhy": [
+    "granska igen"
+  ],
+  "groups": {
+    "identity": "assets/dealers/<dealer>/identity: bilder som bär dealerns likhet. Spelas aldrig.",
+    "anchors": "assets/dealers/<dealer>/anchors: stillbilder som klipp börjar och slutar på (VILA, REDO).",
+    "backgrounds": "assets/scene/backgrounds: bakgrunder att välja mellan.",
+    "materials": "assets/scene/materials: ytor till bordet.",
+    "models": "assets/models: 3D-modeller som är lätta nog för scenen.",
+    "reference": "assets/reference: bilder och filmer som visar ett utseende eller ett prov. Används inte i scenen."
+  },
+  "sources": {
+    "dealer": {
+      "what": "Det gamla projektet Dealer, lokalt C:/Users/jakem/dev/super-feature-sg/dealer",
+      "head": "9d720ef65330ee92a241b9f4046fa6878661269d",
+      "importedAt": "2026-11-18",
+      "note": "En ögonblicksbild. Media ligger utanför Git även där, så det är varje posts sha256 som pekar ut filen; head säger vilken version av registren som lästes. Ingenting här läser från den mappen efter importen."
+    },
+    "inbox": {
+      "what": "Mappen glb/ i det här projektet: Jakobs eget råmaterial"
+    },
+    "runway": {
+      "what": "Genererad genom Runway MCP på Jakobs webbkonto. Posten bär task-id, modell, text och referenser."
+    },
+    "jakob": {
+      "what": "Lämnad av Jakob direkt."
+    }
+  },
+  "assets": [
+    {
+      "file": "dealers/paulina/identity/original-sida-kavaj.png",
+      "group": "identity",
+      "dealer": "paulina",
+      "title": "Jakobs tredje bild: kavaj, vänd mot skon",
+      "status": "utgår",
+      "note": "Låg i provet paow-fran-sidan. Visar henne snett från sidan med handen vid skon.",
+      "width": 1672,
+      "height": 941,
+      "bytes": 1466690,
+      "source": {
+        "from": "dealer",
+        "path": "assets/proofs/paow-fran-sidan/5-jakobs-bild-3.png",
+        "sha256": "a308a9938cc974f79c832be84ba664f514da08321465c869a5c408f4730a1885"
+      },
+      "statusBy": "Agent 2026-11-18, oberoende granskare: båda händerna är otatuerade och vänsterhanden bär en ring, så som identitetsreferens lär bilden ut fel händer. Sedd i full storlek.",
+      "statusAt": "2026-11-18 05:31",
+      "reply": "Samma Paulina som i de godkända bilderna: ansikte, hår, hals- och brösttatuering, halsband och kavaj stämmer. Men båda händerna är otatuerade, vänsterhanden har en ring och bilden är liten, ansiktet cirka 240 bildpunkter högt. Jag satte utgår. Filen ligger kvar. Vinkeln är värd att rädda: en version med tatuerade händer kräver betald generering och ditt ja.",
+      "replyAt": "2026-11-18 05:31"
+    },
+    {
+      "file": "dealers/paulina/identity/sida-kavaj-tatuerad.png",
+      "group": "identity",
+      "dealer": "paulina",
+      "title": "Snett från sidan i kavaj, tatuerade händer",
+      "status": "godkänd",
+      "note": "Gjord 2026-11-18 ur original-sida-kavaj.png, som fick utgår för att händerna var otatuerade och vänsterhanden bar en ring. Händerna är genererade var för sig i ett utsnitt och passade tillbaka: rosen i mandala på handryggen och tecknen på fingrarna ur hander-ovansida.png, ringen borta, tummen bar. Allt utanför de två rutorna är original-sida-kavaj.png bildpunkt för bildpunkt.",
+      "width": 1672,
+      "height": 941,
+      "bytes": 1278480,
+      "licence": "Ingen tredjepartslicens: genererad på Jakobs Runway-konto",
+      "source": {
+        "from": "runway",
+        "model": "nano-banana-pro",
+        "imageSize": "2K",
+        "ratio": "1:1",
+        "credits": 40,
+        "creditsNote": "Två genereringar, 20 var. Saldot var 5 105 före, 5 085 efter den första och 5 065 efter den andra (mätt 2026-11-18). Kontot delas med andra sessioner.",
+        "generations": [
+          {
+            "part": "handen vid skon (hennes vänstra)",
+            "taskId": "0c8b4635-dbcb-42d7-8c84-ec800cb182ad",
+            "references": [
+              {
+                "tag": "base",
+                "what": "utsnitt ur dealers/paulina/identity/original-sida-kavaj.png (x 929-1441, y 406-918), förstorat till 2048"
+              },
+              {
+                "tag": "hands",
+                "what": "dealers/paulina/identity/hander-ovansida.png, genom dess task d4121204-c145-476d-8d08-9bbe144262a5"
+              }
+            ],
+            "prompt": "Edit @base. Keep the photograph exactly as it is: the same framing and crop, the same flat bright green background and green table, the same black card shoe with the yellow card in its window, the same black jacket sleeve, and the same hand in exactly the same position and pose, thumb and index finger pinching the top edge of the yellow card, with the same skin tone, nails, lighting and shadows. Only two things change. First: this hand, the woman's left hand, now has her tattoos. On the back of the hand: the ornamental rose-mandala tattoo from @hands. On the back of each visible finger except the thumb: the small symbol tattoos from @hands. The thumb stays completely bare skin, with no symbol, no dots and no lines, exactly as the thumbs in @hands are bare. Fine grey-black linework, slightly soft like healed ink, following the curvature and perspective of the hand and fingers, at the same scale relative to the hand as in @hands. Second: the ring on her finger is removed, leaving plain skin where it was. Do not add tattoos anywhere else. Do not move, reshape or resize the hand, the fingers, the card, the shoe or the sleeve. No rings, no jewellery, no text, no other changes.",
+            "generated": {
+              "width": 2048,
+              "height": 2048,
+              "sha256": "5d99d14048648f6efcfa30b3a885ebc4e163702a5149c43ed29dcab1c4f01184"
+            }
+          },
+          {
+            "part": "handen på bordet (hennes högra)",
+            "taskId": "e23f3e6a-44fb-4047-94c5-a166153d4c3b",
+            "references": [
+              {
+                "tag": "base",
+                "what": "utsnitt ur dealers/paulina/identity/original-sida-kavaj.png (x 517-1029, y 429-941), förstorat till 2048"
+              },
+              {
+                "tag": "hands",
+                "what": "dealers/paulina/identity/hander-ovansida.png, genom dess task d4121204-c145-476d-8d08-9bbe144262a5"
+              }
+            ],
+            "prompt": "Edit @base. Keep the photograph exactly as it is: the same framing and crop, the same flat bright green background and green table, the same black jacket with its buttons, the same cream top and necklace, the same black jacket sleeves, and the same hand in exactly the same position and pose, resting flat on the green table with the fingers together, with the same skin tone, nails, lighting and shadows. The only change: this hand, the woman's right hand, now has her tattoos. On the back of the hand: the ornamental rose-mandala tattoo from @hands. On the back of each visible finger: the small symbol tattoos from @hands. The thumb, if any of it shows, stays bare skin, as the thumbs in @hands are bare. Fine grey-black linework, slightly soft like healed ink, following the curvature and perspective of the hand and fingers, at the same scale relative to the hand as in @hands. Do not add tattoos anywhere else: the chest tattoo stays exactly as it is. Do not move, reshape or resize the hand, the fingers, the table or the sleeves. No rings, no jewellery, no text, no other changes.",
+            "generated": {
+              "width": 2048,
+              "height": 2048,
+              "sha256": "d96e972db6fef55d358d4d4b5f214b457d9dbc08b047c86486b4d65df17819ff"
+            }
+          }
+        ],
+        "localSteps": [
+          "Handen vid skon: den genererade kvadraten förminskad till 512 och passad mot utsnittet (skala 1, flytt 0,0; skillnad utanför handen 2,66 nivåer av 255), ingen färgändring, inlagd i rutan x 1074-1296, y 580-745 med 14 px mjuk kant (skillnad i kanten 3,37 nivåer; handens och ärmens kant mot det gröna har bytt sida i 0,3 % av rutan).",
+          "Handen på bordet: den genererade kvadraten förminskad till 512 och passad mot utsnittet (skala 1, flytt 0,0; skillnad utanför handen 2,36 nivåer av 255), ingen färgändring, inlagd i rutan x 608-939, y 788-924 med 14 px mjuk kant (skillnad i kanten 2,59 nivåer; handens och ärmens kant mot det gröna har bytt sida i 0,27 % av rutan).",
+          "Ingen färgpassning: en rät linje per kanal, passad på grönt, svart och gult, drog hudens röda nedåt. Mätt på otatuerad hud (R i basen / genererad / färgpassad): tummen vid skon 243,8 / 245,9 / 237,9; fingertopparna på bordet 250,1 / 246,3 / 240,9.",
+          "Inga lokala rättningar: i den genererade bilden är tummen vid skon bar och ringen borta (sett i fyrdubbel förstoring, inte mätt).",
+          "Utanför de två rutorna: 0 ändrade värden mot original-sida-kavaj.png (mätt i den skrivna filen)."
+        ],
+        "sha256": "879c8d25cb3d07ce168bb7f495e738e7fcd320bc88c48d2ea9a28deed045eb00"
+      },
+      "statusBy": "Agent 2026-11-18, oberoende granskare: händerna har samma ställning som i källan, ringen är borta, tummen är bar och tatueringarna följer hander-ovansida.png finger för finger, utan synliga skarvar och med 0 ändrade bildpunkter utanför rutorna, mätt. Poäng av 5: form 5, tatueringar 4, skarvar 5, oförändrat 5, referens 4. Avdrag: skohandens bläck är ljusare än bordshandens och rosen sitter där mot tumsidan. Sedd i full storlek.",
+      "statusAt": "2026-11-18 06:05",
+      "reply": "Båda händerna har nu rosen på handryggen och tecknen på fingrarna som i handreferensen. Ringen är borta, tummen är bar och ställningen är densamma. Inga skarvar syns, och utanför de två rutorna är ingen bildpunkt ändrad mot källan. Tatueringen vid skon är något ljusare än den på bordet. Jag satte godkänd.",
+      "replyAt": "2026-11-18 06:05"
+    },
+    {
+      "file": "dealers/paulina/identity/helkropp-staende.png",
+      "group": "identity",
+      "dealer": "paulina",
+      "title": "Stående i dealerkläder, tatuerade händer",
+      "status": "godkänd",
+      "note": "Gällde som keystone stående i gamla projektet (Jakob 2026-11-18). Samma motiv som glb/paow/1-paow-fram-kavaj.png.",
+      "width": 3584,
+      "height": 4800,
+      "bytes": 16685667,
+      "source": {
+        "from": "dealer",
+        "path": "assets/keystones/paow-staende-tatuerad/keystone.png",
+        "sha256": "bb024b1d804a55877c0afc3413cc8cc3a9e87c09bda04c7506e58f58000c1587"
+      },
+      "statusBy": "Jakob i Labbet 2026-11-18"
+    },
+    {
+      "file": "dealers/paulina/identity/sittande-vid-bord.png",
+      "group": "identity",
+      "dealer": "paulina",
+      "title": "Sittande vid vitt bord, tatuerade händer",
+      "status": "godkänd",
+      "note": "Gällde som keystone sittande (Jakob 2026-11-18). Enligt gamla bristlistan gjord utan skuggan under armarna.",
+      "width": 4800,
+      "height": 3584,
+      "bytes": 16454587,
+      "source": {
+        "from": "dealer",
+        "path": "assets/keystones/paow-sittande-tatuerad/keystone.png",
+        "sha256": "3356124d4f053ba2cdbbf711d1bf64c3df423b1ce74d0cfb3e9dccfdaf625203"
+      },
+      "statusBy": "Jakob i Labbet 2026-11-18"
+    },
+    {
+      "file": "dealers/paulina/identity/ansikte-kavaj.png",
+      "group": "identity",
+      "dealer": "paulina",
+      "title": "Ansikte och hals i kavaj",
+      "status": "godkänd",
+      "note": "Profilbild i kavaj, arbetsmaterial i gamla registret. Den skarpaste bilden av ansiktet i dealerkläderna.",
+      "width": 4096,
+      "height": 4096,
+      "bytes": 21280653,
+      "source": {
+        "from": "dealer",
+        "path": "assets/proofs/paow-kavaj/1-profilbild-a.png",
+        "sha256": "3de4d42ca6f170a76fc259a52e4d321427f5197dbe20190c1a4ba5ffda99c950"
+      },
+      "statusBy": "Jakob i Labbet 2026-11-18"
+    },
+    {
+      "file": "dealers/paulina/identity/hander-ovansida.png",
+      "group": "identity",
+      "dealer": "paulina",
+      "title": "Händerna uppifrån, närbild",
+      "status": "godkänd",
+      "note": "Genererad 2026-11-18 ur händerna i sittande-vid-bord.png, för att ge en skarp bild av handtatueringarna. Samma motiv som där: en ros i mandala på handryggen och små tecken på fingrarna.",
+      "width": 2752,
+      "height": 1536,
+      "bytes": 5519947,
+      "licence": "Ingen tredjepartslicens: genererad på Jakobs Runway-konto",
+      "source": {
+        "from": "runway",
+        "taskId": "d4121204-c145-476d-8d08-9bbe144262a5",
+        "model": "nano-banana-pro",
+        "imageSize": "2K",
+        "ratio": "16:9",
+        "references": [
+          {
+            "tag": "hands",
+            "what": "utsnitt av händerna ur dealers/paulina/identity/sittande-vid-bord.png (x 1500-3300, y 2300-3150)"
+          }
+        ],
+        "prompt": "Photorealistic studio close-up, seen from slightly above, of a woman's two hands resting flat and relaxed side by side on a plain white table, backs of the hands up, fingers slightly apart, short natural nails. These are exactly the hands in @hands: the same ornamental rose-mandala tattoo on the back of each hand and the same small symbol tattoos on each finger, the same fine grey-black linework, the same skin tone, and the same black tailored blazer cuffs at the wrists. The two hands fill most of the frame. Soft, even, frontal studio light with a faint natural contact shadow under the hands, seamless white background, sharp focus, visible skin texture and crisp tattoo lines. One left hand and one right hand, five fingers each, no rings, no jewellery, no text.",
+        "sha256": "959f3e267ff5453663d8e87df2eb2fd84675afb07db7cc7febf295d14413cb12"
+      },
+      "statusBy": "Jakob 2026-11-18: behåll handtatueringarna som i dag, närbilden blir handreferensen"
+    },
+    {
+      "file": "dealers/paulina/identity/foto-armar-hander.png",
+      "group": "identity",
+      "dealer": "paulina",
+      "title": "Fotografi: armar och händer",
+      "status": "godkänd",
+      "note": "Utsnitt ur fotografiet Jakob skickade 2026-11-18 som bästa underlag för de verkliga tatueringarna: bara armar och händer, förstorat två gånger. Ett fotografi, inte en genererad bild; ska inte publiceras. Visar en skuggad ros i svart och grått på varje handrygg och små tatueringar på fingrarna.",
+      "width": 1304,
+      "height": 1800,
+      "bytes": 1275931,
+      "source": {
+        "from": "jakob",
+        "path": "bifogad i chatten 2026-11-18; samma bild som gamla projektets private/referenser/paow-tatueringar-jakob-2026-11-14.png",
+        "sha256": "cf31439e1a0235b7b8ea107893933c55cca63da4d705a33cc1099e09fa78bfad"
+      },
+      "statusBy": "Jakob i Labbet 2026-11-18"
+    },
+    {
+      "file": "dealers/paulina/anchors/vila.png",
+      "group": "anchors",
+      "dealer": "paulina",
+      "title": "VILA: båda händerna på filten, tatuerade",
+      "status": "godkänd",
+      "note": "Gällde som ankare 1 (Jakob 2026-11-18).",
+      "width": 1764,
+      "height": 1174,
+      "bytes": 1443443,
+      "pose": "vila",
+      "oldRole": "ankare-1",
+      "oldState": "gäller",
+      "source": {
+        "from": "dealer",
+        "path": "assets/anchors/paow-vila-tatuerad/anchor.png",
+        "sha256": "83c8b3541dc4f293d679b8bb286c6a70d399dd3f2fa73c41e534268b4802b3a0"
+      },
+      "statusBy": "Jakob i Labbet 2026-11-18"
+    },
+    {
+      "file": "dealers/paulina/anchors/redo-nyp.png",
+      "group": "anchors",
+      "dealer": "paulina",
+      "title": "REDO med nyp",
+      "status": "utgår",
+      "note": "Gällde som ankare 2.1 (Jakob 2026-11-13). Gamla bristlistan: en variant med de tatuerade händerna fanns inte.",
+      "width": 1764,
+      "height": 1174,
+      "bytes": 1425424,
+      "pose": "redo",
+      "grip": "nyp",
+      "oldRole": "ankare-2.1",
+      "oldState": "gäller",
+      "source": {
+        "from": "dealer",
+        "path": "assets/anchors/paow-nyp-ung-1/anchor.png",
+        "sha256": "74eebfdc1388f8de362c0151546bbe08aeb1fed74fca097f8ca6999d833dc702"
+      },
+      "statusBy": "Jakob i Labbet 2026-11-18"
+    },
+    {
+      "file": "dealers/paulina/anchors/redo-nyp-tatuerad.png",
+      "group": "anchors",
+      "dealer": "paulina",
+      "title": "REDO med nyp, tatuerade händer",
+      "status": "godkänd",
+      "note": "Gjord 2026-11-18 ur redo-nyp.png, på Jakobs ord att ankarna ska ha tatuerade händer. Handen vid skon är genererad i ett utsnitt och passad tillbaka. Vilohanden är tagen ur vila.png, så att den är densamma i båda ankarna. Allt utanför de två rutorna är redo-nyp.png bildpunkt för bildpunkt.",
+      "width": 1764,
+      "height": 1174,
+      "bytes": 1404469,
+      "pose": "redo",
+      "grip": "nyp",
+      "licence": "Ingen tredjepartslicens: genererad på Jakobs Runway-konto",
+      "source": {
+        "from": "runway",
+        "taskId": "d4fd9a47-dc5f-4b0a-b79d-185021a5c0ab",
+        "model": "nano-banana-pro",
+        "imageSize": "2K",
+        "ratio": "1:1",
+        "credits": 20,
+        "creditsNote": "Saldot var 5 392 före och 5 372 efter (mätt 2026-11-18). Kontot delas med andra sessioner.",
+        "references": [
+          {
+            "tag": "base",
+            "what": "utsnitt ur dealers/paulina/anchors/redo-nyp.png (x 1040-1600, y 500-1060), förstorat till 2048"
+          },
+          {
+            "tag": "hands",
+            "what": "dealers/paulina/identity/hander-ovansida.png, genom dess task d4121204-c145-476d-8d08-9bbe144262a5"
+          },
+          {
+            "tag": "vila",
+            "what": "utsnitt ur dealers/paulina/anchors/vila.png (x 820-1220, y 660-960)"
+          }
+        ],
+        "prompt": "Edit @base. Keep the photograph exactly as it is: the same framing and crop, the same flat bright green background, the same black card shoe with the yellow card in its window, the same black jacket sleeve, and the same hand in exactly the same position and pose, fingers pinching the top edge of the yellow card, with the same skin tone, nails, lighting and shadows. The only change: this hand, the woman's left hand, now has her tattoos. On the back of the hand: the ornamental rose-mandala tattoo from @hands. On the back of each visible finger: the small symbol tattoos from @hands. Fine grey-black linework, slightly soft like healed ink, following the curvature and perspective of the hand and fingers, at the same scale relative to the hand as in @hands. @vila shows the same woman's tattooed left hand in the same studio and light, as a guide for how the tattoos look at this distance. Do not add tattoos anywhere else. Do not move, reshape or resize the hand, the fingers, the card, the shoe or the sleeve. No rings, no jewellery, no text, no other changes.",
+        "generated": {
+          "width": 2048,
+          "height": 2048,
+          "sha256": "7b86342452229aab2fd1b6549031d19859f233929a3b13d021efedddd1c51e08"
+        },
+        "localSteps": [
+          "Handen vid skon: den genererade kvadraten förminskad till 560 och passad mot utsnittet (skala 1, flytt 0,0; skillnad utanför handen 2,42 nivåer av 255), färgen passad per kanal, inlagd i rutan x 1215-1400, y 615-795 med 14 px mjuk kant.",
+          "Tummen vid skon: bildmodellen ritade ett tecken och prickar som handreferensen saknar. Basens bara tumme är lagd tillbaka i rutan x 1246-1290, y 690-752 med 8 px mjuk kant, efter oberoende granskning 2026-11-18.",
+          "Vilohanden: rutan x 610-880, y 742-915 ur vila.png, passad på ärm, kavaj och grönt (skala 1,0025, flytt 0,0; skillnad utanför handen 3,32 nivåer), ingen färgändring, 14 px mjuk kant.",
+          "Utanför de två rutorna: 0 ändrade värden mot redo-nyp.png (mätt)."
+        ],
+        "sha256": "ec612386d80a6d7c6774c10133f06b0a937ce82a706b5882581e6975b03ec18f"
+      },
+      "statusBy": "Jakob i Labbet 2026-11-18",
+      "reply": "Efter en oberoende granskning tog jag bort ett tecken och några prickar som bildmodellen hade ritat på tummen vid skon; handreferensen har inget där. Granskaren godkände den rättade bilden (5, 4, 4, 4 och 4 av 5). Kvar som svagheter: rosen går inte att läsa på handen vid skon, och bläcket är något mörkare där än på vilohanden. Ditt godkännande står kvar.",
+      "replyAt": "2026-11-18 05:30"
+    },
+    {
+      "file": "dealers/paulina/anchors/redo-slap-blick.png",
+      "group": "anchors",
+      "dealer": "paulina",
+      "title": "REDO med släp, blicken mot kortet, tatuerad hand",
+      "status": "godkänd",
+      "note": "Kandidat A från 2026-11-18, byggd på ankare 2.2 och den tatuerade vilan.",
+      "width": 1764,
+      "height": 1174,
+      "bytes": 1465598,
+      "pose": "redo",
+      "grip": "släp",
+      "oldRole": "ankare-2.2",
+      "oldState": "kandidat",
+      "source": {
+        "from": "dealer",
+        "path": "assets/anchors/paow-ankare-2-2-blick-a/anchor.png",
+        "sha256": "2829f18ef4fe571729f042862b586f3faccdd7bb5b6ab731c8d544ca137b7c66"
+      },
+      "statusBy": "Jakob i Labbet 2026-11-18"
+    },
+    {
+      "file": "dealers/paulina/anchors/redo-ur-docka.png",
+      "group": "anchors",
+      "dealer": "paulina",
+      "title": "REDO ur en film som 3D-dockan styrde",
+      "status": "godkänd",
+      "note": "Kallades ankare 2.3. Kandidat skriven 2026-11-18 02:47; kan ha ändrats i gamla projektet efter importen.",
+      "width": 1764,
+      "height": 1174,
+      "bytes": 1056892,
+      "pose": "redo",
+      "oldRole": "ankare-2.3",
+      "oldState": "kandidat",
+      "source": {
+        "from": "dealer",
+        "path": "assets/anchors/paow-ankare-2-3-a/anchor.png",
+        "sha256": "340842ba3b6af20bdf36646b517d20501163496b426c154d1dd798b488f75542"
+      },
+      "statusBy": "Jakob i Labbet 2026-11-18"
+    },
+    {
+      "file": "scene/backgrounds/la.jpg",
+      "group": "backgrounds",
+      "title": "Skyline",
+      "status": "att granska",
+      "note": "En takvåning över staden i skymningen. Godkänd för spelet i gamla projektet.",
+      "width": 1774,
+      "height": 887,
+      "bytes": 231259,
+      "licence": "Ingen tredjepartslicens: gjord i Jakobs egna sessioner (enligt gamla registret)",
+      "kind": "360",
+      "author": "Generated in Jakob's Codex session 2026-11-07 (OpenAI image model)",
+      "oldView": {
+        "blur": 6,
+        "exposure": 0.7,
+        "turn": 0,
+        "mirror": true
+      },
+      "source": {
+        "from": "dealer",
+        "path": "assets/scene/panorama-la.jpg",
+        "sha256": "84d3a766369aec4129aef1d15d99098cac1e629b9868a61f01eea42339521920"
+      }
+    },
+    {
+      "file": "scene/backgrounds/skog.jpg",
+      "group": "backgrounds",
+      "title": "Skogen",
+      "status": "att granska",
+      "note": "En glänta i skogen. Godkänd för spelet i gamla projektet.",
+      "width": 4096,
+      "height": 2048,
+      "bytes": 2892451,
+      "licence": "CC0 (Poly Haven)",
+      "kind": "360",
+      "page": "https://polyhaven.com/a/forest_slope",
+      "author": "Andreas Mischok",
+      "oldView": {
+        "blur": 6,
+        "exposure": 0.55,
+        "turn": 0,
+        "mirror": true
+      },
+      "source": {
+        "from": "dealer",
+        "path": "assets/scene/panorama-skog.jpg",
+        "sha256": "2829d314e6e6ad2536cc5ddc06fb12930c3aa37f00bc35fe13e849d72c3b5900"
+      }
+    },
+    {
+      "file": "scene/backgrounds/vegas.jpg",
+      "group": "backgrounds",
+      "title": "Las Vegas",
+      "status": "godkänd",
+      "note": "En kasinosal i Las Vegas om natten. Godkänd för spelet i gamla projektet.",
+      "width": 1774,
+      "height": 887,
+      "bytes": 567656,
+      "licence": "Ingen tredjepartslicens: gjord i Jakobs egna sessioner (enligt gamla registret)",
+      "kind": "360",
+      "author": "Generated in Jakob's Codex session 2026-11-07 (OpenAI image model)",
+      "oldView": {
+        "blur": 5,
+        "exposure": 0.8,
+        "turn": 0,
+        "mirror": true
+      },
+      "source": {
+        "from": "dealer",
+        "path": "assets/scene/panorama-vegas.jpg",
+        "sha256": "f3d13ff2009d9f19420bfece9cf173f1e3a6a976c1fc991ff88f5f6b1d6ee253"
+      },
+      "statusBy": "Jakob i Labbet 2026-11-18"
+    },
+    {
+      "file": "scene/backgrounds/balsal.jpg",
+      "group": "backgrounds",
+      "title": "Balsalen",
+      "status": "att granska",
+      "note": "En ljus sal med stuckatur, tavlor, flygel och höga fönster",
+      "width": 4096,
+      "height": 2048,
+      "bytes": 1608521,
+      "licence": "CC0 (Poly Haven)",
+      "kind": "360",
+      "page": "https://polyhaven.com/a/ballroom",
+      "author": "Sergej Majboroda",
+      "oldView": {
+        "blur": 6,
+        "exposure": 0.42,
+        "turn": 0,
+        "mirror": false
+      },
+      "source": {
+        "from": "dealer",
+        "path": "assets/scene/rooms/balsal.jpg",
+        "sha256": "829de7b7da97af8e5fc57bd58d99aa659c027e780161acc6d8d0a9e0041cc0c7"
+      }
+    },
+    {
+      "file": "scene/backgrounds/bankett.jpg",
+      "group": "backgrounds",
+      "title": "Banketthallen",
+      "status": "att granska",
+      "note": "En festlokal i tegel och trä med ljuskronor och dukade långbord",
+      "width": 4096,
+      "height": 2048,
+      "bytes": 990455,
+      "licence": "CC0 (Poly Haven)",
+      "kind": "360",
+      "page": "https://polyhaven.com/a/warm_reception_dinner",
+      "author": "Dimitrios Savva, Jarod Guest",
+      "oldView": {
+        "blur": 6,
+        "exposure": 0.5,
+        "turn": 0,
+        "mirror": false
+      },
+      "source": {
+        "from": "dealer",
+        "path": "assets/scene/rooms/bankett.jpg",
+        "sha256": "dc0142c5e33ce60fc0da358b15b1dc3e6f72ebc3a5573385bbbee44704f50a0f"
+      }
+    },
+    {
+      "file": "scene/backgrounds/dimskog.jpg",
+      "group": "backgrounds",
+      "title": "Dimskogen",
+      "status": "att granska",
+      "note": "En tallskog i morgondimma",
+      "width": 4096,
+      "height": 2048,
+      "bytes": 2297757,
+      "licence": "CC0 (Poly Haven)",
+      "kind": "360",
+      "page": "https://polyhaven.com/a/misty_pines",
+      "author": "Greg Zaal",
+      "oldView": {
+        "blur": 6,
+        "exposure": 0.42,
+        "turn": 0,
+        "mirror": false
+      },
+      "source": {
+        "from": "dealer",
+        "path": "assets/scene/rooms/dimskog.jpg",
+        "sha256": "a213e8aa3ecef026bae40c8c9df1152d8c6c198702f44a0e3a176bf5b5167463"
+      }
+    },
+    {
+      "file": "scene/backgrounds/entre.jpg",
+      "group": "backgrounds",
+      "title": "Entréhallen",
+      "status": "att granska",
+      "note": "En gammal entréhall med valv, tavlor och dagsljus",
+      "width": 4096,
+      "height": 2048,
+      "bytes": 1399764,
+      "licence": "CC0 (Poly Haven)",
+      "kind": "360",
+      "page": "https://polyhaven.com/a/entrance_hall",
+      "author": "Sergej Majboroda",
+      "oldView": {
+        "blur": 5,
+        "exposure": 0.5,
+        "turn": -35,
+        "mirror": false
+      },
+      "source": {
+        "from": "dealer",
+        "path": "assets/scene/rooms/entre.jpg",
+        "sha256": "84971614fa57da0e0a21ec9de339dca1d2027ecc1abf6a7b58115bf917a6daa2"
+      }
+    },
+    {
+      "file": "scene/backgrounds/foaje.jpg",
+      "group": "backgrounds",
+      "title": "Foajén",
+      "status": "att granska",
+      "note": "En grön foajé i ett konserthus med ljuskronor och skinnsoffor",
+      "width": 4096,
+      "height": 2048,
+      "bytes": 1157973,
+      "licence": "CC0 (Poly Haven)",
+      "kind": "360",
+      "page": "https://polyhaven.com/a/music_hall_02",
+      "author": "Sergej Majboroda",
+      "oldView": {
+        "blur": 6,
+        "exposure": 0.5,
+        "turn": 140,
+        "mirror": false
+      },
+      "source": {
+        "from": "dealer",
+        "path": "assets/scene/rooms/foaje.jpg",
+        "sha256": "66e15242f71c982172242d5a82a71e80fd9de6e084f896bf21f57a9334753ea7"
+      }
+    },
+    {
+      "file": "scene/backgrounds/lounge.jpg",
+      "group": "backgrounds",
+      "title": "Loungen",
+      "status": "att granska",
+      "note": "En lounge på ett kryssningsfartyg i soluppgången",
+      "width": 4096,
+      "height": 2048,
+      "bytes": 1886153,
+      "licence": "CC0 (Poly Haven)",
+      "kind": "360",
+      "page": "https://polyhaven.com/a/aft_lounge",
+      "author": "Greg Zaal",
+      "oldView": {
+        "blur": 8,
+        "exposure": 0.45,
+        "turn": -120,
+        "mirror": false
+      },
+      "source": {
+        "from": "dealer",
+        "path": "assets/scene/rooms/lounge.jpg",
+        "sha256": "73582f25728933be063a0a525b777e139b98ce3006e51198cb8f764d2a4e6d21"
+      }
+    },
+    {
+      "file": "scene/backgrounds/monaco.jpg",
+      "group": "backgrounds",
+      "title": "Monaco 1930",
+      "status": "att granska",
+      "note": "En kasinosalong vid havet i 1930-talsstil en kväll, med gäster i frack och aftonklänning som samtalar vid korten",
+      "width": 4096,
+      "height": 2048,
+      "bytes": 458161,
+      "licence": "Ingen tredjepartslicens: genererad på Jakobs Runway-konto (enligt gamla registret)",
+      "kind": "360",
+      "author": "Generated in Jakob's Claude session 2026-11-13 (Nano Banana Pro and WAN 3 through Runway, on Jakob's account)",
+      "oldView": {
+        "blur": 6,
+        "exposure": 0.5,
+        "turn": 0,
+        "mirror": false
+      },
+      "source": {
+        "from": "dealer",
+        "path": "assets/scene/rooms/monaco.jpg",
+        "sha256": "e2806a6c264fc15909c7050d21428229649896d50752ccc3773cb9640fd62fa9"
+      }
+    },
+    {
+      "file": "scene/backgrounds/sallskap.jpg",
+      "group": "backgrounds",
+      "title": "Sällskapsrummet",
+      "status": "att granska",
+      "note": "Ett sällskapsrum med tapeter, tavlor och dörr till nästa rum",
+      "width": 4096,
+      "height": 2048,
+      "bytes": 1558909,
+      "licence": "CC0 (Poly Haven)",
+      "kind": "360",
+      "page": "https://polyhaven.com/a/combination_room",
+      "author": "Sergej Majboroda",
+      "oldView": {
+        "blur": 5,
+        "exposure": 0.6,
+        "turn": -115,
+        "mirror": false
+      },
+      "source": {
+        "from": "dealer",
+        "path": "assets/scene/rooms/sallskap.jpg",
+        "sha256": "e2644dd50eb1bb050792e342d58795cb50653e2bca4eb4a4a1ab8187c62dde1c"
+      }
+    },
+    {
+      "file": "scene/backgrounds/saloon.jpg",
+      "group": "backgrounds",
+      "title": "Saloonen",
+      "status": "att granska",
+      "note": "En saloon i trä och tegel med varmt lampljus",
+      "width": 4096,
+      "height": 2048,
+      "bytes": 1671451,
+      "licence": "CC0 (Poly Haven)",
+      "kind": "360",
+      "page": "https://polyhaven.com/a/cowboy_town_saloon",
+      "author": "Dimitrios Savva, Jarod Guest",
+      "oldView": {
+        "blur": 5,
+        "exposure": 0.6,
+        "turn": -15,
+        "mirror": false
+      },
+      "source": {
+        "from": "dealer",
+        "path": "assets/scene/rooms/saloon.jpg",
+        "sha256": "1c71c4992c74aca2084e2b3efa5a605bbd1dd9c901fde38a01ef4d81f93104d3"
+      }
+    },
+    {
+      "file": "scene/backgrounds/spelhalan.jpg",
+      "group": "backgrounds",
+      "title": "Spelhålan",
+      "status": "att granska",
+      "note": "En mörk spelhåla på 1920-talet med träpanel, blekta väggmålningar och män i skärmmössa som spelar kort och röker",
+      "width": 4096,
+      "height": 2048,
+      "bytes": 334461,
+      "licence": "Ingen tredjepartslicens: genererad på Jakobs Runway-konto (enligt gamla registret)",
+      "kind": "360",
+      "author": "Generated in Jakob's Claude session 2026-11-13 (Nano Banana Pro and WAN 3 through Runway, on Jakob's account)",
+      "oldView": {
+        "blur": 6,
+        "exposure": 0.8,
+        "turn": 0,
+        "mirror": false
+      },
+      "source": {
+        "from": "dealer",
+        "path": "assets/scene/rooms/spelhalan.jpg",
+        "sha256": "c7ac3850f147d63355a987b0ea7bad403f515228ee8f158b19fd67dda850f09a"
+      }
+    },
+    {
+      "file": "scene/backgrounds/teater.jpg",
+      "group": "backgrounds",
+      "title": "Teatern",
+      "status": "att granska",
+      "note": "En teatersalong med röd ridå, orkesterdike och röda stolsrader",
+      "width": 4096,
+      "height": 2048,
+      "bytes": 1303191,
+      "licence": "CC0 (Poly Haven)",
+      "kind": "360",
+      "page": "https://polyhaven.com/a/theater_01",
+      "author": "Oliksiy Yakovlyev",
+      "oldView": {
+        "blur": 6,
+        "exposure": 0.55,
+        "turn": 180,
+        "mirror": false
+      },
+      "source": {
+        "from": "dealer",
+        "path": "assets/scene/rooms/teater.jpg",
+        "sha256": "b16dcff5d20472ef5369a3d927a0e1265f8cc47a59a11ef1963bab084a432eec"
+      }
+    },
+    {
+      "file": "scene/backgrounds/tradgard.jpg",
+      "group": "backgrounds",
+      "title": "Trädgården",
+      "status": "att granska",
+      "note": "En trädgård en kväll, med lyktor och ett upplyst hus",
+      "width": 4096,
+      "height": 2048,
+      "bytes": 1376405,
+      "licence": "CC0 (Poly Haven)",
+      "kind": "360",
+      "page": "https://polyhaven.com/a/ladybrand_heritage_house",
+      "author": "Dario Barresi",
+      "oldView": {
+        "blur": 8,
+        "exposure": 0.65,
+        "turn": 0,
+        "mirror": false
+      },
+      "source": {
+        "from": "dealer",
+        "path": "assets/scene/rooms/tradgard.jpg",
+        "sha256": "2ed902ae83f81ba3b870b031d70b64bbacdec4ab0a1744cee16e59f951ac8d39"
+      }
+    },
+    {
+      "file": "scene/backgrounds/venedig.jpg",
+      "group": "backgrounds",
+      "title": "Venedig",
+      "status": "att granska",
+      "note": "En kaj vid lagunen i Venedig i solnedgången",
+      "width": 4096,
+      "height": 2048,
+      "bytes": 1200529,
+      "licence": "CC0 (Poly Haven)",
+      "kind": "360",
+      "page": "https://polyhaven.com/a/venice_sunset",
+      "author": "Greg Zaal",
+      "oldView": {
+        "blur": 7,
+        "exposure": 0.42,
+        "turn": -25,
+        "mirror": false
+      },
+      "source": {
+        "from": "dealer",
+        "path": "assets/scene/rooms/venedig.jpg",
+        "sha256": "ee42c1a0b4628643595d8bd490521a96472aa1b2ad42acc110cd3c531b78de77"
+      }
+    },
+    {
+      "file": "scene/backgrounds/v6-rum.png",
+      "group": "backgrounds",
+      "title": "Rummet ur V6, platt bild",
+      "status": "att granska",
+      "note": "Ingen 360-bild. Rumslagret i V6.",
+      "width": 1536,
+      "height": 1024,
+      "bytes": 2227560,
+      "kind": "platt",
+      "source": {
+        "from": "dealer",
+        "path": "assets/scene/room.png",
+        "sha256": "e1ae8b78b17beb8c133cb664544cd9b4c72cb97dbc17320db9e15ba838d318b4"
+      }
+    },
+    {
+      "file": "scene/materials/runway_felt-diffuse.webp",
+      "group": "materials",
+      "title": "Filt 1, färg",
+      "status": "godkänd",
+      "width": 2142,
+      "height": 918,
+      "bytes": 332764,
+      "licence": "Ingen tredjepartslicens: genererad på Jakobs Runway-konto (enligt gamla registret)",
+      "source": {
+        "from": "dealer",
+        "path": "assets/scene/materials/runway_felt-diffuse.webp",
+        "sha256": "1ce6deb63fb8cca3421f380b13ce73dbc00ec2498330646cce816b98217e0e20"
+      },
+      "statusBy": "Jakob i Labbet 2026-11-18"
+    },
+    {
+      "file": "scene/materials/runway_felt_2-diffuse.webp",
+      "group": "materials",
+      "title": "Filt 2, färg",
+      "status": "att granska",
+      "width": 2142,
+      "height": 918,
+      "bytes": 447712,
+      "licence": "Ingen tredjepartslicens: genererad på Jakobs Runway-konto (enligt gamla registret)",
+      "source": {
+        "from": "dealer",
+        "path": "assets/scene/materials/runway_felt_2-diffuse.webp",
+        "sha256": "76eaf82fcc980fbcc3ecbef4b3b551ea86b94e02fa3c3d8017568c4b277e6e5c"
+      }
+    },
+    {
+      "file": "scene/materials/runway_felt_3-diffuse.webp",
+      "group": "materials",
+      "title": "Filt 3, färg",
+      "status": "att granska",
+      "width": 2190,
+      "height": 876,
+      "bytes": 198670,
+      "licence": "Ingen tredjepartslicens: genererad på Jakobs Runway-konto (enligt gamla registret)",
+      "source": {
+        "from": "dealer",
+        "path": "assets/scene/materials/runway_felt_3-diffuse.webp",
+        "sha256": "8d9bd3b22ca2007732dbd79446d01fd1bf2390a60a5a8f4f4982e1f274051040"
+      }
+    },
+    {
+      "file": "scene/materials/runway_leather-diffuse.webp",
+      "group": "materials",
+      "title": "Läder 1, färg",
+      "status": "att granska",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 540606,
+      "licence": "Ingen tredjepartslicens: genererad på Jakobs Runway-konto (enligt gamla registret)",
+      "source": {
+        "from": "dealer",
+        "path": "assets/scene/materials/runway_leather-diffuse.webp",
+        "sha256": "9bb40b4c5a00c8d02b10a842f0d782a1a087e98376d52117a43e9c1cceb59bdf"
+      }
+    },
+    {
+      "file": "scene/materials/runway_leather_2-diffuse.webp",
+      "group": "materials",
+      "title": "Läder 2, färg",
+      "status": "att granska",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 496196,
+      "licence": "Ingen tredjepartslicens: genererad på Jakobs Runway-konto (enligt gamla registret)",
+      "source": {
+        "from": "dealer",
+        "path": "assets/scene/materials/runway_leather_2-diffuse.webp",
+        "sha256": "efbf489c203901f1429ef2d4c4a1324b49afd79cf14e09055986224b18abe6b1"
+      }
+    },
+    {
+      "file": "scene/materials/brown_leather-nor_gl.webp",
+      "group": "materials",
+      "title": "Läder, normalkarta",
+      "status": "att granska",
+      "width": 512,
+      "height": 512,
+      "bytes": 76228,
+      "licence": "CC0 (Poly Haven)",
+      "source": {
+        "from": "dealer",
+        "path": "assets/scene/materials/brown_leather-nor_gl.webp",
+        "sha256": "5563963829922e802aef387d7e8d5580aaa03066929be0dea74a7a78995b4386"
+      }
+    },
+    {
+      "file": "scene/materials/brown_leather-rough.webp",
+      "group": "materials",
+      "title": "Läder, strävhet",
+      "status": "att granska",
+      "width": 512,
+      "height": 512,
+      "bytes": 134886,
+      "licence": "CC0 (Poly Haven)",
+      "source": {
+        "from": "dealer",
+        "path": "assets/scene/materials/brown_leather-rough.webp",
+        "sha256": "00612ec28b54cf8da43dc60085be0511a65112825e8ca863afaadefce556d7e4"
+      }
+    },
+    {
+      "file": "scene/materials/denim_fabric-nor_gl.webp",
+      "group": "materials",
+      "title": "Tyg, normalkarta",
+      "status": "att granska",
+      "width": 512,
+      "height": 512,
+      "bytes": 29240,
+      "licence": "CC0 (Poly Haven)",
+      "source": {
+        "from": "dealer",
+        "path": "assets/scene/materials/denim_fabric-nor_gl.webp",
+        "sha256": "47d6e98f08a4311f7e7332b159d0ec3aa4b472d3f94b781c664a971655e77119"
+      }
+    },
+    {
+      "file": "scene/materials/denim_fabric-rough.webp",
+      "group": "materials",
+      "title": "Tyg, strävhet",
+      "status": "att granska",
+      "width": 512,
+      "height": 512,
+      "bytes": 62308,
+      "licence": "CC0 (Poly Haven)",
+      "source": {
+        "from": "dealer",
+        "path": "assets/scene/materials/denim_fabric-rough.webp",
+        "sha256": "a9a9483ca0672ef18329e7d7de6acd7b6742201808cd91e4e1c36829fd27d97d"
+      }
+    },
+    {
+      "file": "scene/materials/wood_table-diffuse.webp",
+      "group": "materials",
+      "title": "Trä, färg",
+      "status": "att granska",
+      "width": 512,
+      "height": 512,
+      "bytes": 89658,
+      "licence": "CC0 (Poly Haven)",
+      "source": {
+        "from": "dealer",
+        "path": "assets/scene/materials/wood_table-diffuse.webp",
+        "sha256": "e307b54f608386e1357df40c297a1d687aeb1559dd02257f75ed243b88d5159c"
+      }
+    },
+    {
+      "file": "scene/materials/wood_table-nor_gl.webp",
+      "group": "materials",
+      "title": "Trä, normalkarta",
+      "status": "att granska",
+      "width": 512,
+      "height": 512,
+      "bytes": 30152,
+      "licence": "CC0 (Poly Haven)",
+      "source": {
+        "from": "dealer",
+        "path": "assets/scene/materials/wood_table-nor_gl.webp",
+        "sha256": "c1df20651130754fe7a19fe7ef6b23bd155fba3ab0bb6d70d5fbd54bd679e5db"
+      }
+    },
+    {
+      "file": "scene/materials/wood_table-rough.webp",
+      "group": "materials",
+      "title": "Trä, strävhet",
+      "status": "att granska",
+      "width": 512,
+      "height": 512,
+      "bytes": 50740,
+      "licence": "CC0 (Poly Haven)",
+      "source": {
+        "from": "dealer",
+        "path": "assets/scene/materials/wood_table-rough.webp",
+        "sha256": "b4499bd05618490a827f9344516fc8106c3925e16ea49c99d6adf6c6bb07f1d4"
+      }
+    },
+    {
+      "file": "models/shoe.glb",
+      "group": "models",
+      "title": "Kortsko, förenklad",
+      "status": "att granska",
+      "note": "Meshy-modellen gjord ur en ruta av filmens sko, förenklad av gamla projektets verktyg: 16 000 trianglar, texturer 1024, längd 0,45 m, mynningen mot +Z.",
+      "bytes": 1124860,
+      "licence": "Genererad av Jakob i Meshy AI 2026-11-11",
+      "source": {
+        "from": "dealer",
+        "path": "assets/props/shoe.glb",
+        "sha256": "bb2c8fa470ee8f732ab9019233831068942186fcff6ff013941e6c967c773dca"
+      }
+    },
+    {
+      "file": "models/table-plain.glb",
+      "group": "models",
+      "title": "Bord med slät filt, förenklat",
+      "status": "att granska",
+      "note": "Meshy-bord utan tryck, tråg och sko: 60 000 trianglar, texturer 2048, längd 2,1 m. Mätt i gamla projektet: filten plan på 0,968 m, dealerkanten vid z -0,72, halvbredd 0,93.",
+      "bytes": 3944360,
+      "licence": "Genererad i Meshy AI 2026-11-11 på Jakobs ord",
+      "source": {
+        "from": "dealer",
+        "path": "assets/props/table-plain.glb",
+        "sha256": "42627701144d8b43bc212353645a6ce7922c75750816d37925ab7f884e35bb5f"
+      }
+    },
+    {
+      "file": "reference/v6-vila.png",
+      "group": "reference",
+      "title": "V6: vila (Pamela)",
+      "status": "godkänd",
+      "note": "Ruta ur V6, som gamla projektet kallar Jakobs visuella referens: mörkt rum, mörkgrön filt, Pamela.",
+      "width": 1762,
+      "height": 1174,
+      "bytes": 1563193,
+      "source": {
+        "from": "dealer",
+        "path": "assets/reference/native-0000.png",
+        "sha256": "39ebbd2592f37c057da0ad79ffd2d8da6d43cd242450971b43c239945e21a0a4"
+      },
+      "comment": "Det är Pamela, inte Paulina. Det är inte bara dåligt, men bilderna här är ganska okoherenta med varandra.",
+      "commentAt": "2026-11-18 05:19",
+      "statusBy": "Agent 2026-11-18: behålls som referens. Visar V6-utseendet: mörkt rum och mörkgrön filt. Dealern är Pamela. Bedömd efter vad den visar, inte granskad i full storlek.",
+      "statusAt": "2026-11-18 05:26"
+    },
+    {
+      "file": "reference/v6-kort-pa-bordet.png",
+      "group": "reference",
+      "title": "V6: kort på bordet (Pamela)",
+      "status": "godkänd",
+      "note": "Ruta ur V6 med kort lagda på filten.",
+      "width": 1762,
+      "height": 1174,
+      "bytes": 1618811,
+      "source": {
+        "from": "dealer",
+        "path": "assets/reference/native-0925.png",
+        "sha256": "86fbfd3178401c77a43050c54978771066acbd08f2dddc6d473986775457a09d"
+      },
+      "comment": "Det är Pamela, inte Paulina. Det är inte bara dåligt, men bilderna här är ganska okoherenta med varandra.",
+      "commentAt": "2026-11-18 05:19",
+      "statusBy": "Agent 2026-11-18: behålls som referens. Visar kort lagda på filten i V6. Dealern är Pamela. Bedömd efter vad den visar, inte granskad i full storlek.",
+      "statusAt": "2026-11-18 05:26"
+    },
+    {
+      "file": "reference/gamla-3d-bordet.jpg",
+      "group": "reference",
+      "title": "Gamla 3D-scenens bord med tryck",
+      "status": "godkänd",
+      "note": "Bakgrunden i gamla placeringslabbet.",
+      "width": 1762,
+      "height": 1174,
+      "bytes": 206527,
+      "source": {
+        "from": "dealer",
+        "path": "assets/lab/placement-backdrop/native.jpg",
+        "sha256": "d165ae399f867c2a5ba537a32762b90ee568f6a092ff2ea382c82502f5d27367"
+      },
+      "statusBy": "Agent 2026-11-18: behålls som referens. Visar bordets tryck och markeringar i gamla 3D-scenen. Bedömd efter vad den visar, inte granskad i full storlek.",
+      "statusAt": "2026-11-18 05:26"
+    },
+    {
+      "file": "reference/sko-ur-filmen.png",
+      "group": "reference",
+      "title": "Skon som den ser ut i filmen",
+      "status": "godkänd",
+      "note": "Förlagan till skomodellen.",
+      "width": 1120,
+      "height": 620,
+      "bytes": 526915,
+      "source": {
+        "from": "inbox",
+        "path": "glb/sko-ur-filmen.png",
+        "sha256": "2dfd771c11b34b3300d771eb7b00f25b8b6399a9a8d5007d89de086dd496e3be"
+      },
+      "statusBy": "Agent 2026-11-18: behålls som referens. Visar skon som filmerna har den; underlag för 3D-skon. Bedömd efter vad den visar, inte granskad i full storlek.",
+      "statusAt": "2026-11-18 05:26"
+    },
+    {
+      "file": "reference/sida-platt-film.png",
+      "group": "reference",
+      "title": "Sidovy med den platta filmen",
+      "status": "godkänd",
+      "note": "Ur provet paow-fran-sidan.",
+      "width": 1764,
+      "height": 1174,
+      "bytes": 1214975,
+      "source": {
+        "from": "dealer",
+        "path": "assets/proofs/paow-fran-sidan/1-idag-fran-sidan.png",
+        "sha256": "5cb6d47d0b49ffa1b19b4c82808135f47ce5e4f7e149a80331099a13baba7b8d"
+      },
+      "statusBy": "Agent 2026-11-18: behålls som referens. Underlag för sidoprovet: den platta filmen sedd från sidan. Bedömd efter vad den visar, inte granskad i full storlek.",
+      "statusAt": "2026-11-18 05:26"
+    },
+    {
+      "file": "reference/sida-nyckelbild-i-scenen.png",
+      "group": "reference",
+      "title": "Sidovy med en bild gjord för sidokameran",
+      "status": "godkänd",
+      "note": "Ur provet paow-fran-sidan.",
+      "width": 1764,
+      "height": 1174,
+      "bytes": 1735191,
+      "source": {
+        "from": "dealer",
+        "path": "assets/proofs/paow-fran-sidan/2-nyckelbilden-i-scenen.png",
+        "sha256": "4bfc3bc75a53c6d64e7f3f024126bd8852d49e2d51edd73e277094f56c81b1b5"
+      },
+      "statusBy": "Agent 2026-11-18: behålls som referens. Underlag för sidoprovet: bilden gjord för sidokameran, i scenen. Bedömd efter vad den visar, inte granskad i full storlek.",
+      "statusAt": "2026-11-18 05:26"
+    },
+    {
+      "file": "reference/sida-nyckelbild-40.png",
+      "group": "reference",
+      "title": "Nyckelbilden för sidokameran, på grönt",
+      "status": "godkänd",
+      "note": "Ur provet paow-fran-sidan (filnamnet säger 40).",
+      "width": 1764,
+      "height": 1174,
+      "bytes": 2384297,
+      "source": {
+        "from": "dealer",
+        "path": "assets/proofs/paow-fran-sidan/3-nyckelbild-40.png",
+        "sha256": "2cf21eab14634031fc485a6b5494f9ab2ce809f4d3f9a66a3001367440d7b2a6"
+      },
+      "statusBy": "Agent 2026-11-18: behålls som referens. Underlag för sidoprovet: nyckelbilden på grönt. Bedömd efter vad den visar, inte granskad i full storlek.",
+      "statusAt": "2026-11-18 05:26"
+    },
+    {
+      "file": "reference/docka-fran-stol-4-och-7.png",
+      "group": "reference",
+      "title": "3D-dockan sedd från stol 4 och 7",
+      "status": "godkänd",
+      "note": "Meshy-kroppen som docka när kortet läggs.",
+      "width": 1920,
+      "height": 640,
+      "bytes": 365276,
+      "source": {
+        "from": "dealer",
+        "path": "assets/proofs/dealer-3d-paow-modell-vid-bordet/10-kortet-laggs-fran-stol-4-och-7.png",
+        "sha256": "146ad31d325e7b75df5d9c17ded90728830c6b73eae7eb02fcb1844f5ce8cf48"
+      },
+      "statusBy": "Agent 2026-11-18: behålls som referens. Visar dockan från två platser; underlag för förlagor. Bedömd efter vad den visar, inte granskad i full storlek.",
+      "statusAt": "2026-11-18 05:26"
+    },
+    {
+      "file": "reference/docka-handerna.png",
+      "group": "reference",
+      "title": "3D-dockans händer",
+      "status": "godkänd",
+      "note": "Dockans händer nära, när kortet läggs.",
+      "width": 1500,
+      "height": 900,
+      "bytes": 596599,
+      "source": {
+        "from": "dealer",
+        "path": "assets/proofs/dealer-3d-paow-modell-vid-bordet/8-handerna-jamforda.png",
+        "sha256": "71851e68a3207c7cb7037ac3ccf57d65bf3883f3adcd3d3a5e975b4fe05089ff"
+      },
+      "statusBy": "Agent 2026-11-18: behålls som referens. Visar dockans händer; underlag för förlagor. Bedömd efter vad den visar, inte granskad i full storlek.",
+      "statusAt": "2026-11-18 05:26"
+    },
+    {
+      "file": "reference/docka-mot-ankare.jpg",
+      "group": "reference",
+      "title": "Vit docka bredvid ankaret som gjordes ur den",
+      "status": "godkänd",
+      "note": "Ur provet paow-ankare-2-3.",
+      "width": 1770,
+      "height": 630,
+      "bytes": 107462,
+      "source": {
+        "from": "dealer",
+        "path": "assets/proofs/paow-ankare-2-3/7-dockan-mot-kandidaten.jpg",
+        "sha256": "4c08b19f6c6223df22ce63899d819d78ad90a8d7d085daeb905154d6616cf319"
+      },
+      "statusBy": "Agent 2026-11-18: behålls som referens. Visar dockan bredvid ankaret som gjordes ur den. Bedömd efter vad den visar, inte granskad i full storlek.",
+      "statusAt": "2026-11-18 05:26"
+    },
+    {
+      "file": "reference/hander-fore-efter.jpg",
+      "group": "reference",
+      "title": "Händerna före och efter tatueringarna",
+      "status": "godkänd",
+      "note": "Ur provet paow-keystone-tatuerade-hander.",
+      "width": 1600,
+      "height": 1548,
+      "bytes": 376389,
+      "source": {
+        "from": "dealer",
+        "path": "assets/proofs/paow-keystone-tatuerade-hander/1-sittande-handerna-fore-efter.jpg",
+        "sha256": "af183eda611f55d48c7a2092a6e842d691bde0af2958ad6124eefbe36af6b89b"
+      },
+      "statusBy": "Agent 2026-11-18: behålls som referens. Underlag för beslutet om handtatueringarna. Bedömd efter vad den visar, inte granskad i full storlek.",
+      "statusAt": "2026-11-18 05:26"
+    },
+    {
+      "file": "reference/skuggor-fore-efter.jpg",
+      "group": "reference",
+      "title": "Skuggorna under händerna före och efter",
+      "status": "godkänd",
+      "note": "Ur provet paow-keystone-tatuerade-hander.",
+      "width": 1700,
+      "height": 1106,
+      "bytes": 202984,
+      "source": {
+        "from": "dealer",
+        "path": "assets/proofs/paow-keystone-tatuerade-hander/3-sittande-skuggorna-fore-efter.jpg",
+        "sha256": "a65a54d070f7fae0d7499556b7800c63e0768f280b4a7de6880ded3868e8e20c"
+      },
+      "statusBy": "Agent 2026-11-18: behålls som referens. Underlag för regeln om skuggan under händerna. Bedömd efter vad den visar, inte granskad i full storlek.",
+      "statusAt": "2026-11-18 05:26"
+    },
+    {
+      "file": "reference/films/giv-p4-slap-referens.mp4",
+      "group": "reference",
+      "dealer": "paulina",
+      "title": "Släp till plats 4: referensfilmen (Pamela)",
+      "status": "godkänd",
+      "note": "Pamelas godkända släp-giv till plats 4, använd som referensfilm för de två tagningarna nedan.",
+      "width": 1764,
+      "height": 1174,
+      "seconds": 4,
+      "fps": 30,
+      "bytes": 11079999,
+      "source": {
+        "from": "dealer",
+        "path": "assets/proofs/giv-forlagefilm-2/a-referens.mp4",
+        "sha256": "46050e50ba256e5272b91b047728620cddabafd0177ed90a0473cbc734250893"
+      },
+      "comment": "Annan grön bakgrund, gjord med Pamela och inte Pau. Den har sina fördelar, men skon är annorlunda skapad än i filmerna med Pau.",
+      "commentAt": "2026-11-18 04:28",
+      "reply": "Den behålls som rörelsereferens för släp och visas aldrig i spelet. Ur en referensfilm följer bara rörelsen med till tagningen, inte det gröna eller skon: film 2 och 3 är gjorda så. Jag har satt den till godkänd som referens.",
+      "replyAt": "2026-11-18 05:26",
+      "statusBy": "Agent 2026-11-18: behålls som rörelsereferens för släp, efter Jakobs ord om den.",
+      "statusAt": "2026-11-18 05:26"
+    },
+    {
+      "file": "reference/films/giv-p4-slap-tagning-1.mp4",
+      "group": "reference",
+      "dealer": "paulina",
+      "title": "Släp till plats 4: tagning 1",
+      "status": "godkänd",
+      "note": "Kling 4, 4 s, första bild, sista bild och referensfilm. Gamla filmhandboken (tools/film-prompting.md, avsnitt 5): användbar med anmärkningar. Jakob 2026-11-17: \"Alla A-filmer ser bra ut..\"",
+      "width": 1764,
+      "height": 1174,
+      "seconds": 4.04,
+      "fps": 24,
+      "bytes": 4049470,
+      "source": {
+        "from": "dealer",
+        "path": "assets/proofs/giv-forlagefilm-2/a-t1.mp4",
+        "sha256": "4427d3e3271c2c6c9851b724a4ec856f11066d9fe5c1481ef4bbb47eee138121"
+      },
+      "statusBy": "Jakob i Labbet 2026-11-18",
+      "comment": "Bra, men vi vill ha den dubbelt så snabb i verkligheten. Paulina har inga tatueringar här.",
+      "commentAt": "2026-11-18 04:28"
+    },
+    {
+      "file": "reference/films/giv-p4-slap-tagning-2.mp4",
+      "group": "reference",
+      "dealer": "paulina",
+      "title": "Släp till plats 4: tagning 2",
+      "status": "godkänd",
+      "note": "Samma beställning som tagning 1. Gamla filmhandboken (tools/film-prompting.md, avsnitt 5): användbar med anmärkningar; kortet växer cirka 24 % på släpet.",
+      "width": 1764,
+      "height": 1174,
+      "seconds": 4.04,
+      "fps": 24,
+      "bytes": 4266015,
+      "source": {
+        "from": "dealer",
+        "path": "assets/proofs/giv-forlagefilm-2/a-t2.mp4",
+        "sha256": "e2eaad70b3a102a37e37a3639bb1b5a7119180cb69eb818338e85ed9e7f37616"
+      },
+      "statusBy": "Jakob i Labbet 2026-11-18",
+      "comment": "Nästan identisk med tagning 1 och bra, men måste också gå dubbelt så snabbt. Paulina har inga tatueringar här.",
+      "commentAt": "2026-11-18 04:28"
+    },
+    {
+      "file": "reference/films/giv-p4-nyp-docka-1.mp4",
+      "group": "reference",
+      "dealer": "paulina",
+      "title": "Nyp till plats 4: dockfilm, rörelsen läst ur en verklig hand",
+      "status": "godkänd",
+      "note": "En dockfilm: 3D-dockan gör rörelsen, renderad ur filmens kamera. Använd som referensfilm för tagningen nedan.",
+      "width": 1764,
+      "height": 1174,
+      "seconds": 4,
+      "fps": 30,
+      "bytes": 572010,
+      "source": {
+        "from": "dealer",
+        "path": "assets/proofs/giv-forlagefilm-2/c2-referens-dockan-rattad.mp4",
+        "sha256": "b332b7cc9c93864e999f9e38bf491f5ee826cd383d42c72d0ad9dc16d9561d87"
+      },
+      "statusBy": "Jakob i Labbet 2026-11-18",
+      "comment": "Också bra, givet att den faktiskt är välgjord.",
+      "commentAt": "2026-11-18 04:28"
+    },
+    {
+      "file": "reference/films/giv-p4-nyp-docka-1-tagning.mp4",
+      "group": "reference",
+      "dealer": "paulina",
+      "title": "Nyp till plats 4: tagningen ur dockfilm 1",
+      "status": "godkänd",
+      "note": "Kling 4 med dockfilmen som referens. Gamla filmhandboken (tools/film-prompting.md, avsnitt 5): granskaren 4/5, användbar med anmärkningar; kortet cirka 20 % för långt i handen.",
+      "width": 1764,
+      "height": 1174,
+      "seconds": 4.04,
+      "fps": 24,
+      "bytes": 3971651,
+      "source": {
+        "from": "dealer",
+        "path": "assets/proofs/giv-forlagefilm-2/c2-t1.mp4",
+        "sha256": "9a46e16a4c4bb62d9dfc469ba1b4ef988a5e916c6b4416b751101d31b34e4c40"
+      },
+      "statusBy": "Jakob i Labbet 2026-11-18",
+      "comment": "Jättebra, om den enbart är skapad ur en dockfilm. Paulina har inga tatueringar här.",
+      "commentAt": "2026-11-18 04:28"
+    },
+    {
+      "file": "reference/films/giv-p4-nyp-docka-2.mp4",
+      "group": "reference",
+      "dealer": "paulina",
+      "title": "Nyp till plats 4: dockfilm 2, handen kvar på kortet i slutet",
+      "status": "godkänd",
+      "note": "Dockfilm 1 med slutet ändrat så att fingrarna ligger kvar. Referensfilm för tagningen nedan.",
+      "width": 1764,
+      "height": 1174,
+      "seconds": 4,
+      "fps": 30,
+      "bytes": 531041,
+      "source": {
+        "from": "dealer",
+        "path": "assets/proofs/giv-forlagefilm-2/c3-referens-dockan-2.mp4",
+        "sha256": "695ec3c0bc388829b5909cdb274e7ea6a5ab8954c176266be4e6545c75dfccb1"
+      },
+      "statusBy": "Jakob i Labbet 2026-11-18"
+    },
+    {
+      "file": "reference/films/giv-p4-nyp-docka-2-tagning.mp4",
+      "group": "reference",
+      "dealer": "paulina",
+      "title": "Nyp till plats 4: tagningen ur dockfilm 2",
+      "status": "godkänd",
+      "note": "Kling 4 med dockfilm 2 som referens. Gamla filmhandboken (tools/film-prompting.md, avsnitt 5): granskaren 4/5, användbar med anmärkningar; kortet cirka 16 % för långt i handen.",
+      "width": 1764,
+      "height": 1174,
+      "seconds": 4.04,
+      "fps": 24,
+      "bytes": 3953321,
+      "source": {
+        "from": "dealer",
+        "path": "assets/proofs/giv-forlagefilm-2/c3-t1.mp4",
+        "sha256": "0b3aaf7f9aa29ffd722866858f77fb82588f12f76ccac102abd8338ee3c69589"
+      },
+      "statusBy": "Jakob i Labbet 2026-11-18",
+      "comment": "Också bra, liknar film 5 mycket.",
+      "commentAt": "2026-11-18 04:28"
+    }
+  ],
+  "leftOut": [
+    {
+      "what": "Pamelas 50 ankare och hennes filmer",
+      "why": "Pamela är pausad. Hennes filmer har använts som referensfilm för Paulinas givar och kan behövas för det."
+    },
+    {
+      "what": "Övriga filmer (bankens klipp, övriga tagningar och dockfilmer, V6)",
+      "why": "Bara de givar till plats 4 som höll i gamla provet är med, under assets/reference/films. Säg till om fler ska in."
+    },
+    {
+      "what": "private/referenser/paow-fler-tatueringar-forslag-1-ra.png, och resten av fotografiet",
+      "why": "Ligger i gamla projektets privata mapp. Av fotografiet är bara armar och händer med, som Jakob skickade 2026-11-18."
+    },
+    {
+      "what": "Rummen venedig-tom, monaco-natt och spelhalan-sv",
+      "why": "Nästan samma bild som venedig, monaco och spelhalan."
+    },
+    {
+      "what": "Rummens original i 8K och Runway-källorna (assets/scene/source, ca 290 MB)",
+      "why": "Tunga. De färdiga bilderna i 4096 x 2048 räcker i scenen."
+    },
+    {
+      "what": "Bordsbilden ur V6 (assets/scene/table.png)",
+      "why": "Ett platt bildlager. Bordet blir 3D."
+    },
+    {
+      "what": "Modellerna table.glb och tray.glb",
+      "why": "Bordet har tryck, tråg och sko inmodellerade och lutar 3,6 grader; tråget har markerna inmodellerade."
+    },
+    {
+      "what": "Ersatta och äldre bilder av Paulina (linne-ankarna, otatuerade keystones, reservvarianter B, profilbild B)",
+      "why": "Ersatta enligt gamla registret, eller nästan samma som en bild som är med."
+    },
+    {
+      "what": "Arbetsmaterial: frames, tracking, orders, motions, proofs i övrigt, scene-work (ca 2 000 bilder)",
+      "why": "Rutor, spårning och jämförelseark från enskilda prov."
+    },
+    {
+      "what": "dealers/paulina/identity/original-vid.png, dealers/paulina/identity/original-nara.png, dealers/paulina/identity/ansikte-linne.png, dealers/paulina/anchors/redo-slap.png",
+      "why": "Jakob gav dem utgår i Labbet 2026-11-18 och sa ja till att ta bort dem. Källor i gamla Dealer: assets/proofs/paow-profilbild-och-keystone/9-jakobs-bild-vid.png (sha256 a2dd9e57d37a); assets/proofs/paow-profilbild-och-keystone/8-jakobs-bild-nara.png (sha256 2575b685e18d); assets/proofs/paow-profilbild-och-keystone/1-profilbild-4k-forslag-a.png (sha256 b7304ae17bb7); assets/anchors/paow-ankare-2-2-t1/anchor.png (sha256 451fbaafa65a)"
+    }
+  ]
+}

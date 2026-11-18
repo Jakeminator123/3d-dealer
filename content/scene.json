@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 1,
+  "about": "Scenen i verkliga meter: x åt höger i bild, y uppåt, z mot kameran, filten på y = 0, origo på filtens plan rakt under kameran. Det här är den enda platsen för scenens tal; det som går att räkna ur dem räknas i src/scene/geometry.ts. Varje grupp bär basis (mätt eller antaget) och en källa. Det som är mätt i bild är fört ut i meter genom kameran, som är antagen: lägena stämmer i kamerans bild, men avstånden i meter är inte säkrare än linsen. Tillgångar pekas ut med registrets file (content/assets.json).",
+  "camera": {
+    "frame": { "width": 1764, "height": 1174 },
+    "focalPx": 2334,
+    "position": [0, 1.11, 0],
+    "pitchDeg": 25.0566,
+    "seat": 4,
+    "basis": "antaget",
+    "source": "Gamla Dealers lins (TABLE_LENS i src/table-lens.ts, commit 1198340): brännvidd 2334 bildpunkter, lutning 0,43731949 rad, höjd 1,10999555 m. Här avrundad, vilket flyttar en punkt på filten högst 0,004 bildpunkter (output/scen-matning/tal.ts). Linsen är passad mot ett kort mätt i film på plats 4 (hitre kant 84,5 bildpunkter, 72 djupt) och mot antagna kroppsmått hos dealern (knogar 76 mm, axlar 400 mm, pupiller 62 mm). Rutan är gamla projektets standardruta, och kameran är ögat för plats 4."
+  },
+  "player": {
+    "height": 0.6,
+    "distance": 2.4,
+    "pitchDeg": 16,
+    "fovDeg": 45,
+    "basis": "antaget",
+    "source": "Valt 2026-11-18 efter prov i bild (output/scen-matning/vy.ts och arken i webbläsaren). Höjden är dealerns ögonhöjd i ankaret VILA (0,58 m över filten): då ses hon rakt framifrån och rummets horisont ligger bakom hennes huvud utan lyft. Avstånd, lutning och bildvinkel är valda så att hela bordet ryms: hjässan 9 % ned i rutan, bordskanten mot dealern 46 % ned och vallens ytterkant 98 % ned. Förkastat: filmkamerans avstånd 1,84 m, där vallen syns först med 73 graders bildvinkel och dealern blir 30 % av rutans höjd; utgångsläget 1,84 m, 14 grader och 50 grader, där vallen mot spelaren hamnar under rutan; och gamla kontraktets kamera (0,493 m över filten, 1,521 m från kanten, 2,5 grader, 67 grader), som i verkliga meter lägger dealern lågt och litet under en ruta som mest är tak, eftersom gamla scenen ritade bordet i dubbel skala."
+  },
+  "dealerEdge": {
+    "z": -1.8438,
+    "basis": "mätt",
+    "source": "Gamla standardens rad för dealerns bordskant, 831,5 av 1174 (mätt i film i gamla projektet), förd ut på filten i bildens mitt genom kameran: z -1,84377."
+  },
+  "table": {
+    "file": "models/table-plain.glb",
+    "model": {
+      "feltY": 0.969,
+      "dealerEdgeZ": -0.692,
+      "basis": "mätt",
+      "source": "Mätt i GLB-filen 2026-11-18 (output/scen-matning/glb.ts och bordskant.ts) och i en rendering ur scenens kamera. Filten ligger på 0,9689 till 0,9697 över bordets mitt och sjunker till 0,964 intill vallen. Kanten mot dealern är rundad: vid x = 0 börjar skivan på z -0,718, 16 mm under filten, och trälisten innanför ligger 1 till 3 mm under filten fram till z -0,63. Scenens kamera ser kantens överkant vid z -0,704, 4 mm under filtens höjd; förd längs siktlinjen upp till filtens plan är det z -0,698 vid x = 0 och z -0,692 vid x ± 0,25, där kanten buktar 6 mm mot spelarna. Det senare värdet står här: då ritas kanten på veckets rad eller strax ovanför den under hela dealerns kropp, och ingen glipa syns mellan kropp och bord. Ut mot sidorna ligger kanten längre bak (z -0,738 vid x ± 0,6). Modellens skala (längd 2,100 m) sattes av gamla projektets verktyg och är antagen."
+    },
+    "tilt": {
+      "deg": 5,
+      "basis": "antaget",
+      "source": "Valt 2026-11-18: bordet lutar mot spelaren kring dealerns bordskant, så att filten öppnar sig mot spelarens öga. Prövat 0, 3,6, 5 och 7 grader med samma inramning (output/scen-matning/vy.ts): händerna på filten ses 0,47, 0,58, 0,63 och 0,69 gånger så djupa som i filmkamerans bild, och filten fyller 37, 40, 41 och 42 % av rutans höjd. 5 grader valdes: mer ger lite till men syns som en sluttning från sidoplatserna. Gamla Meshy-bordet med tryck lutade 3,6 grader. Sedd från filmkameran flyttar lutningen dealerns fingertoppar 6 bildpunkter från ankarbilden; vid vecket ingenting."
+    }
+  },
+  "shoe": {
+    "file": "models/shoe.glb",
+    "at": [0.495, -1.8433],
+    "yawDeg": -74.6,
+    "length": 0.442,
+    "basis": "mätt",
+    "source": "Passad 2026-11-18 mot skon som är inbakad i ankaret dealers/paulina/anchors/vila.png (output/scen-matning/sko-pass.ts): läge, vridning och längd valda så att modellens kontur, sedd genom kameran, täcker den inbakade skon så väl som möjligt (95,8 % gemensam yta; skons nos når som mest 14,7 bildpunkter utanför konturen). Modellen skalas till längden; i GLB-filen är den 0,450 lång, 0,140 bred och 0,150 hög."
+  },
+  "background": {
+    "liftDeg": 5,
+    "basis": "antaget",
+    "source": "Valt 2026-11-18 för spelarens vy, så att rummets väggar och fönster syns bakom dealern i stället för golvet (Jakob: \"ser man fortfarande golvet\"). Spelarens öga står i dealerns ögonhöjd, så olyft ligger en 360-bilds horisont bakom hennes ögon. 5 grader lägger den i höjd med hennes axlar, och då syns mindre av golvet mellan väggen och bordet. Från filmkameran, som ser 25 grader nedåt, behövdes 20 grader för samma sak. Startvärde för reglaget Lyft; gäller 360-bilder, inte platta bilder."
+  },
+  "film": {
+    "lift": 0.0015,
+    "basis": "antaget",
+    "source": "Gamla scenens veck (src/scene3d-film.ts, place): den liggande delen av dealerfilmen ritas 1,5 mm över filten, så att den inte flimrar mot bordets yta."
+  },
+  "card": {
+    "width": 0.063,
+    "height": 0.088,
+    "thickness": 0.0003,
+    "corner": 0.0035,
+    "basis": "antaget",
+    "source": "Standardmått för pokerkort, 63 × 88 mm, som i gamla kontraktet (cardMillimetres). Tjocklek och hörnradie ur gamla linsens CARD. Inget kort är mätt."
+  },
+  "places": {
+    "dealer": [
+      [-0.0266, -1.6862],
+      [0.0266, -1.6862]
+    ],
+    "seats": [
+      { "seat": 1, "cards": [[-0.5321, -1.6073], [-0.5034, -1.6191]] },
+      { "seat": 2, "cards": [[-0.3571, -1.5509], [-0.3253, -1.5633]] },
+      { "seat": 3, "cards": [[-0.1867, -1.5027], [-0.152, -1.5155]] },
+      { "seat": 4, "cards": [[-0.019, -1.4468], [0.0191, -1.46]] },
+      { "seat": 5, "cards": [[0.151, -1.5027], [0.1879, -1.5155]] },
+      { "seat": 6, "cards": [[0.3234, -1.5509], [0.3592, -1.5633]] },
+      { "seat": 7, "cards": [[0.5007, -1.6073], [0.535, -1.6191]] }
+    ],
+    "basis": "antaget",
+    "source": "Jakobs kortplan i gamla projektet (placements/default.json vid commit 1198340, oförändrad sedan 2026-11-11): valda lägen i bilden, inte mätta, förda ut på filten genom kameran och avrundade till 0,1 mm (högst 0,08 bildpunkter fel). Första kortet på plats 4 stämmer inom en bildpunkt med kortet som mättes i film."
+  }
+}

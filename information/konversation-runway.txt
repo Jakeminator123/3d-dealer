@@ -1,0 +1,288 @@
+Hej! Kan du kolla om det finns bra instruktioner för mina AI-agenter i Cursor, ClaudeCode, MCP eller annat indexerbart innehåll om hur man med Runway kan förbättra prompts eller innehåll för olika modeller? Vissa modeller kan ta emot bilder, medan andra inte behöver det. Detta är viktigt för att fånga svåra detaljer, särskilt när det gäller mänskliga rörelser som händer och kort. Du kan gärna titta på mitt projekt som heter Dealer, men jag är osäker på hur mycket av det som är nyuppdaterat idag. Generellt sett kanske du kan hänvisa till något på Runway som kan vara användbart.
+Ja. Runway har numera betydligt bättre stöd för AI-agenter än tidigare, och det finns en ny officiell integration som är särskilt relevant för Dealer.
+
+Den 2 november 2026 lanserade Runway ett utvecklarplugin för Cursor, Claude Code och Codex. Det innehåller både MCP-anslutning och färdiga Agent Skills som hjälper agenter att förstå vilka modeller som finns, vilka indata de accepterar och hur API-anrop ska byggas. 
+
+runway.com
++1
+
+Det är viktigt att skilja på två integrationer:
+
+Runway Dev MCP: För utveckling, API-dokumentation, modellval och automatiserade produktionskedjor.
+
+Runway MCP: För att generera och redigera media direkt från AI-agenter.
+
+För Dealer skulle jag prioritera Runway Dev + modellberoende promptregler + automatisk kvalitetskontroll. En bättre prompt kan hjälpa med rörelserna, men fysisk kontakt mellan hand, kort och bord behöver också kontrolleras bildruta för bildruta.
+
+1. Jag hittade dagens Dealer-projekt
+GITHUB · MAIN · 17 NOVEMBER 2026
+
+Jakeminator123/dealer
+Senaste commit jag hittade är 84a3d61, kl. 19:08 svensk tid. Jag har läst både agentreglerna, promptkoden och handboken.
+
+Uppdaterat idag
+Min bedömning utifrån den kod och dokumentation jag kunnat kontrollera:
+
+Område
+
+Poäng
+
+Befintlig promptdokumentation
+
+9/10
+
+Reproducerbara promptmallar
+
+9/10
+
+Anpassning till olika modeller
+
+6/10
+
+Integrerad Runway Dev-kunskap
+
+3/10
+
+Kontroll av fysisk kortvändning
+
+5/10
+
+Det mest intressanta är att projektet redan har en mycket omfattande guide, tools/film-prompting.md, med egna experiment, officiella tillverkarinstruktioner, resultat och kvalitetsbedömningar.
+
+Den har dessutom konkret information om vad som gått fel. Bland annat:
+
+En hel blackjackrunda i ett klipp: 0 användbara av 7 filmer, för ungefär 3 500 krediter.
+
+Ett godkänt Paow-prov använde en lång prompt på 377 ord, trots att tillverkarna ofta rekommenderar kortare instruktioner.
+
+Kling 4 har gett ett användbart prov med en prompt på 127 ord.
+
+De egna försöken visar att en kortare prompt inte automatiskt ger bättre resultat.
+
+Detta är värdefull empirisk kunskap som bör väga tyngre än generella prompttips.
+
+Dagens specifika problem: handleden
+Jag hittade en tydlig ändring i src/order-prompts.ts.
+
+Promptmall 8
+
+Tidigare
+Handen instruerades att vända kortet en gång. Men instruktionen angav inte tydligt att handleden skulle förbli vriden under placeringen.
+Promptmall 9
+
+17 november
+Ny instruktion: handleden vänds, kortet följer med, handen hålls vriden medan kortet läggs och först efter att kortet släppts roterar den tomma handen tillbaka.
+Samtidigt ändrades släprörelsen från ankare 2.2: tidigare bad en formulering modellen att lyfta kortet från filten, även när du ville se det glida. Den motsägelsen har nu korrigerats.
+
+Min slutsats: Du hade en konkret poäng när du misstänkte själva prompten. Det fanns ett formuleringfel, inte bara en begränsning i videomodellen.
+
+Mall 9 är enligt handboken ännu inte tillräckligt verifierad. Den är en rimlig förbättring, men jag skulle inte låta agenterna behandla den som en bevisat lyckad metod.
+
+Källor i ditt repo: Filmhandboken och Promptmallarna.
+
+2. De viktigaste Runway-resurserna för dina agenter
+Best AI video generators in 2025: 10 tools compared | Kive Learn
+
+Runway Dev Plugin
+
+Det viktigaste nya tillskottet. Ger agenterna officiella Skills och tillgång till aktuella modellbegränsningar, kostnader och API-dokumentation.
+
+How to Use Runway's AI Video to Get a Dynamic Video
+
+Image-to-Video Prompting Guide
+
+Förklarar hur referensbilder, rörelsetext och bildens ursprungliga pose samverkar. Särskilt viktig för dina ankare.
+
+AI video is easy.
+
+Directing it is the hard part.
+
+Because “make him wave” is not direction.
+It is a prayer.
+
+FLORA just made that prayer obsolete.
+
+Kling 2.6 Motion Control is live inside… | Leonard Rodman, M.Sc. PMP LSSBB CSM CSPO Workato | 139 comments
+
+Kling Motion Control
+
+Relevant för att styra rörelser från en filmad referens i stället för att beskriva all koreografi i ord.
+
+Runway Act-Two: AI Performance Capture & Character Animation
+
+Act-Two Performance Capture
+
+Användbar research för att överföra skådespelarrörelser. Jag skulle dock inte anta att den ensam kan återge ett korts exakta tredimensionella kontakt med fingrarna.
+
+Ditt repo refererar redan till flera av de här guiderna. Vad som främst saknas är att den officiella modellinformationen blir exekverbar kunskap för agenterna, så att de kontrollerar varje modells faktiska möjligheter innan ett anrop skickas.
+
+3. Vilken modell ska användas för vad?
+Jag kontrollerade också din anslutna Runway-arbetsyta. Där finns bland annat Wan 3, Seedance 2.5, Kling 4, Kling Motion Control och Gen-4.5.
+
+Det betyder inte att alla stöder samma indata eller inställningar.
+
+Modell/metod
+
+Min rekommenderade användning i Dealer
+
+Wan 3
+
+Din primära testbas. Fortsätt med start-/slutankare och jämför mot tidigare tagningar.
+
+Kling 4
+
+Alternativ för komplexa kroppsrörelser och kortvändning.
+
+Kling Motion Control
+
+Testa med en verkligt filmad hand som vänder ett kort korrekt.
+
+Seedance 2.5
+
+Utvärdera naturlighet, kontinuitet och uttryck i korta sekvenser.
+
+Gen-4.5
+
+Testa mer begränsad och ren rörelse, särskilt med starka referensbilder.
+
+Detta är en föreslagen testfördelning, inte ett verifierat kvalitetsbetyg på modellerna.
+
+En avgörande detalj från din befintliga API-granskning: Wan 3 stöder inte dokumenterade mellanankare vid valfria tidpunkter i det granskade anropet. Start-/slutbilder kan heller inte fritt kombineras med alla andra referenstyper. Agenterna måste känna till sådana begränsningar, annars riskerar de att bygga funktioner som modellen faktiskt inte erbjuder.
+
+4. Så installerar du kunskapen i Cursor och Claude Code
+Cursor
+
+Skriv detta i Agent-chatten:
+
+/add-plugin runway-api
+
+Claude Code
+
+Kör följande:
+
+claude plugin marketplace add anthropics/claude-plugins-official
+claude plugin install runway-api@claude-plugins-official
+claude mcp login plugin:runway-api:runway-dev
+
+Andra MCP-kompatibla agenter
+
+MCP-servern är:
+
+https://dev.runwayml.com/mcp
+
+Installera helst det kompletta pluginet i stället för att lägga till MCP och Skills separat. 
+
+Runway Dev
++1
+
+5. Vad jag skulle förbättra i Dealer
+Jag skulle inte ersätta den befintliga promptgeneratorn. Jag skulle bygga ett tunt kunskaps- och kontrollager ovanpå den.
+
+Beställning i Dealer
+
+Hand, kort, ankare, rörelse, målposition
+Modellrouter
+
+Kontrollerar aktuell modellkapacitet, bild-/videoreferenser, längd och pris
+Promptmall
+
+Bilder / film
+
+API-anrop
+
+Generering + automatisk QA
+
+En fysisk vändning, handkontakt, kortets geometri och skarvar
+Granska i Dealer
+
+Behåll Jakobs godkännande och registrera utfallet per modell och promptversion
+Särskilt viktigt: lagra inte bara om en tagning godkändes, utan vilken rörelse som fungerade och vilka fel som uppstod. Då kan nästa agent välja en empiriskt fungerande metod i stället för att hitta på en ny prompt.
+
+6. Färdigt uppdrag att ge huvudagenten
+Detta kan du klistra in direkt i Dealer-projektets Cursor eller Claude Code.
+
+Granska och förbättra Dealer-projektets Runway-integration och promptsystem.
+
+Mål: AI-agenter ska kunna välja lämplig videomodell och konstruera bästa möjliga uppdrag för mänskliga rörelser, händer, kort och kontaktytor.
+
+Läs AGENTS.md, HANDOFF.md, tools/film-prompting.md, src/order-prompts.ts, src/order-model.ts och tillhörande tester.
+
+Installera eller använd Runway Dev-pluginets officiella MCP och Agent Skills.
+
+Läs Runways aktuella modellkatalog och kontrollera vilka indata, referensbilder, referensfilmer, bildankare, upplösningar och längder varje modell faktiskt stöder.
+
+Jämför med vår historik över godkända och underkända tagningar. Separera tillverkarnas rekommendationer från våra egna verifierade erfarenheter.
+
+Föreslå en modellrouter och modellberoende promptmallar. Förhindra inkompatibla API-parametrar.
+
+Undersök särskilt kortvändningens fysik: grepp, handledsrotation, fingrarnas kontakt, kortets två sidor, släpp och återgång. En färgväxling är inte en fysisk vändning.
+
+Inför förslag på automatisk bildrutebaserad QA och spårbarhet mellan promptversion, referensmaterial, modell, kostnad och resultat.
+
+Bevara gamla promptversioner och befintliga godkända tagningar. Gör inga betalda genereringar eller produktionsändringar utan godkännande enligt projektets regler.
+
+Arbeta med huvudagentens filägarskap och befintliga Git-rutiner. Uppdatera dokumentationen där den hör hemma och lägg till relevanta tester.
+
+Leverera: en konkret jämförelse mellan dagens system och föreslaget system, en prioriterad implementationsplan och tydliga exempel för Wan 3, Kling och Seedance.
+
+Prioritera att förbättra befintlig kod, inte att skapa ett parallellt produktionssystem.
+
+Min slutbedömning: Dealer har redan ovanligt bra empirisk dokumentation. Den stora möjligheten ligger inte i att samla ytterligare hundratals generella prompttips, utan i att göra kunskapen sökbar, modellberoende och automatiskt användbar för varje ny beställning.
+
+Det är särskilt relevant efter dagens problem med handleden: en agent som jämför en ny prompt med historiska misslyckanden borde kunna upptäcka den typen av motsägelse innan du betalar för ännu en film.
+
+Jag har granskat GitHub-versionen och den anslutna Runway-arbetsytan, men inte dina lokala, opushade ändringar. Antalet aktiva underagenter kan jag därför inte verifiera.
+
+Jag kan inte köpa något via mina kort på Runway, och jag förstår inte varför. Finns det någon anledning till detta? kan man föra över krediter från varnliga browserinloggningen till API-sidan?
+
+Öppnade app
+
+Jag har kontrollerat Runways betalningsregler och ditt anslutna konto.
+
+Ditt konto: Du har Runway Max och 7 430 köpta krediter i webbtjänsten. Jag kan däremot inte se saldot eller betalningsavslagen i ditt separata Developer API-konto.
+
+Överföra krediter: Runway tillåter numera överföring mellan webben och API, men funktionen är för närvarande begränsad till Enterprise-konton. Den verkar därför inte vara tillgänglig för ditt vanliga Max-konto. 
+
+Runway
++1
+
+Varför korten nekas: Banken kan blockera internationella köp eller upprepade försök. Stripe kan också stoppa en betalning genom sin bedrägerikontroll. Jag kan inte se vilken orsak som gäller för dig. 
+
+Runway
++1
+
+För API-köp: Du måste ha Admin- eller Billing Admin-behörighet i API-projektet. Minsta köp är 10 USD. 
+
+Runway Dev
+
+En fråga: Är det på Runway Developer API som dina kort nekas, eller på vanliga Runway? Och vilket felmeddelande visas?
+
+Det avgör om vi ska felsöka API-faktureringen, Stripe eller själva kortbetalningen.
+
+API enbart
+Då är det mer sannolikt att problemet ligger i Runways API-betalningssystem än i dina kort, särskilt om samma kort fungerar på vanliga Runway.
+
+Jag skulle kontrollera följande
+API-kontots köpgräns: Runway har en maximal köpgräns per 30 dagar för varje API-projekt. När den nås stoppas ytterligare kreditköp. 
+
+Runway Dev
+
+Betalningen via Stripe: Kontrollera om banken faktiskt får ett betalningsförsök. Om den inte ser något kan betalningen ha blockerats innan den skickades till banken.
+
+Behörighet: Du behöver vara Admin eller Billing Admin i API-projektet för att köpa krediter. 
+
+Runway Dev
+
+Testa minsta beloppet: 10 USD (1 000 API-krediter). Undvik många upprepade försök eftersom det kan utlösa säkerhetsspärrar. 
+
+Runway
++1
+
+Ett alternativ som är särskilt intressant för Dealer
+Runway MCP använder faktiskt dina vanliga webbkrediter! Det innebär att en agent i exempelvis Claude Code kan generera filmer via MCP utan att använda Developer API-saldot. 
+
+Runway
+
+Du har fortfarande cirka 7 430 webbkrediter, enligt din anslutna arbetsyta. Det är alltså ett möjligt alternativ tills API-betalningen är löst. Dealer måste dock anpassas för att använda MCP i stället för sina nuvarande API-anrop.
+
+Min fråga: När du försöker köpa API-krediter, får du ett meddelande som "Card declined", "Payment failed" eller något annat? Skriv gärna exakt vad det står. Det hjälper oss avgöra om det är kortet, Stripe eller Runways API-konto som stoppar köpet.

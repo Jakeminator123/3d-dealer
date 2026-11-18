@@ -1,0 +1,13 @@
+# Media och råmaterial: registreras i content/assets.json, lagras utanför Git
+assets/
+glb/
+
+# Sådant som kan göras om, och pågående jobb
+output/
+runtime/
+dist/
+
+# Beroenden och lokala hemligheter
+node_modules/
+.env*
+*.log
