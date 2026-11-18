@@ -7,12 +7,15 @@ import { test } from 'node:test';
 
 const src = import.meta.dirname;
 
-/** Vad varje mapp får läsa av de andra. `typer` betyder bara med `import type`. */
+/**
+ * Vad varje mapp får läsa av de andra. `typer` betyder bara med `import type`: webbläsarens kod (lab, casino) läser
+ * kärnan bara så, eftersom kärnan körs i servern. En ny mapp under src/ måste stå här innan den får kod.
+ */
 const MAY_READ: Record<string, Record<string, 'allt' | 'typer'>> = {
   engine: {},
   scene: { engine: 'typer' },
-  lab: { scene: 'allt', engine: 'allt' },
-  casino: { scene: 'allt', engine: 'allt' },
+  lab: { scene: 'allt', engine: 'typer' },
+  casino: { scene: 'allt', engine: 'typer' },
   pipeline: { scene: 'allt' },
   server: { engine: 'allt', pipeline: 'allt' },
 };
@@ -67,25 +70,42 @@ test('importer hittas i alla sina former', () => {
   );
 });
 
-test('ingen mapp under src läser en mapp den inte får läsa', () => {
+/** Det filen på `path` (under src/) läser utan att få: en rad per brott. */
+function breaches(path: string, text: string): string[] {
+  const from = folderOf(path);
+  const name = relative(src, path).replaceAll('\\', '/');
+  const rules = MAY_READ[from];
+  if (!rules) return [`${name} ligger i src/${from}, som inte har några gränser i provet`];
   const broken: string[] = [];
-  const files = readdirSync(src, { recursive: true, withFileTypes: true }).filter(
-    (item) => item.isFile() && /\.tsx?$/.test(item.name),
-  );
-  for (const item of files) {
-    const path = join(item.parentPath, item.name);
-    const from = folderOf(path);
-    const rules = MAY_READ[from];
-    if (!rules) continue;
-    for (const entry of importsOf(readFileSync(path, 'utf8'))) {
-      if (!entry.specifier.startsWith('.')) continue;
-      const to = folderOf(resolve(dirname(path), entry.specifier));
-      if (to === from) continue;
-      const allowed = rules[to];
-      if (allowed === undefined || (allowed === 'typer' && !entry.typeOnly)) {
-        broken.push(`${relative(src, path).replaceAll('\\', '/')} läser ${to}: ${entry.line}`);
-      }
-    }
+  for (const entry of importsOf(text)) {
+    if (!entry.specifier.startsWith('.')) continue;
+    const to = folderOf(resolve(dirname(path), entry.specifier));
+    if (to === from) continue;
+    const allowed = rules[to];
+    if (allowed === undefined || (allowed === 'typer' && !entry.typeOnly)) broken.push(`${name} läser ${to}: ${entry.line}`);
   }
+  return broken;
+}
+
+test('ett brott mot en gräns hittas: fel mapp, kärnan utan import type, en mapp utan gränser', () => {
+  const lab = join(src, 'lab', 'Prov.tsx');
+  const text = ["import type { Signal } from '../engine/seats.ts';", "import { readScene } from '../scene/description.ts';", "import { core } from '../engine/core.ts';", "import { viewRegistry } from '../pipeline/registry.ts';"].join('\n');
+  assert.deepEqual(breaches(lab, text), [
+    "lab/Prov.tsx läser engine: import { core } from '../engine/core.ts'",
+    "lab/Prov.tsx läser pipeline: import { viewRegistry } from '../pipeline/registry.ts'",
+  ]);
+  assert.deepEqual(breaches(join(src, 'engine', 'x.ts'), "import { a } from '../scene/a.ts';"), ["engine/x.ts läser scene: import { a } from '../scene/a.ts'"]);
+  assert.deepEqual(breaches(join(src, 'ny', 'x.ts'), ''), ['ny/x.ts ligger i src/ny, som inte har några gränser i provet']);
+});
+
+test('ingen mapp under src läser en mapp den inte får läsa', () => {
+  const files = readdirSync(src, { recursive: true, withFileTypes: true }).filter(
+    // Filer direkt under src/, som det här provet, hör inte till någon mapp.
+    (item) => item.isFile() && /\.tsx?$/.test(item.name) && item.parentPath !== src,
+  );
+  const broken = files.flatMap((item) => {
+    const path = join(item.parentPath, item.name);
+    return breaches(path, readFileSync(path, 'utf8'));
+  });
   assert.deepEqual(broken, []);
 });

@@ -2,23 +2,20 @@
 // En cykel (content/moves/cykel-*.json) börjar och slutar i REDO; sista bilden är REDO-ankaret med märkkortet lagt på
 // kortplatsen. Kortets hörn räknas ur dockan och scenen (dollPose.ts, geometry.ts), aldrig ur bilden.
 //
-//   node src/pipeline/cykel.ts horn <cykel> [vy]
-//     Skriver output/forlagor/<cykel>_<vy>-nara_korthorn.json: det lagda kortets fyra hörn i bildpunkter för varje
-//     plats och kortplats, i förlagans ruta.
-//   node src/pipeline/cykel.ts sista <cykel> <ankare.png> <plats> <kort> <ut.png> [vy]
-//     Målar märkkortet enfärgat i ankaret där cykeln lägger det, i den färg sidan som är upp har.
+// Det här är ett bibliotek. Kommandot är src/pipeline/tagning.ts, som gör sista bilden (lastPicture) när en tagning
+// förbereds och mäter klippet mot kortets hörn (cornersIn) när den tas emot.
 //
 // Vyn är `spelaren` eller `plats-N`, och alltid dess närbild. Kort är kortplatsens nummer på platsen, 0 för den första.
-// Kommandot avgör ingenting i spelet: det räknar var dockan lägger kortet och målar det där.
+// Ingenting här avgör något i spelet: det räknar var dockan lägger kortet och målar det där.
 
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import sharp from 'sharp';
 import type { Rgb } from '../scene/dealer.ts';
 import { readScene, type SceneDescription } from '../scene/description.ts';
 import { MARK_BACK, MARK_FACE } from '../scene/doll.ts';
 import { moveFor, poseAt, readCycle, readDoll, readMove, type CardPose, type DollCycle, type DollDescription, type DollMove } from '../scene/dollPose.ts';
-import { framed, see, viewEye, viewName, type Eye, type Pixel, type SeatView } from '../scene/geometry.ts';
+import { framed, see, viewEye, type Eye, type Pixel, type SeatView } from '../scene/geometry.ts';
 
 export class CycleError extends Error {}
 
@@ -68,8 +65,11 @@ const rgbOf = (colour: number): Rgb => [(colour >> 16) & 255, (colour >> 8) & 25
 /** Märkkortets färg för sidan som är upp: gul baksida eller blå framsida, som dockan ritar dem (doll.ts). */
 export const markColour = (card: CardPose): Rgb => rgbOf(card.up === 'framsida' ? MARK_FACE : MARK_BACK);
 
-// Hud: rödare än grön och blå. Samma gräns som när märkkortet målades i ankarna till given (output/work/giv-4/mala-kort.ts).
-const isSkin = (r: number, g: number, b: number): boolean => r > 105 && r > g + 8 && g >= b - 6 && r - b > 22;
+/**
+ * Hud: rödare än grön och blå. Samma gräns som när märkkortet målades i ankarna till given (output/work/giv-4/mala-kort.ts),
+ * och som tagningens mätningar letar givhanden med (matning.ts). Dealerns krämvita blus räknas också som hud.
+ */
+export const isSkin = (r: number, g: number, b: number): boolean => r > 105 && r > g + 8 && g >= b - 6 && r - b > 22;
 
 /**
  * Målar en fyrhörning enfärgad i en bild (RGB, tre kanaler, rad för rad). Hörnen är bildpunkternas mitt och går runt åt
@@ -131,46 +131,3 @@ export async function lastPicture(parts: CycleParts, anchor: string, seat: numbe
 
 const round = (value: number): number => Math.round(value * 100) / 100;
 
-/** Det lagda kortets hörn i vyns närbild för varje plats och kortplats. */
-export function cornerTable(parts: CycleParts, view: SeatView) {
-  const { scene, cycle } = parts;
-  const eye = forlagaEye(scene, view);
-  const cards = scene.places.seats.flatMap(({ seat, cards: places }) =>
-    places.map((place, index) => {
-      const card = laidCard(parts, seat, index);
-      return { seat, index, place, side: card.up, corners: cornersIn(eye, card).map((p) => [round(p.x), round(p.y)]) };
-    }),
-  );
-  return {
-    about: `Det lagda kortets fyra hörn i bildpunkter när cykeln ${cycle.id} är slut, för varje plats (seat) och kortplats (index, 0 är den första), sett genom vyns närbild i förlagans ruta. Räknade ur dockan och scenen (src/pipeline/cykel.ts: laidCard, cornersIn), inte mätta i bild. Bildpunkterna är punkternas mitt, med origo uppe till vänster och y nedåt. Hörnen går som i src/scene/geometry.ts, cardCorners: bortre vänstra, bortre högra, hitre högra, hitre vänstra. place är kortplatsen på filten i meter (content/scene.json). side är sidan som är upp.`,
-    cycle: cycle.id,
-    view,
-    frame: eye.frame,
-    eye: { position: eye.position, forward: eye.forward, focalPx: eye.focalPx },
-    cards,
-  };
-}
-
-if (import.meta.main) {
-  const [step, name, ...rest] = process.argv.slice(2);
-  try {
-    if (step === 'horn' && name) {
-      const view = closeView(rest[0]);
-      const table = cornerTable(readCycleParts(name), view);
-      const dir = join(root, 'output', 'forlagor');
-      mkdirSync(dir, { recursive: true });
-      const file = join(dir, `${name}_${viewName(view)}_korthorn.json`);
-      writeFileSync(file, `${JSON.stringify(table, null, 1)}\n`);
-      console.log(file);
-    } else if (step === 'sista' && name && rest.length >= 4) {
-      const [anchor, seat, index, out, word] = rest;
-      console.log(JSON.stringify(await lastPicture(readCycleParts(name), anchor!, Number(seat), Number(index), out!, closeView(word))));
-    } else {
-      console.error('node src/pipeline/cykel.ts horn <cykel> [vy]\nnode src/pipeline/cykel.ts sista <cykel> <ankare.png> <plats> <kort> <ut.png> [vy]');
-      process.exit(1);
-    }
-  } catch (error) {
-    console.error((error as Error).message);
-    process.exit(1);
-  }
-}

@@ -8,6 +8,7 @@ import { readScene, type SceneDescription, type Vec3 } from './description.ts';
 import {
   FINGERS,
   armHits,
+  fitHand,
   handSize,
   handSkeleton,
   inShoe,
@@ -18,6 +19,7 @@ import {
   readCycle,
   readDoll,
   readMove,
+  relaxedLeft,
   restPose,
   throughShoe,
   type CardPose,
@@ -477,6 +479,7 @@ test('cykeln läses, och fel i den sägs på svenska', () => {
   assert.throws(() => readCycle({ ...whole, seconds: 3.5 }), /Cykeln går inte att använda: seconds ska vara summan av parts/);
   assert.throws(() => readCycle({ ...whole, to: 'LAGT 4' }), /from och to ska vara samma/);
   assert.throws(() => readCycle({ ...whole, back: { ...whole.back, look: 0 } }), /back:/);
+  assert.throws(() => readCycle({ ...whole, back: { ...whole.back, close: whole.back.open / 2 } }), /open och close/);
   assert.throws(() => readCycle({ ...whole, basis: 'gissat' }), /basis och source/);
 });
 
@@ -561,6 +564,31 @@ for (const [seat, index] of CYCLES) {
     }
   });
 }
+
+test('cykelns hand: fingrarna släpper greppet till en avslappnad hand och sluter sig till nypet först vid skon', () => {
+  // Handens form utan läge och vridning: avstånden mellan handled, knogar och fingertoppar.
+  const POINTS = [0, 1, 5, 9, 13, 17, ...TIPS];
+  const shape = (hand: Vec3[]): number[] => POINTS.flatMap((a, i) => POINTS.slice(i + 1).map((b) => far(hand[a]!, hand[b]!)));
+  const apart = (a: number[], b: number[]): number => a.reduce((sum, value, k) => sum + Math.abs(value - b[k]!), 0) / a.length;
+  const relaxed = shape(fitHand(handSkeleton(doll), relaxedLeft(doll), 'left', [4, 8]));
+  for (const [seat, index] of [[4, 0], [1, 0], [7, 1]] as const) {
+    const move = cycleTo(seat, index);
+    const { letsGo, home } = move.back!;
+    const handAt = (share: number): Vec3[] => poseAt(scene, doll, move, (letsGo + share * (home - letsGo)) / move.fps).hands.left;
+    const grip = apart(shape(handAt(0)), relaxed);
+    const what = `plats ${seat}, kort ${index}`;
+    // Greppet är en annan form än den avslappnade handen, och nypet i skon också.
+    assert.ok(grip > 0.004, `${what}: greppet skiljer sig ${(grip * 1000).toFixed(1)} mm från den avslappnade handen`);
+    assert.ok(apart(shape(handAt(1)), relaxed) > 0.004, `${what}: nypet i skon`);
+    // Mellan open och close är handen avslappnad.
+    for (const share of [cycle.back.open + 0.02, (cycle.back.open + cycle.back.close) / 2, cycle.back.close - 0.02]) {
+      near(apart(shape(handAt(share)), relaxed), 0, 0.0005, `${what}: handen ${share.toFixed(2)} av vägen tillbaka`);
+    }
+    // Nypet formas först mot slutet: halvvägs mellan close och skon är handen ännu inte nypet.
+    const late = apart(shape(handAt((cycle.back.close + 1) / 2)), shape(handAt(1)));
+    assert.ok(late > 0.001, `${what}: handen är redan nypet ${(late * 1000).toFixed(1)} mm före skon`);
+  }
+});
 
 test('en cykel som har sparats och lästs igen spelas som den var', () => {
   const kept = cycleTo(7, 1);

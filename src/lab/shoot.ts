@@ -2,7 +2,8 @@
 // läggs i window.shot när förlagan är sparad eller har misslyckats. Sidan öppnas av src/pipeline/shoot.ts i en huvudlös
 // webbläsare; i Labbet sparas samma sak med knapparna i steget Scen. Båda går genom saveForlaga.
 
-import { buildScene, type Background, type Dealer, type DealerNote } from '../scene/build.ts';
+import { buildScene, type Background, type CardNote, type Dealer, type DealerNote } from '../scene/build.ts';
+import { filmOf } from '../scene/dealer.ts';
 import { readScene, type Frame, type SceneDescription } from '../scene/description.ts';
 import { isCycle, moveFor, readCycle, readDoll, readMove } from '../scene/dollPose.ts';
 import { saveForlaga, type ForlagaOrder, type Saved } from './forlaga.ts';
@@ -29,12 +30,14 @@ async function json(path: string): Promise<unknown> {
 }
 
 /**
- * Dealern så som scenen bygger den: dockans mått och rörelse läses ur content/, och rörelsen ställs om till platsen och
+ * Dealern så som scenen bygger den: en dealerfilm som en följd av klipp, där ett ensamt klipp skrivet som förr får
+ * beställningens kort `card`; dockans mått och rörelse läses ur content/, och rörelsen ställs om till platsen och
  * kortplatsen. En cykel läses med sin giv och spelas på givens egen plats om ingen annan sägs.
  */
-async function dealerOf(scene: SceneDescription, note: DealerNote | null): Promise<Dealer | null> {
+async function dealerOf(scene: SceneDescription, note: DealerNote | null, card: CardNote | null): Promise<Dealer | null> {
+  if (card && note?.kind !== 'film') throw new Error('Beställningens kort hör till en dealerfilm');
   if (!note) return null;
-  if (note.kind !== 'docka') return note;
+  if (note.kind === 'film') return filmOf(note, card);
   const doll = readDoll(await json('/content/doll.json'));
   const read = await json(`/content/moves/${note.move}.json`);
   const cycle = isCycle(read) ? readCycle(read) : undefined;
@@ -55,12 +58,12 @@ async function shoot(problems: string[]): Promise<Saved> {
   const host = document.getElementById('stage')!;
   host.style.width = `${frame.width}px`;
   host.style.height = `${frame.height}px`;
-  const handle = buildScene(host, scene, { urlOf: mediaUrl, dealer: await dealerOf(scene, shot.dealer), onProblem: (text) => problems.push(text), pixelRatio: 1 });
+  const dealer = await dealerOf(scene, shot.dealer, shot.card ?? null);
+  const handle = buildScene(host, scene, { urlOf: mediaUrl, dealer, onProblem: (text) => problems.push(text), pixelRatio: 1 });
   handle.resize(frame.width, frame.height);
   handle.setStudio(shot.studio);
   handle.setShoe(shot.shoe);
   handle.setPlaces(shot.places === true);
-  handle.setCard(shot.card ?? null);
   handle.setView(shot.view);
   const background: Background | null = shot.background ? { ...shot.background, url: mediaUrl(shot.background.file) } : null;
   await Promise.all([handle.ready, handle.setBackground(background)]);

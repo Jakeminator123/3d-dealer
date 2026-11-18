@@ -66,8 +66,18 @@ export type SceneDescription = {
    * kortplats på filten (`past`). `margin` är luften mot rutans kant, som andel av rutan.
    */
   film: Marked & { lift: number; frame: Frame; reach: { x: [number, number]; top: number; behind: number; past: number }; margin: number };
-  /** Kortet: bredd, höjd, tjocklek och hörnradie, och hur högt över filten scenens kort ritas (under `film.lift`). */
-  card: Marked & { width: number; height: number; thickness: number; corner: number; lift: number };
+  /**
+   * Kortet: bredd, höjd, tjocklek och hörnradie, och hur högt över filten scenens kort ritas (under `film.lift`); en
+   * kortplats andra kort ligger en tjocklek högre. `colours` är framsidan, dess kant och baksidan, 0–255 per kanal.
+   */
+  card: Marked & {
+    width: number;
+    height: number;
+    thickness: number;
+    corner: number;
+    lift: number;
+    colours: { face: [number, number, number]; edge: [number, number, number]; back: [number, number, number] };
+  };
   /** Kortplatser: kortets mitt på filten, för dealern och för varje spelarplats, i den ordning korten läggs. */
   places: Marked & { dealer: FeltPoint[]; seats: { seat: number; cards: FeltPoint[] }[] };
 };
@@ -132,7 +142,13 @@ export function readScene(value: unknown): SceneDescription {
   need(isNumber(film?.margin) && film.margin >= 0 && film.margin < 0.5, 'film.margin');
   marked(film, 'film');
   need([card?.width, card?.height, card?.thickness, card?.corner].every(isNumber), 'card');
-  need(isNumber(card?.lift) && card.lift > 0 && isNumber(film?.lift) && card.lift < film.lift, 'card.lift, under film.lift');
+  // Kortplatsens sista kort ligger ovanpå de andra, en tjocklek högre för varje, och ska fortfarande ligga under filmen.
+  const stacked = Math.max(1, ...(places?.seats ?? []).map((entry) => (Array.isArray(entry?.cards) ? entry.cards.length : 1)));
+  need(
+    isNumber(card?.lift) && card.lift > 0 && isNumber(film?.lift) && isNumber(card?.thickness) && card.lift + (stacked - 1) * card.thickness < film.lift,
+    'card.lift, under film.lift också för kortplatsens sista kort',
+  );
+  need([card?.colours?.face, card?.colours?.edge, card?.colours?.back].every(isRgb), 'card.colours');
   marked(card, 'card');
   need(Array.isArray(places?.dealer) && places.dealer.every((point) => isPoint(point, 2)), 'places.dealer');
   need(

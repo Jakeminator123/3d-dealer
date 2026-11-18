@@ -69,7 +69,7 @@ Varje vy som ska visa dealern går igenom Förlaga, Ankare och Film för sig. Do
 
 ## Runway
 
-- All generering går genom Runways MCP-server i agentchatten, på arbetsytan "Jakob", aldrig genom API-nycklar. Ramen står i [AGENTS.md](../AGENTS.md).
+- Generering går genom Runways MCP-server i agentchatten, på arbetsytan "Jakob". Regeln och ramen står i [AGENTS.md](../AGENTS.md).
 - Kontots saldo delas med andra sessioner. Läs saldot direkt före och direkt efter en beställning; annars går kostnaden inte att skilja ut. Beställningen förs in med `npm run reg -- order <beställning.json>` (fälten står i `Order` i `src/pipeline/registry.ts`): kostnaden är mätt bara när båda saldona är givna och skillnaden är krediterna.
 - En lokal fil laddas upp först (`init_upload`, `curl.exe` med adressen inom enkla citattecken i PowerShell, `complete_upload`) och ges som referens. En tidigare Runway-bild pekas ut med sitt `taskId`. Adressen förs in med `npm run reg -- upload <lokal fil> <adress> [assetId]`. Signaturen sparas inte (`origin` är publikt); en fil som behövs igen när adressen har gått ut laddas upp på nytt.
 - Kontrollera modellens indata med `whoami` och verktygets beskrivning före varje ny typ av beställning.
@@ -77,7 +77,7 @@ Varje vy som ska visa dealern går igenom Förlaga, Ankare och Film för sig. Do
 
 ## Rörelser och underlag
 
-- En rörelse för dockan läses ur de bästa verkliga klippen i gamla Dealer (Pamelas och Paos), som given till plats 4. Pamelas klipp till plats 1 och 7 är inte bra.
+- En rörelse för dockan läses ur de bästa verkliga klippen i gamla Dealer (Pamelas och Paos), som given till plats 4. Pamelas klipp till plats 1 och 7 är inte bra. local-studios "pamela" är inte gamla Dealers Pamela.
 - local-studio har ingen 3D-modell av en dealer (sökt 2026-11-18, också i `Stortest.zip` och `C:\Users\jakem\Desktop\wow`). Dess "3D-dealer" är en platt film på ett nät med en bula för underarmarna, 0,46 m fram över bordet. Där finns Livs 44 klipp (VILA → REDO, REDO → REDO, REDO → VILA och VILA → VILA per plats) och Görans klipp till alla sju platser, som rörelsereferens.
 
 ## Visat och inte visat

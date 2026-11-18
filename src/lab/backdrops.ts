@@ -1,6 +1,7 @@
 // Det steget Scen läser ur registret: bakgrunderna med sina startvärden, och dealerfilmerna att välja mellan.
 
-import type { DealerNote, SeatView } from '../scene/build.ts';
+import type { SeatView } from '../scene/build.ts';
+import type { OneClipNote } from '../scene/dealer.ts';
 import { kindOf, sectionsOf, type Asset, type Item, type Registry } from './registry.ts';
 
 /**
@@ -56,7 +57,7 @@ export const backdropKind = (asset: Asset): '360' | 'platt' => (asset.kind === '
  * filmen då det ligger. Från den tiden visar scenen sitt eget kort där.
  */
 type Landing = { seat: number; index: number; at: number };
-type DealerChoice = { dealer: Extract<DealerNote, { kind: 'film' }>; label: string; film: boolean; lands?: Landing };
+type DealerChoice = { dealer: OneClipNote; label: string; film: boolean; lands?: Landing };
 
 /** Vyn en dealerfilm är gjord i, så som posten bär den (`view`). Null när posten inte säger en vy som går att använda. */
 function madeIn(asset: Asset): SeatView | null {

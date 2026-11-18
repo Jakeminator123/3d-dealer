@@ -1,5 +1,6 @@
 // Dealerns bild som textur: en film eller en stillbild på grön skärm, läst från en adress, för den vikta ytan (film.ts).
-// En film styrs här på samma sätt som dockans rörelse (Clip).
+// En film styrs här på samma sätt som dockans rörelse (Clip). Följden i film.ts styr filmerna: en film går inte av sig
+// själv och börjar inte om, utan står på sin sista ruta när den är slut.
 
 import * as THREE from 'three';
 import { prepareKeyTexture } from './key.ts';
@@ -58,9 +59,17 @@ function screenColour(picture: HTMLVideoElement | HTMLImageElement): [number, nu
 /**
  * Läser filmen eller stillbilden på adressen `url`. `anisotropy` är grafikkortets högsta. `shown` anropas när första
  * rutan är läst, `changed` för varje ny ruta, och `problem` när filen inte gick att läsa; `what` är vad den kallas då.
- * En film går av sig själv från början, utan ljud och om och om igen.
+ * En film går utan ljud när den får `play`, och står på sin sista ruta när den är slut; då anropas `ended`.
  */
-export function loadPicture(url: string, anisotropy: number, shown: () => void, changed: () => void, problem: (text: string) => void, what: string): Picture {
+export function loadPicture(
+  url: string,
+  anisotropy: number,
+  shown: () => void,
+  changed: () => void,
+  problem: (text: string) => void,
+  what: string,
+  ended: () => void = () => {},
+): Picture {
   let closed = false;
   let release = (): void => {};
   let clip: Clip | null = null;
@@ -71,9 +80,12 @@ export function loadPicture(url: string, anisotropy: number, shown: () => void, 
   if (isFilm(url)) {
     const video = document.createElement('video');
     video.muted = true;
-    video.loop = true;
+    video.loop = false;
     video.playsInline = true;
     video.preload = 'auto';
+    video.addEventListener('ended', () => {
+      if (!closed) ended();
+    });
     element = video;
     texture = new THREE.VideoTexture(video);
     const perFrame = 'requestVideoFrameCallback' in video;
@@ -100,8 +112,8 @@ export function loadPicture(url: string, anisotropy: number, shown: () => void, 
       video.load();
     };
 
-    // Om filmen ska gå. Den som pausar innan filmen är läst får den stående på första rutan.
-    let wanted = true;
+    // Om filmen ska gå. Den står på första rutan tills någon ber den gå.
+    let wanted = false;
     // En film utan ljud får starta av sig själv. Nekas den ändå står rutan kvar.
     const start = (): void => {
       video.play().catch(() => {});

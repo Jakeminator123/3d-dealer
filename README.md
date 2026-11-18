@@ -8,16 +8,15 @@ Två lägen delar samma scen: **Labbet**, där en dealer skapas och granskas, oc
 
 ```
 npm install
-npm run dev
+npm start
 ```
 
-Öppna sedan http://localhost:5310/lab/. Servern svarar bara på den här datorn och laddar inte om sin egen kod: starta om den efter en ändring i `src/server` eller `src/pipeline`. `npm test` kör testerna och `npm run typecheck` typkontrollen.
+- `npm start` startar servern dold i bakgrunden, med logg i `output/server-5310.log`, och säger till när http://localhost:5310/lab/ svarar.
+- `npm stop` stoppar den.
 
-Kommandona för produktionen (`node src/pipeline/shoot.ts`, och `npm run reg` för registret) står i [docs/production.md](docs/production.md) och [AGENTS.md](AGENTS.md).
+`npm run dev` kör servern i en terminal i stället; Ctrl+C stoppar. Servern svarar bara på den här datorn och startar om sig själv när dess kod ändras, och Labbets sida laddar då om sig. `PORT` väljer en annan port. `npm test` kör testerna och `npm run typecheck` typkontrollen.
 
-## Läget
-
-Labbet har två steg: Granska, där allt i bildregistret visas och döms, och Scen, där bord, sko, rum och dealer ses ur spelarnas vyer. Produktionskedjan är körd en gång: Paulina ger ett kort till plats 4. Spelet är inte byggt än. Se [docs/status.md](docs/status.md).
+Kommandona för produktionen (`node src/pipeline/shoot.ts` för förlagor, `npm run reg` för registret) står i [docs/production.md](docs/production.md) och [AGENTS.md](AGENTS.md). Läget står i [docs/status.md](docs/status.md).
 
 ## Karta
 
@@ -34,7 +33,7 @@ Labbet har två steg: Granska, där allt i bildregistret visas och döms, och Sc
 | `docs/` | Fyra dokument, ett ämne var. | ja |
 | `information/` | Bakgrund: samtal, extern granskning, underlaget från inläsningen och gamla filmhandboken. | ja |
 | `glb/` | Jakobs råmaterial (tunga modeller och bilder), orört. | nej |
-| `output/` | Sådant som kan göras om: förlagor, förhandsbilder, arbetsmaterial och arkiverade filer (`output/work/arkiv/`). | nej |
+| `output/` | Sådant som kan göras om: förlagor, förhandsbilder, serverns logg, arbetsmaterial och arkiverade filer (`output/work/arkiv/`). | nej |
 
 ## Dokument
 

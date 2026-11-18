@@ -1,5 +1,5 @@
-// Nyckeln: materialet som tar bort den gröna skärmen ur dealerfilmen på den vikta ytan (film.ts) och, när kortet ligger,
-// märkkortets blå.
+// Nyckeln: materialet som tar bort den gröna skärmen ur dealerfilmen på den vikta ytan (film.ts) och gör märkkortet till
+// ett spelkort: det gula och det blå målas med kortets färger, och när kortet ligger tas det blå bort (marker.ts).
 //
 // Nyckeln är förd över ur gamla Dealer (src/scene3d-film.ts, FRAGMENT, commit 1198340774d8ee78be218506a169faeaa781fa22):
 // skärmens andel av en bildpunkt, konturen indragen en bildpunkt, det gröna spillet och den rena kanten (edgeClean, där
@@ -7,6 +7,7 @@
 
 import * as THREE from 'three';
 import type { Frame } from './description.ts';
+import { MARKER_GLSL, markerUniforms, type CardColours } from './marker.ts';
 
 // Nyckelns gränser: skärmens grönhet är 1, och en bildpunkt är helt dealer under LO och helt skärm över HI.
 // Värdena är gamla projektets för den upprätta delen (lo 0,12 och hi 0,9 − 0,08).
@@ -16,6 +17,15 @@ const HI = 0.82;
 const ERODE = 0.6;
 // Steget mellan nyckelns prov, i rutans bildpunkter. Kanten letas två och fyra steg ut och färgen hämtas fem steg in.
 const STEP = 1.4;
+
+/**
+ * Hur mycket av en bildpunkt som är skärm, som nyckeln räknar det (screenOf nedan): 0 är dealer, 1 är skärm. Färgerna är
+ * 0–255. För mätningar av en film utanför webbläsaren (src/pipeline/matning.ts).
+ */
+export function screenShare(r: number, g: number, b: number, key: readonly [number, number, number]): number {
+  const range = Math.max((key[1] - Math.max(key[0], key[2])) / 255, 0.05);
+  return Math.min(1, Math.max(0, ((g - Math.max(r, b)) / 255 / range - LO) / (HI - LO)));
+}
 
 // Bilden på den vikta ytan hämtas där kameran som gjorde den såg punkten: punktens plats i världen, genom kamerans
 // projektion. Bilden är gjord i scenen som den står, med bordet lutat.
@@ -46,13 +56,7 @@ float screenOf(vec3 c, float range) {
 float screenAt(vec2 uv, float range) {
   return screenOf(texture2D(map, uv).rgb, range);
 }
-// Hur mycket av en bildpunkt som är märkkortets blå: 0 är inget, 1 är märkkort.
-float blueOf(vec3 c) {
-  return smoothstep(0.1, 0.2, c.b - max(c.r, c.g));
-}
-float blueAt(vec2 uv) {
-  return blueOf(texture2D(map, uv).rgb);
-}
+${MARKER_GLSL}
 
 void main() {
   if (vFilm.w <= 0.0) discard;
@@ -97,21 +101,13 @@ void main() {
 
   // Den indragna konturen tunnar ut punkten, den färgar inte om den.
   colour *= alpha / max(whole, 0.001);
-  // Märkkortets blå framsida: när kortet ligger tas det blå bort, så att scenens kort syns där under handen.
-  // Blått över rött och grönt finns bara i märkkortet: hud, kläder och tatueringar har det inte. Kortets kant är en
-  // blandning av blått och skärm; en punkt som är blåare än röd och har märkkort intill sig tas därför också bort.
-  float blue = blueOf(c);
-  float beside = max(
-    max(blueAt(uv + vec2(two.x, 0.0)), blueAt(uv - vec2(two.x, 0.0))),
-    max(blueAt(uv + vec2(0.0, two.y)), blueAt(uv - vec2(0.0, two.y))));
-  beside = max(beside, max(
-    max(blueAt(uv + vec2(four.x, 0.0)), blueAt(uv - vec2(four.x, 0.0))),
-    max(blueAt(uv + vec2(0.0, four.y)), blueAt(uv - vec2(0.0, four.y)))));
-  float gone = marker * max(blue, beside * smoothstep(0.05, 0.15, c.b - c.r));
-  colour *= 1.0 - gone;
-  alpha *= 1.0 - gone;
-  if (alpha < 0.004) discard;
-  gl_FragColor = vec4(colour, alpha);
+  // Märkkortet blir ett spelkort, och när kortet ligger tas det blå bort, så att scenens kort syns där under handen
+  // (marker.ts). Det målade kortet ritas över scenens sko.
+  float front;
+  vec4 marked = markCard(uv, c, colour, alpha, range, front);
+  if (marked.a < 0.004) discard;
+  gl_FragDepth = frontDepth(front);
+  gl_FragColor = marked;
 }`;
 
 export type Key = {
@@ -119,8 +115,10 @@ export type Key = {
   material: THREE.ShaderMaterial;
   /** Skärmens färg i bilden, 0–255 per kanal. */
   setScreen(red: number, green: number, blue: number): void;
-  /** Tar bort märkkortets blå ur bilden, eller låter det vara. */
+  /** Tar bort märkkortets blå ur bilden, eller målar det som kortets framsida. */
   setMarker(gone: boolean): void;
+  /** Byter bilden: en följds nästa klipp. */
+  setMap(map: THREE.Texture): void;
 };
 
 /**
@@ -136,15 +134,16 @@ export function prepareKeyTexture(texture: THREE.Texture, anisotropy: number): v
 
 /**
  * Nyckelns material för en bild i rutan `frame`, gjord genom kameran `projection` (projektion gånger vy): bilden ligger
- * där den kameran såg ytans punkter.
+ * där den kameran såg ytans punkter. Märkkortet målas med kortets färger `card`.
  */
-export function createKey(map: THREE.Texture, frame: Frame, projection: THREE.Matrix4): Key {
+export function createKey(map: THREE.Texture, frame: Frame, projection: THREE.Matrix4, card: CardColours): Key {
   const uniforms = {
     map: { value: map },
     film: { value: projection },
     key: { value: new THREE.Vector3(0, 1, 0) },
     texel: { value: new THREE.Vector2(STEP / frame.width, STEP / frame.height) },
     marker: { value: 0 },
+    ...markerUniforms(card),
   };
   const material = new THREE.ShaderMaterial({
     uniforms,
@@ -162,6 +161,9 @@ export function createKey(map: THREE.Texture, frame: Frame, projection: THREE.Ma
     },
     setMarker(gone) {
       uniforms.marker.value = gone ? 1 : 0;
+    },
+    setMap(next) {
+      uniforms.map.value = next;
     },
   };
 }

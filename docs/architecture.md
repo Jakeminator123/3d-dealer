@@ -34,7 +34,7 @@ server ───> engine, pipeline
 | `src/lab` | Stegen Scen, Dealer, Klipp, Granska, Spela | Har ingen egen scen eller uppspelning |
 | `src/casino` | En riktig runda från vald plats | Har ingen egen scen eller uppspelning |
 | `src/pipeline` | Förlaga, beställning, och registret (`registry.ts`, den enda vägen till `content/register.db`) | Spelar inte, avgör inget i spelet |
-| `src/server` | Lokal spelsession, filer, jobb | Har ingen logik som hör till kärnan |
+| `src/server` | Registret, filerna och förlagorna över HTTP; senare spelsessionen | Har ingen logik som hör till kärnan |
 
 Pilarna är importer. Labbet och Casinot når servern över HTTP (`/api`, `/media`, `/thumb`), inte genom import. Gränserna prövas av `src/boundaries.test.ts`.
 

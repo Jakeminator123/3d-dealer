@@ -19,6 +19,7 @@ import {
   archive,
   check,
   createRegister,
+  dropMeasurements,
   expiryOf,
   getEntry,
   importAsset,
@@ -442,6 +443,18 @@ test('en mätning förs in för en fil som har en post, och syns när filen visa
   assert.deepEqual(about(root, 'dealers/p/clips/giv.mp4').measurements.map((row) => [row.what, row.value]), [['kortet stilla från', '3,29 s'], ['kort per ruta', '[{"frame":79}]']]);
   assert.throws(() => addMeasurement(root, { file: 'scene/finns-inte.png', what: 'x', value: '1', basis: 'mätt' }), /Ingen post/);
   assert.equal(getEntry(root, 'dealers/p/clips/giv.mp4')!.source && 'measured' in (getEntry(root, 'dealers/p/clips/giv.mp4')!.source as object), false, 'en egen mätning är inte postens');
+});
+
+test('en mätares egna mätningar av en fil kan tas bort för att mätas om; andras och postens står kvar', () => {
+  addEntry(root, entry('dealers/p/clips/giv.mp4', { group: 'clips', source: { measured: { lands: 1.92 } } }));
+  addMeasurement(root, { file: 'dealers/p/clips/giv.mp4', what: 'takt', value: '1,49', basis: 'mätt', who: 'src/pipeline/tagning.ts' });
+  addMeasurement(root, { file: 'dealers/p/clips/giv.mp4', what: 'skon', value: '1,44', basis: 'mätt', who: 'src/pipeline/tagning.ts' });
+  addMeasurement(root, { file: 'dealers/p/clips/giv.mp4', what: 'takt', value: '1,49', basis: 'mätt', who: 'granskaren' });
+  assert.equal(dropMeasurements(root, 'assets/dealers/p/clips/giv.mp4', 'src/pipeline/tagning.ts'), 2);
+  assert.deepEqual(about(root, 'dealers/p/clips/giv.mp4').measurements.map((row) => row.who), ['granskaren']);
+  assert.deepEqual((getEntry(root, 'dealers/p/clips/giv.mp4')!.source as { measured: unknown }).measured, { lands: 1.92 });
+  assert.equal(dropMeasurements(root, 'dealers/p/clips/giv.mp4', 'src/pipeline/tagning.ts'), 0);
+  assert.throws(() => dropMeasurements(root, 'dealers/p/clips/giv.mp4', ''), RegistryError);
 });
 
 test('summeringen räknar poster per grupp och status, och de andra tabellerna', () => {

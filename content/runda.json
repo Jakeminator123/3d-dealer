@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "about": "En runda: ordningen dealern delar ut korten i, valörerna scenen lägger, och hur rundan sparas som film. Läses av src/pipeline/runda.ts. Ingenting här avgör spelet: när spelkärnan delar ut säger den vilka kort som läggs och i vilken ordning.",
+  "order": [
+    { "seat": 1, "index": 0 },
+    { "seat": 2, "index": 0 },
+    { "seat": 3, "index": 0 },
+    { "seat": 4, "index": 0 },
+    { "seat": 5, "index": 0 },
+    { "seat": 6, "index": 0 },
+    { "seat": 7, "index": 0 },
+    { "seat": 1, "index": 1 },
+    { "seat": 2, "index": 1 },
+    { "seat": 3, "index": 1 },
+    { "seat": 4, "index": 1 },
+    { "seat": 5, "index": 1 },
+    { "seat": 6, "index": 1 },
+    { "seat": 7, "index": 1 }
+  ],
+  "faces": ["A♠", "K♥", "7♦", "10♣", "Q♠", "4♥", "9♦", "J♣", "2♠", "8♥", "5♣", "A♦", "6♠", "3♥"],
+  "basis": "antaget",
+  "source": "Ordningen är Jakobs mål 2026-11-18: Paulina delar ut till alla sju platser, två kort per plats, plats 1–7 första kortet och sedan plats 1–7 andra kortet. Dealerns egna kort är inte med: de har inga klipp än. index är vilket av platsens kort, 0 för det första (kortplatserna i content/scene.json). faces är valörerna i samma ordning, en fast följd vald av agenten 2026-11-18 som stå-in tills spelkärnan säger vilka kort som läggs.",
+  "film": {
+    "background": "scene/backgrounds/balsal.jpg",
+    "fps": 24,
+    "hold": 1.5,
+    "basis": "antaget",
+    "source": "Rundan som film, valt av agenten 2026-11-18: ur vyn med rum, i balsalen som i cykelpilotens bevis, med bakgrundens visning ur registrets oldView och rummets mått ur content/scene.json. 24 rutor/s som klippen från Kling 4, så att varje ruta i varje klipp syns en gång. Efter sista klippet står dess sista ruta kvar hold sekunder, så att alla kort syns lagda."
+  }
+}

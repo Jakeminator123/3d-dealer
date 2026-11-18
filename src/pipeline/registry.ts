@@ -974,6 +974,15 @@ export function addMeasurement(root: string, measurement: Measurement): number {
   });
 }
 
+/**
+ * Tar bort de mätningar av en fil som `who` har fört in, så att samma mätare kan föra in dem på nytt när den mäter om
+ * (src/pipeline/tagning.ts). Postens egna mått (source.measured) och andras mätningar rörs inte. Svaret är antalet.
+ */
+export function dropMeasurements(root: string, file: string, who: string): number {
+  if (!who) throw new RegistryError('Säg vems mätningar som ska tas bort');
+  return writing(root, (db) => Number(db.prepare('DELETE FROM measurements WHERE file = ? AND who = ? AND post_key IS NULL').run(pathOf(file), who).changes));
+}
+
 // ---------------------------------------------------------------------------------------------------------------
 // Att fråga registret.
 

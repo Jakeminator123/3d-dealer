@@ -1,11 +1,8 @@
-# Indexeras inte, men går att läsa när det behövs.
+# Indexeras inte, men går att läsa när det behövs. Det som aldrig läses som text står i .cursorignore.
 
 # Media och arbetsmaterial: bilder ses en i taget, aldrig genom sökning
 assets/
 output/
-
-# Registret är en databas: fråga den med npm run reg, läs den aldrig som text
-content/register.db
 
 # Stora bakgrundstexter: läs med Grep eller offset/limit, inte i sin helhet
 information/filmhandbok-gamla-dealer.md

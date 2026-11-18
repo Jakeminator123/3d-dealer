@@ -85,24 +85,19 @@ const encodePath = (file: string): string => file.split('/').map(encodeURICompon
 export const mediaUrl = (file: string): string => `/media/${encodePath(file)}`;
 export const thumbUrl = (file: string, width: number): string => `/thumb/${encodePath(file)}?w=${width}`;
 
-export async function fetchRegistry(): Promise<Registry> {
-  const response = await fetch('/api/registry');
-  if (!response.ok) throw new Error(`Registret gick inte att läsa (${response.status})`);
-  return (await response.json()) as Registry;
-}
-
-async function post(path: string, body: unknown, failure: string): Promise<Registry> {
-  const response = await fetch(path, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
+/** Registret ur ett svar från servern, eller ett fel med serverns skäl (`error`) när det inte gick. */
+async function registryOf(response: Response, failure: string): Promise<Registry> {
   if (!response.ok) {
     const problem = (await response.json().catch(() => null)) as { error?: string } | null;
-    throw new Error(problem?.error ?? `${failure} (${response.status})`);
+    throw new Error(problem?.error ? `${failure}: ${problem.error}` : `${failure} (${response.status})`);
   }
   return (await response.json()) as Registry;
 }
+
+export const fetchRegistry = async (): Promise<Registry> => registryOf(await fetch('/api/registry'), 'Registret gick inte att läsa');
+
+const post = async (path: string, body: unknown, failure: string): Promise<Registry> =>
+  registryOf(await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }), failure);
 
 export const saveStatus = (file: string, status: string): Promise<Registry> =>
   post('/api/registry/status', { file, status }, 'Omdömet gick inte att spara');

@@ -85,8 +85,9 @@
     "thickness": 0.0003,
     "corner": 0.0035,
     "lift": 0.0006,
+    "colours": { "face": [251, 250, 246], "edge": [201, 198, 189], "back": [160, 30, 45] },
     "basis": "antaget",
-    "source": "Standardmått för pokerkort, 63 × 88 mm, som i gamla kontraktet (cardMillimetres). Tjocklek och hörnradie ur gamla linsens CARD. Inget kort är mätt. lift är hur högt över filten scenens kort ritas: under dealerfilmens liggande del (film.lift), så att handen ritas över kortet."
+    "source": "Standardmått för pokerkort, 63 × 88 mm, som i gamla kontraktet (cardMillimetres). Tjocklek och hörnradie ur gamla linsens CARD. Inget kort är mätt. lift är hur högt över filten scenens kort ritas: under dealerfilmens liggande del (film.lift), så att handen ritas över kortet. En kortplats andra kort ligger en tjocklek högre än det första, ovanpå det. colours är kortets färger, 0–255 per kanal: framsidan och dess kant som scenens kort ritas med (förr fasta i src/scene/cards.ts), och baksidan. Nyckeln målar filmens märkkort med dem: det gula med baksidan, med framsidans färg som kant, och det blå med framsidan medan kortet är i luften (src/scene/marker.ts). Baksidan är vald 2026-11-18 av agenten, en klassisk röd; ingen färg är mätt."
   },
   "places": {
     "dealer": [

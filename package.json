@@ -6,7 +6,9 @@
     "node": ">=24"
   },
   "scripts": {
-    "dev": "node src/server/main.ts",
+    "dev": "node --watch --watch-preserve-output src/server/main.ts",
+    "start": "node src/server/background.ts start",
+    "stop": "node src/server/background.ts stop",
     "test": "node --test \"src/**/*.test.ts\"",
     "typecheck": "tsc --noEmit",
     "reg": "node src/pipeline/registry.ts"

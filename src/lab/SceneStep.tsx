@@ -2,7 +2,7 @@
 // vrider runt i miljön och sätter sitt omdöme på dem. Härifrån sparas också förlagor: scenen som bild eller klipp ur en vy.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { buildScene, type Background, type CardNote, type Dealer, type SceneHandle, type View } from '../scene/build.ts';
+import { buildScene, type Background, type Dealer, type FilmNote, type SceneHandle, type View } from '../scene/build.ts';
 import { readScene, type SceneDescription } from '../scene/description.ts';
 import { seatsOf } from '../scene/geometry.ts';
 import { backdropItems, backdropKind, dealerChoices, PLAIN, sameLook, startLook, type Look } from './backdrops.ts';
@@ -102,8 +102,14 @@ function Workbench({ registry, scene, route, problem, onProblem, onJudge, onSay 
   const dealers = dealerChoices(registry, DEALER);
   // Från början visas den första dealerfilmen: en film före en stillbild.
   const choice = dealers.find((entry) => entry.dealer.file === dealerFile) ?? dealers[0] ?? null;
-  const dealer = choice?.dealer ?? null;
-  const card: CardNote | null = choice?.lands ? { seat: choice.lands.seat, index: choice.lands.index, face: SHOWN_CARD, from: choice.lands.at } : null;
+  // Den valda dealerfilmen är en följd med ett klipp, med scenens kort där klippet lägger sitt.
+  const dealer: FilmNote | null = choice
+    ? {
+        kind: 'film',
+        view: choice.dealer.view,
+        clips: [{ file: choice.dealer.file, ...(choice.lands ? { card: { seat: choice.lands.seat, index: choice.lands.index, face: SHOWN_CARD, at: choice.lands.at } } : {}) }],
+      }
+    : null;
 
   // Ett fel som gällde förra bakgrunden ska inte stå kvar över nästa.
   const file = chosen?.asset.file;
@@ -170,7 +176,6 @@ function Workbench({ registry, scene, route, problem, onProblem, onJudge, onSay 
           <Stage
             scene={scene}
             dealer={dealer}
-            card={card}
             paused={paused}
             background={background}
             view={view}
@@ -191,7 +196,7 @@ function Workbench({ registry, scene, route, problem, onProblem, onJudge, onSay 
             <select
               className="pick"
               aria-label="Dealer"
-              value={dealer?.file ?? ''}
+              value={choice?.dealer.file ?? ''}
               onChange={(event) => {
                 setDealerFile(event.currentTarget.value);
                 setPaused(false);
@@ -340,10 +345,11 @@ function Workbench({ registry, scene, route, problem, onProblem, onJudge, onSay 
 
 type StageProps = {
   scene: SceneDescription;
-  /** Dealern. Scenen byggs om när den byts mot en annan, inte när samma dealer kommer som ett nytt värde. */
+  /**
+   * Dealern, med scenens kort där klippet lägger sitt. Scenen byggs om när den byts mot en annan, inte när samma dealer
+   * kommer som ett nytt värde.
+   */
   dealer: Dealer | null;
-  /** Scenens kort där klippet lägger sitt, när klippet säger var och när. */
-  card: CardNote | null;
   /** Om dealerns film står stilla. */
   paused: boolean;
   background: Background | null;
@@ -356,7 +362,7 @@ type StageProps = {
 };
 
 /** 3D-ytan. Den har kamerans sidförhållande och fyller så mycket av platsen som ryms. */
-function Stage({ scene, dealer, card, paused, background, view, shoe, onMoved, onProblem, onHandle }: StageProps) {
+function Stage({ scene, dealer, paused, background, view, shoe, onMoved, onProblem, onHandle }: StageProps) {
   const holder = useRef<HTMLDivElement>(null);
   const [handle, setHandle] = useState<SceneHandle | null>(null);
   // Dealern som text: lika för två värden som säger samma sak.
@@ -397,11 +403,6 @@ function Stage({ scene, dealer, card, paused, background, view, shoe, onMoved, o
   useEffect(() => {
     handle?.setShoe(shoe);
   }, [handle, shoe]);
-
-  const cardKey = JSON.stringify(card);
-  useEffect(() => {
-    handle?.setCard(JSON.parse(cardKey) as CardNote | null);
-  }, [handle, cardKey]);
 
   const { width, height } = scene.camera.frame;
   return (

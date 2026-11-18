@@ -128,6 +128,8 @@ export type Back = { letsGo: number; home: number; pace: number; lift: number; b
  * kortet (`onCard`), vägen tillbaka till nästa kort i skon (`back`) och stilla i REDO (`still`). De ska tillsammans
  * vara `seconds`.
  * `back` är bågen tillbaka: `lift` meter över den raka vägen som mest, och andelarna `release` och `look` (se Back).
+ * Handen är avslappnad på vägen tillbaka: fingrarna öppnar sig ur greppet till dockans vilande hand tills andelen `open`
+ * av vägen är gången, och sluter sig till nypet från andelen `close` tills handen är i skon.
  */
 export type DollCycle = Marked & {
   schemaVersion: number;
@@ -138,7 +140,7 @@ export type DollCycle = Marked & {
   give: string;
   seconds: number;
   parts: { ready: number; deal: number; onCard: number; back: number; still: number };
-  back: { lift: number; release: number; look: number };
+  back: { lift: number; release: number; look: number; open: number; close: number };
 };
 
 /** En arm: axel, armbåge och handled. `reached` är falskt när handleden ligger längre bort än armen räcker. */
@@ -708,6 +710,12 @@ function heldOf(points: Vec3[]): Held {
   return { grip, axes: [forward, palm, across], local };
 }
 
+/**
+ * En avslappnad vänsterhand: dockans vilande högerhand (content/doll.json, hand.rest) spegelvänd, som i VILA. Fingrarna är
+ * lätt krökta och skilda åt, utan grepp. Den är formen handen har mitt på vägen tillbaka i en cykel.
+ */
+export const relaxedLeft = (doll: DollDescription): Vec3[] => doll.hand.rest.map((point): Vec3 => [-point[0], point[1], point[2]]);
+
 /** Vridningen som för tre axlar till tre andra, som en enhetsaxel och en vinkel i radianer. Båda trippletterna har samma handhet. */
 function rotationBetween(from: Vec3[], to: Vec3[]): { axis: Vec3; angle: number } {
   // R = summan av to_k · from_kᵀ för axlarna k: den matris som för varje from_k till to_k.
@@ -733,11 +741,13 @@ function rotationBetween(from: Vec3[], to: Vec3[]): { axis: Vec3; angle: number 
  * Vägen tillbaka börjar där handen ligger på kortet och slutar i REDO, så som given började. Greppet (mitten mellan tummens
  * och pekfingrets spetsar) går den raka vägen med minsta ryck, och bågar `lift` meter uppåt och `bow` meter ut mot
  * spelarna, mest halvvägs; uppåt går bågen fortare i början än vägen framåt, så handen lyfter från kortet innan den går.
- * Handen vrids under tiden, i samma takt som vägen, från hur den låg på kortet till hur den nyper i skon, och fingrarna
- * formas om lika fort. Axlar, huvud och den vilande handen går samma takt tillbaka till sina lägen i REDO. Från rutan
- * `home` är allt som i givens första ruta, så att cykeln slutar i samma ställning som den började.
+ * Handen vrids under tiden, i samma takt som vägen, från hur den låg på kortet till hur den nyper i skon. Fingrarna
+ * släpper greppet och öppnar sig till en avslappnad hand (dockans vilande hand, relaxedLeft), och sluter sig till nypet
+ * först mot slutet, när handen når skon (`back.open`, `back.close` i cykeln). Axlar, huvud och den vilande handen går
+ * samma takt tillbaka till sina lägen i REDO. Från rutan `home` är allt som i givens första ruta, så att cykeln slutar
+ * i samma ställning som den började.
  */
-function cycled(move: DollMove, tracks: Tracks, cycle: DollCycle, bow: number): Timing & { tracks: Tracks } {
+function cycled(doll: DollDescription, move: DollMove, tracks: Tracks, cycle: DollCycle, bow: number): Timing & { tracks: Tracks } {
   const frames = (seconds: number): number => Math.round(seconds * move.fps);
   const ready = frames(cycle.parts.ready);
   const deal = frames(cycle.parts.deal);
@@ -752,7 +762,14 @@ function cycled(move: DollMove, tracks: Tracks, cycle: DollCycle, bow: number): 
   const given = (frame: number): number => Math.max(0, Math.min(frame, letsGo) - ready) * pace;
   const leaving = heldOf(sampled(leftHand.points, given(letsGo), mixPoints));
   const reaching = heldOf(leftHand.points[0]!);
+  const relaxed = heldOf(relaxedLeft(doll));
   const turn = rotationBetween(leaving.axes, reaching.axes);
+  // Fingrarnas form på vägen tillbaka, som andel av tiden: ur greppet till den avslappnade handen, och åter till nypet.
+  const shapeAt = (share: number, k: number): Vec3 => {
+    const closing = smooth((share - cycle.back.close) / (1 - cycle.back.close));
+    if (closing > 0) return mix(relaxed.local[k]!, reaching.local[k]!, closing);
+    return mix(leaving.local[k]!, relaxed.local[k]!, smooth(share / cycle.back.open));
+  };
 
   const out = {
     centre: [] as Vec3[],
@@ -784,8 +801,8 @@ function cycled(move: DollMove, tracks: Tracks, cycle: DollCycle, bow: number): 
     const arc = Math.sin(Math.PI * share) ** 2;
     const grip = add(mix(leaving.grip, reaching.grip, way), [0, lift * arc, bow * arc]);
     const axes = leaving.axes.map((axis) => turned(axis, turn.axis, turn.angle * way));
-    out.left.push(leaving.local.map((point, k) => {
-      const shaped = mix(point, reaching.local[k]!, way);
+    out.left.push(leaving.local.map((_, k) => {
+      const shaped = shapeAt(share, k);
       return add(grip, add(add(mul(axes[0]!, shaped[0]), mul(axes[1]!, shaped[1])), mul(axes[2]!, shaped[2])));
     }));
     const back = <T>(track: T[], blend: (a: T, b: T, t: number) => T): T => blend(sampled(track, at, blend), track[0]!, way);
@@ -1005,7 +1022,7 @@ function place(scene: SceneDescription, doll: DollDescription, move: DollMove, s
   if (cycle) {
     const given = tracks;
     const shaped = (backBow: number): DollMove => {
-      const { tracks: round, ...rest } = cycled(move, given, cycle, backBow);
+      const { tracks: round, ...rest } = cycled(doll, move, given, cycle, backBow);
       return { ...move, ...rest, tracks: round };
     };
     const blockedBack = (shape: DollMove): number => {
@@ -1302,6 +1319,7 @@ export function readCycle(value: unknown): DollCycle {
   need(isNumber(cycle?.seconds) && lengths.every(isNumber) && Math.abs(lengths.reduce((sum: number, part) => sum + part!, 0) - cycle.seconds) < 1e-6, 'seconds ska vara summan av parts');
   const back = cycle?.back;
   need(isNumber(back?.lift) && back.lift >= 0 && [back?.release, back?.look].every((share) => isNumber(share) && share > 0 && share <= 1), 'back: lift från 0, release och look andelar över 0 och högst 1');
+  need(isNumber(back?.open) && isNumber(back?.close) && back.open > 0 && back.open <= back.close && back.close < 1, 'back: open och close andelar, 0 < open ≤ close < 1');
   need(isMarked(cycle ?? undefined), 'basis och source');
   if (wrong.length > 0) throw new Error(`Cykeln går inte att använda: ${wrong.join('; ')}`);
   return cycle as DollCycle;

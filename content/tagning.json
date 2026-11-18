@@ -1,0 +1,102 @@
+{
+  "schemaVersion": 1,
+  "about": "Tagningen: allt som en filmbeställning av en cykel byggs av och prövas mot, utom scenen och dockan (scene.json, doll.json, moves/). Läses av src/pipeline/tagning.ts (forbered, ta-emot, pröva). Varje grupp bär basis (mätt eller antaget) och en källa. Bildpunkter (bp) är i filmens ruta, 1920 × 1080.",
+  "order": {
+    "tool": "Runways MCP-server, generate_video, arbetsytan Jakob",
+    "model": "kling-4",
+    "resolution": "1080p",
+    "duration": 4,
+    "ratio": "16:9",
+    "basis": "mätt",
+    "source": "Pilotens beställning 2026-11-18 (taskId 2612cba3-f7d7-48e0-bbf4-d1eff506605e, output/work/cykel/pilot/bestallning.json): Kling 4 med första bild, sista bild och dockans film som referenceVideos gav en film på 4,04 s i 24 rutor/s och kostade 85 krediter, mätt med saldot direkt före och efter."
+  },
+  "reference": {
+    "studio": { "screen": [118, 124, 128], "table": [176, 176, 176] },
+    "fps": 24,
+    "basis": "antaget",
+    "source": "Dockans rörelsereferens sparas i grå ateljé, som sedan 2026-11-18 (förr i output/work/giv-4/gor-bestallning.mjs och output/work/cykel/gor-bestallning.mjs): skärm och bord grå, så att filmmodellen tar rörelsen ur dockan och färgerna ur bilderna. fps: 24, filmmodellens egen takt, efter granskningen av piloten (output/work/granskning-pilot/omdome.json, serien.b): pilotens referens i 30 rutor/s gav ett ryck där vart fjärde steg var 1,49 gånger grannarnas (dockan 1,00), antagligen för att Kling räknade om 30 till 24. Att 24 tar bort rycket är inte visat."
+  },
+  "redo": {
+    "anchors": {
+      "paulina": {
+        "spelaren": "dealers/paulina/anchors/spelaren-redo.png",
+        "plats-7": "dealers/paulina/anchors/plats-7-redo.png"
+      }
+    },
+    "basis": "antaget",
+    "source": "Vyns REDO-ankare, registrernamn under assets/. Cykeln börjar och slutar i REDO, som given giv-nyp-plats-4 börjar (dollPose.ts, cycled), så samma ankare som gjordes för given gäller. Spelaren: godkänt och använt i piloten. Plats 7: godkänt 2026-11-18, ännu inte använt i en cykel."
+  },
+  "prompt": {
+    "text": "Locked camera, one continuous shot. The woman in image 1 performs the movement of the white mannequin in video 1, with the same timing. Image 1 is the first frame of the clip and image 2 is the last frame. Her left hand at the card shoe draws the yellow card up out of the opening, holding it by its short end between thumb and fingers, and carries it low over the table to its place, where the last frame shows it; the next card stays down in the opening and is not lifted with it. On the way her wrist rolls once and hand and card turn over together about the card's long side, like turning a key: the broad yellow side narrows to a thin edge, then the broad blue side opens upward. With the same hold she lays the card flat at its place, blue side up, and her fingertips rest on it for a moment. Then she lifts her hand off the card, and it travels back in a calm arc to the card shoe, where her fingers pinch the next yellow card in the opening; she ends exactly as in the last frame. She is alive and attentive: her eyes follow the card the whole way out, her head turns with it from the shoe to the card's place, her gaze rests on the laid card for a moment and then goes back to the shoe with her hand, and her shoulder and upper body lean slightly with the reach and come back, naturally, as a professional dealer moves. She blinks once. Her other hand rests on the table and does not move. Only one card moves: a small card, about half as long as her hand, which keeps the same size all the way. It is blank, solid yellow on one side and solid blue on the other. Once laid, the blue card lies completely still exactly where she put it until the clip ends. The next card in the shoe is the same blank yellow, so towards the end there are two cards in view, the blue one on the table and the yellow one in the shoe, never more. Her hands stay small and slender, the same size as in the first frame, with the same tattoos. The black card shoe does not move. The background stays the same flat green everywhere: no table is visible, there are no shadows on the green, and nothing else appears. No sound.",
+    "basis": "antaget",
+    "source": "Pilotens text (output/work/cykel/pilot/text-cykel-t1.txt), ordagrann utom tre ställen. Granskaren av piloten bytte de två platsbundna fraserna så att samma text gäller plats 1–7 (output/work/granskning-pilot/omdome.json, serien.b): 'to its place in front of her' blev 'to its place', och 'to the middle of the table' blev 'to the card's place'; var kortet ligger visar sista bilden. Pilotens rättelse är lagd sist i samma mening: 0,58–0,71 s gick det dragna kortet och nästa kort ihop till en gul form (granskaren: 4 rutor, inte synligt i full fart), så texten säger att nästa kort stannar nere i mynningen. Samma text för varje plats och vy."
+  },
+  "proof": {
+    "background": { "file": "scene/backgrounds/balsal.jpg", "kind": "360", "turn": 0, "blur": 6, "exposure": 0.42, "mirror": false },
+    "face": "A♠",
+    "fps": 24,
+    "basis": "antaget",
+    "source": "Beviset i scenen som piloten och dess granskare gjorde det (output/work/cykel/pilot/gor-bevis-cykel.mjs): vyns närbild med balsalen i gamla projektets visning (blur 6, exposure 0,42, ingen vridning), lyft, höjd och radie ur content/scene.json (background, room), kortplatserna utritade och scenens kort lagt från lands.at. 24 rutor/s som filmen."
+  },
+  "measure": {
+    "cardPart": 200,
+    "mouthReach": 40,
+    "merged": 1.4,
+    "placeGrow": 3,
+    "insideShare": 0.97,
+    "coverShare": 0.5,
+    "leavesPx": 6,
+    "homePx": 2,
+    "maskGrow": 4,
+    "regionGrow": 60,
+    "cardTop": 40,
+    "handTop": 100,
+    "cadencePeriod": 4,
+    "cadenceStill": 0.4,
+    "waist": [-0.09, 0.145],
+    "gapRows": 95,
+    "gapLeast": 2,
+    "greenInner": 3,
+    "greenOff": 12,
+    "greenEvery": 4,
+    "handWindow": 0.15,
+    "eyeRows": [-0.25, 0.2],
+    "headReach": 1.67,
+    "headInner": 0.2,
+    "dark": 70,
+    "proofReach": 150,
+    "basis": "antaget",
+    "source": "Hur måtten tas, efter pilotens mätskript (output/work/cykel/pilot/) och granskarens (output/work/granskning-pilot/: mat.mjs, kadens.mjs, skarv.mjs, glipa.mjs, bevis-bla.mjs), med deras fasta rutor räknade ur scenen och dockan i stället (src/pipeline/matning.ts, layoutFor). cardPart: minsta del i bp som räknas som ett kort. mouthReach: kortet har lämnat skon när en kortdel ligger längre än så från mynningens kort i första rutan. merged: en gul del större än så många gånger mynningens kort är två kort som gått ihop. placeGrow, insideShare och coverShare: lands.at är första rutan där det blå är platt och stilla på sin plats till slutet, mätt som att minst insideShare av det blå ligger inom kortets räknade fyrhörning vuxen placeGrow bp, och att det täcker minst coverShare av den (fingrar som vilar på kortet får täcka ett hörn). Först prövat med hörnen (alla inom 3,6 bp från de räknade, pilotens tal): det höll för plats 4, men vid plats 1 och 7 täcker de vilande fingrarna ett hörn (14–17 bp fel i dockans film) och kortet är snett i bild. leavesPx: handen har lämnat kortet när dess tyngdpunkt har flyttat sig så långt från där den var vid lands.at. homePx: handen är åter i REDO när tyngdpunkten är så nära sista rutans och så till slutet. maskGrow: huden i första bilden utom givhanden (vilande handen, hals, blus) växer så många bp och räknas inte till givhanden. regionGrow: hur många bp regionerna (huvud, bål, vilande hand, mynning) växer utanför dockans delar sedda i vyn. cardTop: kort letas från så många bp under axlarnas rad (granskarens rad 450 mot axlarna 410; ovanför kan blont hår räknas som gult). handTop: givhanden letas från så många bp ovanför dockans givhand i REDO (granskarens rad 560 mot 659). cadencePeriod och cadenceStill: takten jämför varje steg med grannarnas medel i varje läge modulo 4, och hoppar över steg där grannarna rör sig mindre än 0,4. waist: midjans band i meter i sidled vid bordskanten, valt så att det i Spelarens närbild blir granskarens x 830–1075. gapRows: kolumnen ska vara dealer så många rader ovanför bordskanten (granskarens rad 700 mot kanten 795), och glipa räknas när kavajen slutar mer än gapLeast bp ovanför kanten. greenInner, greenOff, greenEvery: skärmen räknas 3 bp in från kanterna (7 × 7), avviker när någon kanal skiljer mer än 12 från den gröna, i var fjärde ruta. handWindow: givhanden jämförs med dockans bredd inom ±0,15 s. eyeRows, headReach, headInner, dark: huvudets vridning, ögonens mörka punkter mot huvudets kontur, i huvudradier kring ögonens rad (pilotens rad 195–250, x 700–1120, 25 bp in från konturen, ljushet under 70). proofReach: blått kvar i beviset letas så långt runt kortet."
+  },
+  "limits": {
+    "format": { "what": "format: bredd × höjd, rutor/s och rutor", "is": "1920×1080 24/s 97", "source": "granskaren (c): 1920 × 1080, 24/s, 97 rutor" },
+    "ljud": { "what": "ljudspår i den mottagna filmen efter att ljudet tagits bort", "is": false, "source": "granskaren (c): inget ljudspår; docs/production.md" },
+    "takt": { "what": "takt: största median av steg mot grannarnas medel, per läge modulo 4", "unit": "gånger", "see": 1.25, "most": 1.6, "source": "granskaren (c): högst 1,25; mellan 1,25 och 1,6 ses klippet i full fart; över 1,6 utgår det. Piloten 1,49, den godkända giv-4-tagningen 1,07, dockan 1,00" },
+    "kortdelar": { "what": "flest kortdelar (blå och gula ≥ 200 bp) i en ruta", "unit": "delar", "most": 2, "source": "granskaren (c)" },
+    "gulForm": { "what": "rutor där dragna och nästa kort gått ihop till en gul form", "unit": "rutor", "most": 4, "source": "granskaren (c); piloten 4 (0,58–0,71 s)" },
+    "gulFormEfterDraget": { "what": "rutor med sammanslagen gul form efter att kortet har lämnat skon", "unit": "rutor", "most": 0, "source": "granskaren (c): bara medan kortet dras" },
+    "vandningTillbaka": { "what": "rutor med ett gult kort utanför skon efter att det blivit blått", "unit": "rutor", "most": 0, "source": "granskaren (c): gult blir blått en gång, aldrig tillbaka" },
+    "kortetsRorelse": { "what": "lagda kortets tyngdpunkt från att handen lämnat det till slutet, längst från sista rutans", "unit": "bp", "most": 2, "source": "granskaren (c), som mätte från lands.at; här från en kvarts sekund efter att handen lämnat kortet, eftersom vilande fingrar kan täcka en del av det och flytta det blås tyngdpunkt" },
+    "kortetsHorn": { "what": "lagda kortets största hörnfel mot märkkortet i sista bilden (målat där dockan lägger kortet, letat på samma sätt), från att handen lämnat det till slutet", "unit": "bp", "most": 4, "source": "granskaren (c): mot dockans korthörn, från lands.at. Här mot sista bildens kort: dockans eget 3D-kort har (antagligen, scenens hörnradie 3,5 mm) rundade hörn, som vid plats 1 och 7, där kortet är snett i bild, ger 6–8 bp hörnfel fast tyngdpunkten ligger inom 1,4 bp. Och från att handen lämnat kortet, eftersom vilande fingrar kan täcka ett hörn" },
+    "kortetsYta": { "what": "lagda kortets blå yta efter att handen lämnat det, mot kortets räknade yta i bild", "unit": "gånger", "least": 0.932, "most": 1.03, "source": "granskaren (c): ±5 % av pilotens 4 380 bp (4 161–4 599), justerat för platsens djup genom att jämföra med kortets räknade yta i bild: för plats 4, kort 0 är den 4 463,6 bp, och pilotens 4 380 är 0,981 av den (kanten mot skärmen räknas inte som blå)" },
+    "nastaKortSaknas": { "what": "rutor utan nästa kort i skon", "unit": "rutor", "most": 0, "source": "granskaren (c): finns i varje ruta" },
+    "nastaKortFlyttar": { "what": "nästa korts tyngdpunkt, längst från första rutans (utom rutor där korten gått ihop)", "unit": "bp", "most": 5, "source": "granskaren (c); piloten inom 4 bp" },
+    "handIRedo": { "what": "givhandens bredd i första och sista rutan mot ankarets (den som avviker mest)", "unit": "gånger", "least": 0.95, "most": 1.05, "source": "granskaren (c): inom ±5 %; piloten 1,00" },
+    "handMotDockan": { "what": "givhandens bredd på kortet och på återvägen mot dockans bredaste inom ±0,15 s, störst", "unit": "gånger", "most": 1.1, "source": "granskaren (c); piloten högst 1,08" },
+    "skarvRegion": { "what": "skarven: sista rutan mot första, medel av största kanalskillnad, värsta region (huvud, bål, vilande hand, mynning, sko)", "unit": "nivåer", "most": 4, "source": "granskaren (c); piloten 1,25–2,82" },
+    "skarvLjus": { "what": "skarven: medelskillnad med tecken, värsta kanal och region", "unit": "nivåer", "most": 1.5, "source": "granskaren (c); piloten högst 0,96" },
+    "skarvHand": { "what": "skarven: givhandens tyngdpunkt, sista rutan mot första", "unit": "bp", "most": 2, "source": "granskaren (c); piloten 0,4" },
+    "forstaRutan": { "what": "första rutan mot första bilden, hela rutan", "unit": "dB", "least": 33, "source": "granskaren (c); piloten 35,0" },
+    "sistaRutan": { "what": "sista rutan mot sista bilden, hela rutan", "unit": "dB", "least": 33, "source": "granskaren (c); piloten 34,2" },
+    "gront": { "what": "inre skärmen som avviker mer än 12 från den gröna, värsta ruta", "unit": "%", "most": 0.1, "source": "granskaren (c); piloten 0,009–0,05" },
+    "skon": { "what": "skons bakre del mot första rutan, medel av största kanalskillnad, värsta ruta", "unit": "nivåer", "most": 2, "source": "granskaren (c); piloten högst 1,29, den godkända giv-4-tagningen 6,6–6,8" },
+    "glipaRutor": { "what": "rutor med glipa mellan kavaj och bordskant", "unit": "rutor", "most": 2, "source": "granskaren (c); piloten 1 ruta" },
+    "glipaHojd": { "what": "största glipa mellan kavaj och bordskant", "unit": "bp", "most": 4, "source": "granskaren (c); piloten 4" },
+    "kortetLigger": { "what": "lands.at mot dockans tid för samma sak", "unit": "s", "least": -0.25, "most": 0.25, "source": "granskaren (c): inom 0,25 s; piloten +0,05" },
+    "handenISkon": { "what": "hur långt före slutet handen är åter i REDO", "unit": "s", "least": 0.25, "source": "granskaren (c): minst 0,25 s; piloten 0,33" },
+    "bevisBlatt": { "what": "beviset i scenen: blå eller cyan bildpunkter kring kort och hand, flest i en ruta från lands.at", "unit": "bp", "most": 0, "source": "granskaren (c); piloten 0" },
+    "dockansHandled": { "what": "dockans handled när kortet läggs och fingrarna vilar: största vinkel mellan underarm och hand", "unit": "grader", "most": 85, "source": "agenten som byggde tagning.ts, 2026-11-18, prövas när paketet görs innan något beställs: en handled böjs bakåt omkring 70 grader, och given som är läst ur film (plats 4) går till 72. Plats 6 och 7 går till 99–111" },
+    "basis": "antaget",
+    "source": "Gränser för en tagning, ur granskningen av piloten (output/work/granskning-pilot/omdome.json, serien.c_automatiskaMatt), utom dockansHandled. En tagning utanför en gräns är inte underkänd av koden: det visas, och en granskare dömer. Bildpunkterna gäller Spelarens närbild; i en annan vy är korten mindre eller större. Att scenens kort 1 ligger ovanpå kort 0 med handen ovanpå båda (granskaren, sista punkten) prövas inte: beviset ritar bara klippets eget kort."
+  }
+}

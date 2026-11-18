@@ -1,4 +1,4 @@
-# Det här läser en agent aldrig som text och det indexeras inte. Skalkommandon (ffmpeg, node) når det ändå.
+# Det här läser en agent aldrig som text och det indexeras inte. Skalkommandon (ffmpeg, node, npm run reg) når det ändå.
 # Bilder i assets/ och output/ står inte här: de ska gå att se på. De hålls utanför indexet i .cursorindexingignore.
 
 # Beroenden och byggen
@@ -6,10 +6,12 @@ node_modules/
 dist/
 package-lock.json
 
-# Råmaterial och pågående jobb
+# Råmaterial och förhandsbilder
 glb/
-runtime/
 output/cache/
+
+# Registret är en databas: fråga den med npm run reg
+*.db
 
 # Filmer, modeller och arkiv: binärer som blir tusentals rader skräp när de öppnas som text
 *.mp4

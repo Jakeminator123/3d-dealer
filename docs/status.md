@@ -1,23 +1,20 @@
 # Läget
 
-Senast ändrad 2026-11-18, förmiddag. Ersätt det som inte längre gäller.
+Senast ändrad 2026-11-18, förmiddag. Ersätt det som inte längre gäller. Antal och listor står inte här: fråga registret.
 
 ## Finns
 
 - Mappstrukturen och dokumenten.
-- Ett startkommando: `npm run dev`, sedan http://localhost:5310/lab/. Se [README.md](../README.md).
-- Servern (`src/server`): lämnar ut registret, filerna i `assets/` och förhandsbilder av dem, och tar emot förlagor. Svarar bara på localhost.
+- Servern (`src/server`): lämnar ut registret, filerna i `assets/` och förhandsbilder av dem, och tar emot förlagor. Svarar bara på localhost, och startar om sig själv när dess kod ändras. `npm start` och `npm stop` ([README.md](../README.md)); Labbet på http://localhost:5310/lab/.
 - Labbet, steget Granska: registret avdelning för avdelning. Bilder i full storlek och pixel för pixel, filmer i full fart, långsamt och ruta för ruta, modeller i 3D med mått mätta i filen. Omdömen sätts med klick och sparas i registret. Jakob kan skriva varför, och agentens svar syns bredvid.
 - Scenen (`src/scene`, `content/scene.json`) och Labbets steg Scen: bord, sko och ett rum med golv, att vrida runt och zooma i. Vyerna är Spelaren (ögat i dealerns ögonhöjd, 1,90 m från hennes bordskant), Plats 1–7 och närbilden av var och en. Dealern i scenen är en dealerfilm på den vikta ytan eller dockan. Kortplatserna går att rita ut, och scenens eget kort läggs på kortplatsen när ett klipp har lagt sitt märkkort.
 - Dockan (`src/scene/doll.ts`, `dollPose.ts`, `content/doll.json`, `content/moves/`): nyp-given REDO → LAGT, hämtad i scenens sko och lagd på första kortplatsen för plats 1–7. Hon är standarden för var kort hämtas och läggs. I bild: `output/work/giv-4/standard-platser.jpg`.
 - Förlagor ur scenen, från Labbet eller från kommandoraden (`node src/pipeline/shoot.ts`): bilder och klipp ur en vy, i rum eller i ateljé.
-- Jakobs server på 5310 kör serverkoden från 05:25 (mätt 2026-11-18 förmiddag) och behöver startas om: för förlagor med en dealerfilm eller dockan, och för registret. Den gamla koden läser `content/assets.json`, som är borttagen, så ett omdöme i Labbet sparas inte förrän servern är omstartad.
 - Paulinas giv till plats 4 ur Spelaren, på grön skärm: ankarna `spelaren-redo.png` och `spelaren-lagt-4.png` och tagningen `clips/giv-4-nyp_spelaren_t1.mp4`, alla godkända. Lagd i scenen hamnar kortet på kortplatsen för plats 4, och scenens kort tar märkkortets plats (bevisfilmer: `output/forlagor/giv-4-nyp-spelaren-t1_*`). Hur den gjordes står i [production.md](production.md).
 - Samma giv ur Plats 7: ankarna `plats-7-redo.png` och `plats-7-lagt-4.png` är godkända. Tagning 1 är underkänd (högra handen lyfter och svävar 1,79–2,67 s) och arkiverad: `npm run reg -- show dealers/paulina/clips/giv-4-nyp_plats-7_t1.mp4`.
 - Registret (`content/register.db`): posterna, omdömenas historik, beställningarna med kostnad, uppladdningarna, mätningarna och det som har lämnat registret. Vägen dit är `npm run reg` (`npm run reg -- hjälp`); reglerna står i [AGENTS.md](../AGENTS.md).
 - Spelkärnan (`src/engine`): förd över ur gamla Dealer med sju testfiler. De tio kodfilerna är byte för byte desamma som där; ursprung och avvikelser står i `src/engine/provenance.json`. Den är inte kopplad till något gränssnitt än.
-- Tester: `npm test` (226 tester) och `npm run typecheck` gick igenom 2026-11-18 cirka 10:30. `npm run reg -- check` gick igenom samtidigt: varje fil i `assets/` har en post med rätt sha256.
-- Git: grenen `main` och fjärrarkivet `origin` (github.com/Jakeminator123/3d-dealer), som är publikt. Lokala `main` ligger före `origin`; ingenting pushas utan Jakobs ord.
+- Prov: `npm test` (också gränserna mellan mapparna och serverns felsvar), `npm run typecheck`, och `npm run reg -- check` för `assets/` mot registret.
 - Underlaget från inläsningen av gamla projektet: [information/underlag-inlasning-2026-11-18.md](../information/underlag-inlasning-2026-11-18.md).
 
 ## Finns inte än
@@ -32,13 +29,12 @@ Senast ändrad 2026-11-18, förmiddag. Ersätt det som inte längre gäller.
 
 ## Omdömen
 
-Sedan 2026-11-18 dömer agenten, efter oberoende granskning, och Jakob ändrar det han vill i Labbet: http://localhost:5310/lab/#granska.
+Agenten dömer efter oberoende granskning, och Jakob ändrar det han vill i Labbet: http://localhost:5310/lab/#granska. Läget frågas ur registret:
 
-- Antal per grupp och status: `npm run reg -- summary`. Det produktionslinjen inte använder, och varför: `npm run reg -- unused`.
-- Av ankarna är de för Spelaren och Plats 7 dealerfilmer. `vila.png` i gamla rutan står kvar: skons passning i `content/scene.json` och kroppens mått i testerna är mätta i den. Helfigurerna och de andra gamla ankarna är borttagna.
-- Bakgrunderna med `granska igen` väntar på omdöme i scenen med golv. Därefter material och modeller.
-- Numren i Labbet är registrets ordning inom varje avdelning.
-- Det som lämnades utanför, arkiverades eller togs bort står i tabellen `left_out`, med hela posten: `npm run reg -- show <fil>`. Arkiverade filer ligger i `output/work/arkiv/`.
+- antal per grupp och status: `npm run reg -- summary`;
+- det som väntar: `npm run reg -- queue`, och `npm run reg -- list <grupp> "granska igen"`;
+- det produktionslinjen inte använder, och vad som hindrar att det tas bort: `npm run reg -- unused`;
+- det som lämnades utanför, arkiverades eller togs bort, med hela posten: `npm run reg -- show <fil>` (arkiverade filer ligger i `output/work/arkiv/`).
 
 ## Näst
 
@@ -50,7 +46,7 @@ Sedan 2026-11-18 dömer agenten, efter oberoende granskning, och Jakob ändrar d
 
 ## Öppet
 
-- Fyra poster som linjen inte använder står kvar, eftersom något pekar på dem (`npm run reg -- unused` säger vad): en är källa till en godkänd identitetsbild, tre är namn i ett test.
+- Om `dealers/paulina/anchors/vila.png`, det sista ankaret i gamla rutan, ska stå kvar: skons passning i `content/scene.json` och dealerns kropp i `src/scene/geometry.test.ts` är mätta i den. Ingen kod läser filen.
 - Om nyp eller släp blir Paulinas grepp. Given här är nyp.
 - Takten för nyp-given, i dag 4 s. Om nyp har Jakob inget sagt; om släp, se [production.md](production.md).
 - Om Spelarens nya avstånd (1,90 m) är rätt. Det är valt av agenten efter Jakobs ord om att bord och dealer ska skjutas samman; han har inte sett det. Som jämförelse står local-studios öga 1,48 m över golvet, cirka 0,68 m över filten (vårt: 0,60).

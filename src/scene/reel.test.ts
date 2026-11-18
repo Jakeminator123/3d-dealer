@@ -1,0 +1,86 @@
+// Följden: vilket klipp och vilken tid som gäller vid en tid i följden, vilka kort som ligger och när märkkortet tas bort.
+// Talen är pilotens: ett klipp på 97 rutor i 24 rutor/s (4,0417 s) där kortet ligger från 1,92 s.
+
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import type { ClipCard } from './dealer.ts';
+import { lyingAt, makeReel, markerDown, placeIn, reelEnd } from './reel.ts';
+
+const SECONDS = 97 / 24;
+const card = (seat: number, index: number, face: string, at = 1.92): ClipCard => ({ seat, index, face, at });
+const close = (actual: number, expected: number) => assert.ok(Math.abs(actual - expected) < 1e-9, `${actual} ≠ ${expected}`);
+
+test('en följd börjar varje klipp där det förra slutar, och sista rutan står kvar i hold sekunder', () => {
+  const reel = makeReel([{ seconds: SECONDS }, { seconds: 3 }, { seconds: SECONDS }], 1.5);
+  assert.deepEqual(reel.starts, [0, SECONDS, SECONDS + 3]);
+  close(reel.seconds, 2 * SECONDS + 3 + 1.5);
+  close(reelEnd(reel), 2 * SECONDS + 3);
+  assert.throws(() => makeReel([]), /minst ett klipp/);
+});
+
+test('vid en tid gäller det klipp som har börjat, med tiden räknad från dess början', () => {
+  const reel = makeReel([{ seconds: SECONDS }, { seconds: SECONDS }, { seconds: SECONDS }], 1);
+  assert.deepEqual(placeIn(reel, 0), { index: 0, local: 0, held: false });
+  assert.deepEqual(placeIn(reel, -2), { index: 0, local: 0, held: false });
+  const third = placeIn(reel, 2 * SECONDS + 1);
+  assert.equal(third.index, 2);
+  close(third.local, 1);
+  // Skarven hör till nästa klipp: dess första ruta, inte förra klippets sista.
+  assert.deepEqual(placeIn(reel, SECONDS), { index: 1, local: 0, held: false });
+  const before = placeIn(reel, SECONDS - 1e-6);
+  assert.equal(before.index, 0);
+  // Mitt i ruta k (k + 0,5) / 24 visar varje ruta i varje klipp en gång: ruta 96 är första klippets sista, 97 nästas första.
+  assert.equal(placeIn(reel, 96.5 / 24).index, 0);
+  assert.equal(placeIn(reel, 97.5 / 24).index, 1);
+  close(placeIn(reel, 97.5 / 24).local, 0.5 / 24);
+  // Efter sista klippet står följden på dess sista ruta, också förbi följdens slut.
+  for (const time of [3 * SECONDS, 3 * SECONDS + 0.5, reel.seconds + 10]) assert.deepEqual(placeIn(reel, time), { index: 2, local: SECONDS, held: true });
+});
+
+test('ett klipp utan längd hoppas över, och en ensam stillbild står på sin enda ruta', () => {
+  const reel = makeReel([{ seconds: 2 }, { seconds: 0 }, { seconds: 2 }]);
+  assert.equal(placeIn(reel, 2).index, 2);
+  const still = makeReel([{ seconds: 0, card: card(4, 0, 'A♠', 0) }]);
+  assert.deepEqual(placeIn(still, 0), { index: 0, local: 0, held: true });
+  assert.deepEqual(lyingAt(still, 0), [0]);
+  assert.equal(markerDown(still, 0), true);
+});
+
+test('ett kort ligger från att det landar tills följden är slut, och märkkortet tas bort bara i klippet som lade det', () => {
+  const reel = makeReel(
+    [
+      { seconds: SECONDS, card: card(1, 0, 'A♠') },
+      { seconds: SECONDS, card: card(2, 0, 'K♥', 2.1) },
+      { seconds: SECONDS },
+      { seconds: SECONDS, card: card(1, 1, '7♦', 1.5) },
+    ],
+    1.5,
+  );
+  assert.deepEqual(lyingAt(reel, 0), []);
+  assert.equal(markerDown(reel, 1.91), false);
+  assert.deepEqual(lyingAt(reel, 1.92), [0]);
+  assert.equal(markerDown(reel, 1.92), true);
+  // Nästa klipp börjar rent: första kortet ligger kvar, men klippets eget märkkort är i luften och ska inte tas bort.
+  assert.deepEqual(lyingAt(reel, SECONDS + 0.01), [0]);
+  assert.equal(markerDown(reel, SECONDS + 0.01), false);
+  assert.deepEqual(lyingAt(reel, SECONDS + 2.1), [0, 1]);
+  assert.equal(markerDown(reel, SECONDS + 2.1), true);
+  // Ett klipp utan kort tar inte bort något och lägger inget.
+  assert.deepEqual(lyingAt(reel, 2 * SECONDS + 3), [0, 1]);
+  assert.equal(markerDown(reel, 2 * SECONDS + 3), false);
+  // Platsens andra kort läggs till; efter sista klippet ligger alla, och sista klippets märkkort är borta.
+  assert.deepEqual(lyingAt(reel, 3 * SECONDS + 1.5), [0, 1, 3]);
+  assert.deepEqual(lyingAt(reel, reel.seconds), [0, 1, 3]);
+  assert.equal(markerDown(reel, reel.seconds), true);
+});
+
+test('ett senare kort på samma kortplats tar det tidigares plats', () => {
+  const reel = makeReel([
+    { seconds: SECONDS, card: card(4, 0, 'A♠') },
+    { seconds: SECONDS, card: card(4, 0, 'K♥') },
+    { seconds: SECONDS, card: card(4, 0, '7♦') },
+  ]);
+  assert.deepEqual(lyingAt(reel, SECONDS + 1.91), [0]);
+  assert.deepEqual(lyingAt(reel, SECONDS + 1.92), [1]);
+  assert.deepEqual(lyingAt(reel, reel.seconds), [2]);
+});

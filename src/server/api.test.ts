@@ -9,11 +9,19 @@ import { after, before, test } from 'node:test';
 import sharp from 'sharp';
 import { addEntry, createRegister, readRegistry } from '../pipeline/registry.ts';
 import { createApi } from './api.ts';
+import { handler } from './main.ts';
 
 let root: string;
 let server: Server;
 let base: string;
 let port: number;
+
+/** Studions server för projektmappen `folder`, med en sida som svarar 418 i stället för Vite. */
+async function serve(folder: string, pages: Parameters<typeof handler>[1] = (_request, response) => void response.writeHead(418).end('inte serverns')) {
+  const running = createServer(handler(createApi(folder, () => '2026-11-18 05:30'), pages));
+  await new Promise<void>((done) => running.listen(0, '127.0.0.1', done));
+  return { running, base: `http://127.0.0.1:${(running.address() as AddressInfo).port}` };
+}
 
 const STATUSES = { 'att granska': 'väntar', godkänd: 'ja', utgår: 'nej' };
 const sha = (content: string | Buffer): string => createHash('sha256').update(content).digest('hex');
@@ -37,13 +45,8 @@ before(async () => {
   addEntry(root, { file: 'scene/bild.png', group: 'backgrounds', title: 'Bild', status: 'att granska', source: { from: 'dealer', sha256: sha(picture) } });
   addEntry(root, { file: 'reference/film.mp4', group: 'reference', title: 'Film', status: 'att granska', source: { from: 'dealer', sha256: sha('0123456789') } });
 
-  const api = createApi(root, () => '2026-11-18 05:30');
-  server = createServer(async (request, response) => {
-    if (!(await api(request, response))) response.writeHead(418).end('inte serverns');
-  });
-  await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
+  ({ running: server, base } = await serve(root));
   port = (server.address() as AddressInfo).port;
-  base = `http://127.0.0.1:${port}`;
 });
 
 after(() => {
@@ -90,8 +93,47 @@ test('beskrivningarna i content lämnas ut som de står, och bara JSON', async (
   assert.equal(await raw('/content/..%2Fassets%2Fscene%2Fbild.png'), 404, 'annat än JSON');
 });
 
-test('en väg som inte är serverns lämnas vidare', async () => {
+test('en väg som inte är serverns lämnas vidare till sidorna, och roten leder till Labbet', async () => {
   assert.equal((await fetch(`${base}/lab/`)).status, 418);
+  for (const path of ['/', '/lab']) {
+    const response = await fetch(`${base}${path}`, { redirect: 'manual' });
+    assert.deepEqual([response.status, response.headers.get('location')], [302, '/lab/'], path);
+  }
+});
+
+test('ett register som saknas eller är trasigt ger ett svar med skälet, inte ett tomt serverfel', async () => {
+  const folder = mkdtempSync(join(tmpdir(), 'api-trasig-'));
+  const { running, base: there } = await serve(folder);
+  try {
+    const missing = await fetch(`${there}/api/registry`);
+    assert.equal(missing.status, 500);
+    assert.match((await missing.json()).error, /^Registret finns inte: .*register\.db/);
+
+    mkdirSync(join(folder, 'content'));
+    writeFileSync(join(folder, 'content', 'register.db'), 'det här är ingen databas, men tillräckligt långt för att SQLite ska läsa det som en');
+    const broken = await fetch(`${there}/api/registry`);
+    assert.equal(broken.status, 500);
+    assert.match((await broken.json()).error, /^Registret \(content\/register\.db\) svarade med ett fel: /);
+    // En ändring mot samma register får samma slags svar, inte ett 400 som skyller på den som frågade.
+    const change = await fetch(`${there}/api/registry/status`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{"file":"a.png","status":"godkänd"}' });
+    assert.equal(change.status, 500);
+    assert.match((await change.json()).error, /^Registret/);
+  } finally {
+    running.close();
+    rmSync(folder, { recursive: true, force: true });
+  }
+});
+
+test('ett fel på sidorna svaras med sitt skäl', async () => {
+  const { running, base: there } = await serve(root, () => {
+    throw new Error('sidan föll');
+  });
+  try {
+    const response = await fetch(`${there}/lab/`);
+    assert.deepEqual([response.status, await response.text()], [500, 'Serverfel: sidan föll']);
+  } finally {
+    running.close();
+  }
 });
 
 test('en fil lämnas ut hel och i delar', async () => {
@@ -143,10 +185,12 @@ test('bara filer under assets lämnas ut', async () => {
   }
 });
 
-test('servern svarar bara när den tilltalas som localhost', async () => {
+test('servern svarar bara när den tilltalas som localhost, sidorna också', async () => {
   assert.equal(await raw('/api/registry', { Host: 'ond.example' }), 403);
   assert.equal(await raw('/media/reference/film.mp4', { Host: `ond.example:${port}` }), 403);
+  assert.equal(await raw('/lab/', { Host: `127.0.0.1.nip.io:${port}` }), 403);
   assert.equal(await raw('/api/registry', { Host: `localhost:${port}` }), 200);
+  assert.equal(await raw('/lab/', { Host: `[::1]:${port}` }), 418);
 });
 
 test('en förhandsbild görs i webp, förminskad, och återanvänds', async () => {

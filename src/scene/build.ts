@@ -10,11 +10,12 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { createBackdrop, type Background } from './backdrop.ts';
 import { createCard, type Card } from './cards.ts';
-import type { CardNote, Rgb, Studio } from './dealer.ts';
+import type { FilmNote, Rgb, Studio } from './dealer.ts';
 import type { Frame, SceneDescription } from './description.ts';
 import { createDoll } from './doll.ts';
 import type { DollDescription, DollMove } from './dollPose.ts';
 import { createFilm } from './film.ts';
+import { lyingAt, markerDown } from './reel.ts';
 import {
   cardCorners,
   dealerEdge,
@@ -35,17 +36,16 @@ import {
 import type { Clip } from './picture.ts';
 
 export type { Background } from './backdrop.ts';
-export type { CardNote, DealerNote, Rgb, Studio } from './dealer.ts';
+export type { CardNote, ClipCard, DealerNote, FilmClip, FilmNote, Rgb, Studio } from './dealer.ts';
 export type { Eye, SeatView, View } from './geometry.ts';
 export type { Clip } from './picture.ts';
 
 /**
- * Dealern i scenen: det som pekas ut i scene/dealer.ts, med dealerfilmen som registrets `file`, och dockan med sina mått
- * och sin rörelse redan lästa (dollPose.ts: readDoll, readMove och moveFor).
+ * Dealern i scenen: en dealerfilm som en följd av klipp, var och en med kortet den lägger (scene/dealer.ts, FilmNote;
+ * ett ensamt klipp är en följd med ett klipp), eller dockan med sina mått och sin rörelse redan lästa (dollPose.ts:
+ * readDoll, readMove och moveFor).
  */
-export type Dealer =
-  | { kind: 'film'; file: string; view: SeatView }
-  | { kind: 'docka'; doll: DollDescription; move: DollMove; pose: 'giv' | 'vila' };
+export type Dealer = FilmNote | { kind: 'docka'; doll: DollDescription; move: DollMove; pose: 'giv' | 'vila' };
 
 export type SceneOptions = {
   /** Adressen till en fil ur registret, given postens `file`. */
@@ -77,7 +77,10 @@ export type SceneHandle = {
   canvas: HTMLCanvasElement;
   /** Uppfylls när bord, sko och dealer är lästa, eller har visat sig oläsbara. */
   ready: Promise<void>;
-  /** Dealerns film eller dockans rörelse. Null för stillbilder och utan dealer. */
+  /**
+   * Dealerns följd av klipp som en film, eller dockans rörelse. Null för stillbilder och utan dealer. Scenens kort ligger
+   * efter följdens tid: varje klipps kort från att det har landat tills följden är slut.
+   */
   clip: Clip | null;
   /** Byter rummet bakom scenen och hur det visas. Null släcker det. Löftet uppfylls när rummet visas så. */
   setBackground(background: Background | null): Promise<void>;
@@ -89,11 +92,6 @@ export type SceneHandle = {
   setShoe(shown: boolean): void;
   /** Visar eller döljer kortplatserna: konturen av ett kort på var och en av beskrivningens platser, på filten. */
   setPlaces(shown: boolean): void;
-  /**
-   * Lägger scenens kort på en kortplats, eller tar bort det med null. Kortet syns från tiden `from` i dealerns film, och
-   * från samma tid tas filmens blå märkkort bort, så att kortet syns under handen. Utan film syns kortet hela tiden.
-   */
-  setCard(card: CardNote | null): void;
   /** Ytans storlek på sidan. Hela vyns ruta visas alltid, inpassad på höjden eller bredden. */
   resize(width: number, height: number): void;
   /** Ritar en ruta nu. Annars ritas scenen bara när något har ändrats. */
@@ -211,7 +209,15 @@ export function buildScene(host: HTMLElement, scene: SceneDescription, options: 
   const chosen = options.dealer ?? null;
   const film =
     chosen?.kind === 'film'
-      ? createFilm(scene, viewEye(scene, { ...chosen.view, close: true }), options.urlOf(chosen.file), anisotropy, changed, problem)
+      ? createFilm(
+          scene,
+          viewEye(scene, { ...chosen.view, close: true }),
+          chosen.clips.map((clip) => ({ url: options.urlOf(clip.file), ...(clip.card ? { card: clip.card } : {}) })),
+          chosen.hold ?? 0,
+          anisotropy,
+          changed,
+          problem,
+        )
       : null;
   // Dockans punkter står redan i scenens mått med bordets lutning inräknad: hon läggs olutad i världen.
   const doll = chosen?.kind === 'docka' ? createDoll(scene, chosen.doll, chosen.move, changed) : null;
@@ -317,8 +323,21 @@ export function buildScene(host: HTMLElement, scene: SceneDescription, options: 
   }
   world.add(places);
 
-  // Scenens kort på en kortplats. Om det syns avgörs för varje ritad ruta av var dealerns film står.
-  let laid: { note: CardNote; card: Card } | null = null;
+  // Scenens kort, ett för varje klipp som lägger ett, på sin kortplats. Vilka som syns avgörs för varje ritad ruta av var
+  // dealerns följd står.
+  const laid: { part: number; card: Card }[] = [];
+  if (chosen?.kind === 'film') {
+    chosen.clips.forEach((clip, part) => {
+      const note = clip.card;
+      if (!note) return;
+      const place = scene.places.seats.find((entry) => entry.seat === note.seat)?.cards[note.index];
+      if (!place) return problem(`Scenen har ingen kortplats ${note.index + 1} för plats ${note.seat}`);
+      const card = createCard(scene, { place, face: note.face, index: note.index }, anisotropy);
+      card.mesh.visible = false;
+      world.add(card.mesh);
+      laid.push({ part, card });
+    });
+  }
 
   let shoeShown = true;
   let shoeStand: THREE.Group | null = null;
@@ -348,13 +367,14 @@ export function buildScene(host: HTMLElement, scene: SceneDescription, options: 
     if (moved || stale) draw();
   });
 
-  /** Ställer kortet och märkkortet efter filmens tid. Görs före varje ritad ruta. */
+  /** Ställer korten och märkkortet efter följdens tid. En stillbild står i slutet: dess kort ligger. Görs före varje ritad ruta. */
   function settle(): void {
-    if (!laid) return;
-    const playing = film?.clip ?? null;
-    const down = !playing || playing.time() >= laid.note.from;
-    laid.card.mesh.visible = down;
-    film?.setMarker(down);
+    const reel = film?.reel() ?? null;
+    if (!film || !reel) return;
+    const time = film.clip ? film.clip.time() : reel.seconds;
+    const lying = new Set(lyingAt(reel, time));
+    for (const { part, card } of laid) card.mesh.visible = lying.has(part);
+    film.setMarker(markerDown(reel, time));
   }
 
   function draw(): void {
@@ -384,21 +404,6 @@ export function buildScene(host: HTMLElement, scene: SceneDescription, options: 
     },
     setPlaces(shown) {
       places.visible = shown;
-      changed();
-    },
-    setCard(note) {
-      if (laid) {
-        world.remove(laid.card.mesh);
-        laid.card.dispose();
-        laid = null;
-        film?.setMarker(false);
-      }
-      const place = note && scene.places.seats.find((entry) => entry.seat === note.seat)?.cards[note.index];
-      if (note && !place) problem(`Scenen har ingen kortplats ${note.index + 1} för plats ${note.seat}`);
-      if (note && place) {
-        laid = { note, card: createCard(scene, { place, face: note.face }, anisotropy) };
-        world.add(laid.card.mesh);
-      }
       changed();
     },
     resize(width, height) {
@@ -452,7 +457,7 @@ export function buildScene(host: HTMLElement, scene: SceneDescription, options: 
       backdrop.dispose();
       film?.dispose();
       doll?.dispose();
-      laid?.card.dispose();
+      for (const { card } of laid) card.dispose();
       grid.geometry.dispose();
       gridLines.dispose();
       for (const line of places.children) (line as THREE.LineLoop).geometry.dispose();
