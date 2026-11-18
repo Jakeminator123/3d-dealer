@@ -191,6 +191,6 @@ test('ett klipp sätts ihop av rutorna när den sista är inne', { skip: hasFfmp
   assert.equal(probe.stdout.toString().trim(), '64,36,yuv420p,30/1,3');
   const record = JSON.parse(readFileSync(join(root, saved!.json), 'utf8'));
   assert.deepEqual([record.name, record.still, record.frames, record.fps, record.seconds], [name, false, 3, 30, 0.1]);
-  // Rutorna ligger kvar i förlagans mapp.
-  assert.deepEqual(readdirSync(forlagaPaths(root, name).dir).sort(), ['bestallning.json', 'ruta-0001.png', 'ruta-0002.png', 'ruta-0003.png']);
+  // Mappen med rutorna behövs inte efteråt: klippet och beskrivningen står kvar.
+  assert.ok(!existsSync(forlagaPaths(root, name).dir));
 });

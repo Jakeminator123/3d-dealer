@@ -343,9 +343,8 @@ async function finish(root: string, name: string, order: ForlagaOrder, now: stri
   }
   const target = order.still ? paths.picture : paths.film;
   if (order.still) {
-    // Stillbilden är förlagan själv: mappen med den enda rutan och beställningen behövs inte längre.
+    // Stillbilden är förlagan själv.
     copyFileSync(framePath(root, name, 0), target);
-    rmSync(paths.dir, { recursive: true });
   } else {
     try {
       await run('ffmpeg', ['-v', 'error', '-y', '-framerate', String(order.fps), '-start_number', '1', '-i', join(paths.dir, 'ruta-%04d.png'), ...COLOUR, ...ENCODING, target]);
@@ -353,6 +352,9 @@ async function finish(root: string, name: string, order: ForlagaOrder, now: stri
       throw new ForlagaError(`ffmpeg kunde inte sätta ihop klippet: ${(error as Error).message.trim().split('\n').at(-1)}`);
     }
   }
+  // Mappen med rutorna och beställningen behövs inte längre: beställningen står i beskrivningen bredvid förlagan, och
+  // ingenting läser rutorna efteråt (en runda på en minut är 2 GB rutor).
+  rmSync(paths.dir, { recursive: true });
   const within = (path: string): string => relative(root, path).replaceAll('\\', '/');
   // En stillbild har ingen längd.
   const seconds = order.still ? 0 : +(order.frames / order.fps).toFixed(4);
