@@ -283,6 +283,7 @@ export function buildScene(host: HTMLElement, scene: SceneDescription, options: 
           problem,
           options.doll ? pickUpCard(filmShoeScene, options.doll).corners : null,
           chosen.loop ?? true,
+          chosen.wait ? options.urlOf(chosen.wait) : null,
         )
       : null;
   // Dockans punkter står redan i scenens mått med bordets lutning inräknad: hon läggs olutad i världen.

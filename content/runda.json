@@ -25,5 +25,10 @@
     "hold": 1.5,
     "basis": "antaget",
     "source": "Rundan som film, valt av agenten 2026-11-18: ur vyn med rum, i balsalen som i cykelpilotens bevis, med bakgrundens visning ur registrets oldView och rummets mått ur content/scene.json. 24 rutor/s som klippen från Kling 4, så att varje ruta i varje klipp syns en gång. Efter sista klippet står dess sista ruta kvar hold sekunder, så att alla kort syns lagda."
+  },
+  "wait": {
+    "most": 4,
+    "basis": "antaget",
+    "source": "Valt av agenten 2026-11-18 efter Jakobs ord om att dealern inte ska frysa medan spelet väntar. När följden väntar (vänta-klippet, action wait, spelas om och om efter sista klippet) och nästa kort kommer, går det pågående varvet klart innan kortets klipp börjar, så att bytet sker i REDO (src/scene/reel.ts, nextStart). most är hur många sekunder ett nytt kort högst väntar på det: är mer kvar av varvet börjar kortets klipp direkt, med ett hopp. 4 är ett varv av vänta-klippet som det är beställt (4 s), så att korten, pengarna och knapparna aldrig dröjer mer än ett varv. Ingenting är mätt."
   }
 }

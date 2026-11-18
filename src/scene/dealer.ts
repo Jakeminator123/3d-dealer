@@ -45,9 +45,11 @@ export type FilmClip = { file: string; card?: ClipCard } | { file: null; seconds
  * ligger kvar från att det har landat tills följden är slut. Efter sista klippet står filmens sista ruta kvar i `hold`
  * sekunder, och sedan börjar följden om; med `loop: false` står den kvar där. Ett ensamt klipp är en följd med ett
  * klipp; en stillbild kan bara stå ensam. `eye` och `shoe` är ögat filmerna är gjorda genom och skon de bär, när
- * registret säger det (FilmEye, FilmShoe); utan dem räknas de ur scenen och vyn.
+ * registret säger det (FilmEye, FilmShoe); utan dem räknas de ur scenen och vyn. `wait` är vänta-klippet som registrets
+ * `file` (waitClip i round.ts): med det väntar dealern efter sista klippet i stället för att sista rutan står kvar, i
+ * hela varv som täcker `hold` innan följden börjar om, och med `loop: false` tills följden ställs om (reel.ts).
  */
-export type FilmNote = { kind: 'film'; view: SeatView; clips: FilmClip[]; hold?: number; loop?: boolean; eye?: FilmEye; shoe?: FilmShoe };
+export type FilmNote = { kind: 'film'; view: SeatView; clips: FilmClip[]; hold?: number; loop?: boolean; wait?: string; eye?: FilmEye; shoe?: FilmShoe };
 
 /**
  * Ett ensamt klipp skrivet som förr: filen här, och kortet bredvid i beställningen (`card`, CardNote). Det läses som en

@@ -88,6 +88,7 @@ test('hela given att välja: varje vy med cykelklipp, rundan som spelkärnan del
     deal: { seed: 'prov', bets: [{ seat: 1, main: 10 }], hitBelow: 15 },
     fallback: { seconds: 1.2, turn: 0.8, move: 0.8 },
     film: { background: 'scene/backgrounds/prov-rum.jpg', fps: 24, hold: 1.5 },
+    wait: { most: 4 },
   };
   // Spelkärnans start: plats 1 får A♠, dealern 9♦ upp, plats 1 K♥, och hålkortet. Bara det rundan läser är ifyllt.
   const seatCard = (cardIndex: number, r: string, s: string, shoeDraw: number) => ({ type: 'deal', to: 'seat', seat: 1, hand: 0, cardIndex, card: { r, s }, faceDown: false, shoeDraw });

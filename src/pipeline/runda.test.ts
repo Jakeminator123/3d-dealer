@@ -18,6 +18,7 @@ const round: Round = {
   deal: { seed: 'prov', bets: [{ seat: 1, main: 10 }], hitBelow: 15 },
   fallback: { seconds: 1.2, turn: 0.8, move: 0.8 },
   film: { background: 'scene/backgrounds/prov-rum.jpg', fps: 24, hold: 1.5 },
+  wait: { most: 4 },
 };
 const deals: Deal[] = [
   { seat: 1, hand: 0, index: 0, face: 'A♠', action: 'deal' },

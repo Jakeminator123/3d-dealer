@@ -6,6 +6,10 @@
 //
 // En del utan film (`from` satt) är spelkärnans fallback för ett kort som saknar klipp: dealern står i REDO medan
 // scenens kort glider från skon, flyttas från en annan kortplats eller vänds där det ligger, och ligger från `card.at`.
+//
+// En följd kan sluta i väntan (`wait`, vänta-klippets längd): efter sista delen spelas vänta-klippet om och om, ett varv
+// i taget, i stället för att sista rutan hålls. Varje varv börjar och slutar i REDO, liksom varje klipp, så nästa klipp
+// börjar där ett varv slutar (nextStart). Utan vänta-klipp hålls sista rutan, som förut.
 
 import { spotKey, type CardSpot, type ClipCard } from './dealer.ts';
 import type { FeltPoint } from './description.ts';
@@ -17,18 +21,28 @@ import type { FeltPoint } from './description.ts';
 export type ReelPart = { seconds: number; card?: ClipCard; from?: CardSpot | 'skon' };
 
 /**
- * Följden: delarna, var och en börjar, hur länge sista rutan står kvar efter sista delen (`hold`), och hela längden med
- * den tiden inräknad. Allt i sekunder.
+ * Följden: delarna, var och en börjar, tiden efter sista delen (`hold`), och hela längden med den tiden inräknad. Utan
+ * `wait` står sista rutan kvar under `hold`. Med `wait`, vänta-klippets längd, väntar följden efter sista delen: `hold`
+ * är då hela varv av väntan, minst ett, och väntan går vidare förbi `seconds` så länge ingen börjar om följden. Allt i
+ * sekunder.
  */
-export type Reel = { parts: ReelPart[]; starts: number[]; hold: number; seconds: number };
+export type Reel = { parts: ReelPart[]; starts: number[]; hold: number; seconds: number; wait?: number };
 
 // Tider som skiljer mindre än så här är samma tid: summan av klippens längder avrundas annorlunda än en tid räknad ur dem.
 const SLACK = 1e-9;
 
-/** Var följden står: delen (från 0), tiden i den, och om följden är förbi sista delen och står på dess sista ruta. */
-export type ReelPlace = { index: number; local: number; held: boolean };
+/**
+ * Var följden står: delen (från 0), tiden i den, och om följden är förbi sista delen och står på dess sista ruta. När
+ * följden väntar är delen den sista och hel (alla kort ligger), och `wait` säger varvet (från 0) och tiden i
+ * vänta-klippet. Utan väntan finns inget `wait`.
+ */
+export type ReelPlace = { index: number; local: number; held: boolean; wait?: { turn: number; local: number } };
 
-export function makeReel(parts: ReelPart[], hold = 0): Reel {
+/**
+ * Följden av delarna `parts`. Utan `wait` står sista rutan kvar `hold` sekunder. Med `wait`, vänta-klippets längd i
+ * sekunder, väntar följden efter sista delen i stället, i så många hela varv som täcker `hold`, minst ett.
+ */
+export function makeReel(parts: ReelPart[], hold = 0, wait?: number): Reel {
   if (parts.length === 0) throw new Error('En följd behöver minst ett klipp');
   const starts: number[] = [];
   let at = 0;
@@ -36,11 +50,15 @@ export function makeReel(parts: ReelPart[], hold = 0): Reel {
     starts.push(at);
     at += Math.max(0, part.seconds);
   }
+  if (wait !== undefined && Number.isFinite(wait) && wait > 0) {
+    const turns = Math.max(1, Math.ceil(Math.max(0, hold) / wait - SLACK));
+    return { parts, starts, hold: turns * wait, seconds: at + turns * wait, wait };
+  }
   const rest = Math.max(0, hold);
   return { parts, starts, hold: rest, seconds: at + rest };
 }
 
-/** Där sista delen slutar och dess sista ruta börjar stå kvar. */
+/** Där sista delen slutar, och dess sista ruta börjar stå kvar eller väntan börjar. */
 export const reelEnd = (reel: Reel): number => reel.seconds - reel.hold;
 
 /** Där delen `index` slutar. */
@@ -52,7 +70,8 @@ export const isStill = (part: ReelPart): boolean => part.from !== undefined;
 /**
  * Var följden står vid tiden `time`. En del gäller från sin början fram till nästa dels början. Före början står
  * följden på första delens början; från sista delens slut står den på dess sista ruta (`held`, och `local` är delens
- * längd).
+ * längd), eller, när följden har en väntan, i väntan: varvet och tiden i vänta-klippet, också förbi följdens längd.
+ * Skarven mellan två varv hör till nästa varv, som skarven mellan två delar hör till nästa del.
  */
 export function placeIn(reel: Reel, time: number): ReelPlace {
   const t = Math.max(0, time);
@@ -66,8 +85,29 @@ export function placeIn(reel: Reel, time: number): ReelPlace {
   }
   const seconds = Math.max(0, reel.parts[index]!.seconds);
   const local = t - reel.starts[index]!;
-  if (index === last && local >= seconds - SLACK) return { index, local: seconds, held: true };
+  if (index === last && local >= seconds - SLACK) {
+    if (reel.wait === undefined) return { index, local: seconds, held: true };
+    const since = Math.max(0, t - reelEnd(reel));
+    const turn = Math.floor((since + SLACK) / reel.wait);
+    return { index, local: seconds, held: false, wait: { turn, local: Math.max(0, since - turn * reel.wait) } };
+  }
   return { index, local, held: false };
+}
+
+/**
+ * När en del som läggs till följden vid tiden `time` får börja, i följdens tid: när följdens egna delar är slut, och i
+ * en väntan där det pågående varvet slutar, så att vänta-klippet går klart och nästa klipp börjar i REDO. Står följden
+ * just på en varvgräns börjar delen direkt. Är det mer än `most` sekunder kvar av varvet börjar den direkt, med ett
+ * hopp. Utan väntan börjar den direkt när delarna är slut, som förut.
+ */
+export function nextStart(reel: Reel, time: number, most: number): number {
+  const t = Math.max(0, time);
+  const end = reelEnd(reel);
+  if (t < end) return end;
+  const place = placeIn(reel, t);
+  if (!place.wait || reel.wait === undefined || place.wait.local <= SLACK) return t;
+  const boundary = end + (place.wait.turn + 1) * reel.wait;
+  return boundary - t > Math.max(0, most) + SLACK ? t : boundary;
 }
 
 /**
@@ -153,10 +193,12 @@ export function laidAt(reel: Reel, index: number, time: number, glide: Glide, fr
 
 /**
  * Om märkkortet i bilden ska tas bort vid tiden `time`: från att den visade delens kort har landat, så att scenens kort
- * syns där. Under en fallback står filmens ruta kvar, med det förra klippets kort lagt: där är märkkortet borta.
+ * syns där. Under en fallback står filmens ruta kvar, med det förra klippets kort lagt: där är märkkortet borta. I
+ * väntan lägger filmen inget kort: där är det också borta.
  */
 export function markerDown(reel: Reel, time: number): boolean {
-  const { index, local } = placeIn(reel, time);
+  const { index, local, wait } = placeIn(reel, time);
+  if (wait) return true;
   const part = reel.parts[index]!;
   if (isStill(part)) return true;
   return part.card !== undefined && local >= part.card.at;

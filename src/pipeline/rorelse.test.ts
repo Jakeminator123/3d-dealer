@@ -6,6 +6,7 @@ import { join, resolve } from 'node:path';
 import { test } from 'node:test';
 import type { Action, Seat } from '../scene/dollPose.ts';
 import { cycleMove, readCycleParts } from './cykel.ts';
+import { dollWrist } from './tagning.ts';
 import { judge, type Limit } from './matning.ts';
 import { abrupt, busiest, dollMotion, filled, longestRun, motionNumbers, motionValues, peaksIn, segments, snap, sparc, speedOf, type MotionMeasure, type Tracks } from './rorelse.ts';
 
@@ -104,6 +105,19 @@ const CYCLES: [string, Seat, number, Action][] = [
   ['cykel-nyp-flytande', 'D', 1, 'flip'],
   ['cykel-nyp-flytande', 'D', 0, 'wait'],
 ];
+test('variant D vid plats 6 och 7: handleden under 85 grader och armbågen under 90 när kortet läggs alldeles intill skon', () => {
+  const parts = readCycleParts('cykel-nyp-flytande');
+  for (const seat of [6, 7]) {
+    for (const index of [0, 1, 2]) {
+      const move = cycleMove(parts, { seat, index, action: 'deal' });
+      const wrist = dollWrist(parts, { seat, index, action: 'deal' });
+      const elbow = Math.max(0, ...(move.tracks.leftArm?.turnDeg ?? [0]).map(Math.abs));
+      assert.ok(wrist < 85, `plats ${seat}, kort ${index}: handleden ${wrist.toFixed(0)} grader`);
+      assert.ok(elbow < 90, `plats ${seat}, kort ${index}: armbågen ${elbow} grader`);
+    }
+  }
+});
+
 for (const [name, seat, index, action] of CYCLES) {
   test(`${name}, ${action} till ${seat === 'D' ? 'dealern' : `plats ${seat}`}, kort ${index}: dockans rörelse är inom rörelsens gränser`, () => {
     const parts = readCycleParts(name);

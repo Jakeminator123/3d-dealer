@@ -8,7 +8,7 @@ import { buildScene, type Background, type Dealer, type FilmNote, type SceneHand
 import type { SceneDescription } from '../scene/description.ts';
 import type { DollDescription } from '../scene/dollPose.ts';
 import { seatsOf } from '../scene/geometry.ts';
-import { anchorName, dealName } from '../scene/round.ts';
+import { anchorName, dealName, waitClip } from '../scene/round.ts';
 import { backdropItems, backdropKind, dealerChoices, PLAIN, roundChoices, sameLook, startLook, type Look } from './backdrops.ts';
 import { fetchAll, type Content } from './content.ts';
 import { saveForlaga, type Saved } from './forlaga.ts';
@@ -110,8 +110,11 @@ function Workbench({ registry, scene, doll, round, dealt, route, problem, onProb
   // Hela given är en följd av klipp med scenens kort kvar på bordet; ett valt klipp är en följd med ett klipp, lagt genom
   // ögat det är gjort i, och dess kort landar där handen lade det och går sedan till kortplanen, som i hela given.
   const { eye, shoe, place } = choice?.made ?? {};
+  // När hela given har spelat klart väntar dealern med vänta-klippet ur givens ankare, ett varv eller fler som täcker
+  // rundans hold, och sedan börjar given om. Utan vänta-klipp står sista rutan kvar under hold.
+  const wait = roundChoice ? waitClip(registry.assets, DEALER, roundChoice.view, roundChoice.plan.anchor) : null;
   const dealer: FilmNote | null = roundChoice
-    ? roundChoice.dealer
+    ? { ...roundChoice.dealer, ...(wait ? { wait } : {}) }
     : choice
       ? {
           kind: 'film',
@@ -363,7 +366,7 @@ function Workbench({ registry, scene, doll, round, dealt, route, problem, onProb
             </li>
             <li>
               {roundChoice
-                ? `Hela given: en runda som spelkärnan har delat (frö ${dealt.seed}, plats ${dealt.bets.map((bet) => bet.seat).join(', ')}, Hit under ${dealt.hitBelow}; content/runda.json), ${roundChoice.plan.dealt.length} kort i spelkärnans ordning med dess valörer. Varje kort spelas med dealerns godkända cykelklipp ur registret, gjort i närbilden av ${madeIn}, eller, när klippet saknas, går kortet självt medan dealern står i REDO; samma val och samma uppspelning som node src/pipeline/runda.ts och Casinot. Hålkortet ligger med baksidan upp tills det vänds. Klippen spelas efter varandra utan glapp, och varje kort ligger kvar på bordet från att det har landat; när handen har släppt det och lyft går det till sin plats i kortplanen och sin storlek på bordet (steget Kortplan). Efter sista kortet står sista rutan kvar ${comma(round.film.hold)} s, och sedan börjar given om; Börja om tar den från början. Bilden läggs tillbaka genom ${madeIn}s öga: sedd ur den vyn, eller dess närbild, är den bilden som den är; ur andra vyer är kroppen platt. Alla klipp i given är gjorda ur samma REDO-ankare, det med flest godkända klipp för rundan: ${anchorName(roundChoice.plan.anchor)}${roundChoice.plan.anchors.length > 1 ? ` (inte valda: ${roundChoice.plan.anchors.slice(1).map((one) => `${anchorName(one.anchor)}, ${one.clips} klipp`).join('; ')})` : ''}.${roundChoice.plan.missing.length > 0 ? ` Saknar klipp: ${roundChoice.plan.missing.map(dealName).join('; ')}.` : ''}`
+                ? `Hela given: en runda som spelkärnan har delat (frö ${dealt.seed}, plats ${dealt.bets.map((bet) => bet.seat).join(', ')}, Hit under ${dealt.hitBelow}; content/runda.json), ${roundChoice.plan.dealt.length} kort i spelkärnans ordning med dess valörer. Varje kort spelas med dealerns godkända cykelklipp ur registret, gjort i närbilden av ${madeIn}, eller, när klippet saknas, går kortet självt medan dealern står i REDO; samma val och samma uppspelning som node src/pipeline/runda.ts och Casinot. Hålkortet ligger med baksidan upp tills det vänds. Klippen spelas efter varandra utan glapp, och varje kort ligger kvar på bordet från att det har landat; när handen har släppt det och lyft går det till sin plats i kortplanen och sin storlek på bordet (steget Kortplan). ${wait ? `Efter sista kortet väntar dealern: vänta-klippet (${wait.split('/').at(-1)}) spelas ett varv eller fler, så många som täcker ${comma(round.film.hold)} s, och given börjar om där ett varv slutar, i REDO.` : `Efter sista kortet står sista rutan kvar ${comma(round.film.hold)} s, och sedan börjar given om (givens ankare har inget vänta-klipp).`} Börja om tar den från början. Bilden läggs tillbaka genom ${madeIn}s öga: sedd ur den vyn, eller dess närbild, är den bilden som den är; ur andra vyer är kroppen platt. Alla klipp i given är gjorda ur samma REDO-ankare, det med flest godkända klipp för rundan: ${anchorName(roundChoice.plan.anchor)}${roundChoice.plan.anchors.length > 1 ? ` (inte valda: ${roundChoice.plan.anchors.slice(1).map((one) => `${anchorName(one.anchor)}, ${one.clips} klipp`).join('; ')})` : ''}.${roundChoice.plan.missing.length > 0 ? ` Saknar klipp: ${roundChoice.plan.missing.map(dealName).join('; ')}.` : ''}`
                 : !choice
                   ? 'Ingen dealer visas: registret har ingen dealerfilm för dealern.'
                   : `Dealern är en dealerfilm: ”${choice.label}”, en ${choice.film ? 'film' : 'stillbild'} av dealern på grön skärm, gjord i närbilden av ${madeIn}: samma öga som vyn, inzoomat på dealern. Bilden läggs tillbaka genom det ögat och viks vid bordskanten, så att kroppen står upprätt och händerna ligger på filten. Sedd ur den vyn är den bilden som den är; ur andra vyer är kroppen platt.${choice.lands ? ` När klippet har lagt sitt märkkort (${comma(choice.lands.at)} s in) tas det blå bort och scenens kort ligger där handen lade det, och går sedan till kortplatsen för plats ${choice.lands.seat} i kortplanen; valören är en stå-in.` : ''}`}{' '}

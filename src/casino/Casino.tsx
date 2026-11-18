@@ -3,6 +3,11 @@
 // har sagt. Varje steg blir dealerns film genom samma val av klipp som Labbet och runda.ts (src/scene/round.ts): ett
 // godkänt cykelklipp för varje kort, eller spelkärnans fallback när klippet saknas, där kortet går självt medan dealern
 // står i REDO. Filmen avgör ingenting: utfallet visas när filmen har lagt korten, men det är kärnans.
+//
+// Medan spelet väntar (före första given, när spelaren ska bestämma sig, och när rundan är avgjord) väntar dealern:
+// följden slutar i vänta-klippet (waitClip i round.ts, reel.ts), som spelas om och om. När nästa kort kommer går det
+// pågående varvet klart innan kortets klipp börjar, högst content/runda.json wait.most sekunder. Utan vänta-klipp står
+// filmens sista ruta kvar.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Action } from '../engine/round.ts';
@@ -10,8 +15,8 @@ import type { SeatSignalEvent } from '../engine/seats.ts';
 import { buildScene, type Background, type FilmNote, type SceneHandle, type SeatView } from '../scene/build.ts';
 import { readScene, type SceneDescription } from '../scene/description.ts';
 import { readDoll, type DollDescription } from '../scene/dollPose.ts';
-import { reelEnd } from '../scene/reel.ts';
-import { anchorName, backgroundOf, dealName, dealsOf, planRound, readRound, readyClip, type Plan, type Round, type RoundEntry } from '../scene/round.ts';
+import { nextStart, reelEnd } from '../scene/reel.ts';
+import { anchorName, anchorOf, backgroundOf, dealName, dealsOf, planRound, readRound, readyClip, waitClip, type Plan, type Round, type RoundEntry } from '../scene/round.ts';
 import { fetchContent, fetchEntries, fetchTable, mediaUrl, newSession, sendCommand, type Table } from './server.ts';
 
 // Första dealern. Tills dealerns egen fil finns i content/ står hennes id här, som i Labbet.
@@ -80,7 +85,17 @@ function Room({ content, table, onTable, problem, onProblem }: RoomProps) {
   // Utan runda står dealern i REDO: första rutan av ett godkänt cykelklipp.
   const ready = useMemo(() => readyClip(content.entries, DEALER, VIEW), [content.entries]);
   const idle = plan.clips.length === 0;
-  const dealer: FilmNote | null = !idle ? { kind: 'film', view: VIEW, clips: plan.clips, loop: false } : ready ? { kind: 'film', view: VIEW, clips: [{ file: ready }], loop: false } : null;
+  // Vänta-klippet ur ankaret följdens klipp är gjorda ur, och utan runda ur REDO-klippets ankare. Null när det saknas.
+  const readyEntry = content.entries.find((entry) => entry.file === ready);
+  const wait = waitClip(content.entries, DEALER, VIEW, idle ? (readyEntry ? anchorOf(readyEntry) : null) : plan.anchor);
+  // Utan runda och med vänta-klippet väntar dealern från början: en följd av vänta-klippet, som slutar i väntan.
+  const dealer: FilmNote | null = !idle
+    ? { kind: 'film', view: VIEW, clips: plan.clips, loop: false, ...(wait ? { wait } : {}) }
+    : wait
+      ? { kind: 'film', view: VIEW, clips: [{ file: wait }], loop: false, wait }
+      : ready
+        ? { kind: 'film', view: VIEW, clips: [{ file: ready }], loop: false }
+        : null;
 
   const send = async (command: Record<string, unknown>): Promise<void> => {
     if (busy || playing) return;
@@ -126,8 +141,10 @@ function Room({ content, table, onTable, problem, onProblem }: RoomProps) {
           doll={content.doll}
           background={content.background}
           dealer={dealer}
-          start={idle ? 0 : from}
+          start={idle ? (wait ? 'end' : 0) : from}
           play={!idle && from !== 'end' && playing}
+          most={content.round.wait.most}
+          fps={content.round.film.fps}
           onDone={() => setPlaying(false)}
           skip={skip}
           onProblem={onProblem}
@@ -233,6 +250,7 @@ function Room({ content, table, onTable, problem, onProblem }: RoomProps) {
             {plan.anchors.length > 1 ? ` (inte valda: ${plan.anchors.slice(1).map((one) => anchorName(one.anchor)).join(', ')})` : ''}.
           </p>
         )}
+        {dealer && !wait && <p className="missing">Inget vänta-klipp ur ankaret: medan spelet väntar står filmens sista ruta kvar.</p>}
         <p className="fine">
           Spelkärnan i servern avgör kort och pengar ({view.shoe?.source === 'secure' ? 'säker sko' : `sko: ${view.shoe?.source}`}, insats {limits.min}–{limits.max}). Filmen visar bara det
           kärnan har sagt. Sessionen börjar om när servern startar om.
@@ -293,8 +311,15 @@ type StageProps = {
   dealer: FilmNote | null;
   /** Delen filmen börjar på, eller dess slut. */
   start: number | 'end';
-  /** Om filmen spelas därifrån när den är byggd, eller står still. Läses när en ny film byggs, och bygger inte om den. */
+  /**
+   * Om filmen spelas därifrån när den är byggd, eller står still (en följd som väntar väntar då). Läses när en ny film
+   * byggs, och bygger inte om den.
+   */
   play: boolean;
+  /** Hur länge en ny film högst väntar på att dealerns varv av väntan ska gå klart, i sekunder (content/runda.json). */
+  most: number;
+  /** Filmernas rutor per sekund (content/runda.json): en halv ruta från varvets slut räknas som slutet. */
+  fps: number;
   /** Sägs till när filmen har lagt sitt sista kort. */
   onDone: () => void;
   /** Får det som hoppar fram till filmens slut. */
@@ -302,11 +327,38 @@ type StageProps = {
   onProblem: (text: string) => void;
 };
 
+// Hur länge, i millisekunder, en ny film väntar efter att varvet borde ha gått klart, om filmen som syns har stannat.
+const TURN_PATIENCE = 500;
+
+/**
+ * Uppfylls när dealern i scenen `handle` har gått klart med sitt pågående varv av väntan (reel.ts, nextStart, högst
+ * `most` sekunder), inom `near` sekunder från varvets slut. Direkt när hennes film inte går eller inte väntar, och när
+ * `still` slutar vara sant.
+ */
+function turnOver(handle: SceneHandle | null, most: number, near: number, still: () => boolean): Promise<void> {
+  const clip = handle?.clip;
+  const reel = handle?.reel();
+  if (!clip || !reel || reel.wait === undefined || !clip.playing()) return Promise.resolve();
+  const from = clip.time();
+  const at = nextStart(reel, from, most);
+  if (at - from <= near) return Promise.resolve();
+  const until = performance.now() + (at - from) * 1000 + TURN_PATIENCE;
+  return new Promise((done) => {
+    const look = (): void => {
+      const now = clip.time();
+      if (!still() || now >= at - near || now < from || performance.now() > until) return done();
+      requestAnimationFrame(look);
+    };
+    requestAnimationFrame(look);
+  });
+}
+
 /**
  * Scenen. En ny dealerfilm byggs i en egen scen bredvid den som syns, och tar dess plats först när bord, rum och
- * klipp är lästa och filmen står där den ska börja, så att bordet inte blinkar mellan stegen.
+ * klipp är lästa och filmen står där den ska börja, så att bordet inte blinkar mellan stegen. Väntar dealern i den som
+ * syns tar den nya över där hennes pågående varv slutar, i REDO, där den nya filmen börjar.
  */
-function Stage({ scene, doll, background, dealer, start, play, onDone, skip, onProblem }: StageProps) {
+function Stage({ scene, doll, background, dealer, start, play, most, fps, onDone, skip, onProblem }: StageProps) {
   const holder = useRef<HTMLDivElement>(null);
   const shown = useRef<{ handle: SceneHandle; layer: HTMLDivElement } | null>(null);
   const done = useRef(onDone);
@@ -330,6 +382,9 @@ function Stage({ scene, doll, background, dealer, start, play, onDone, skip, onP
     fit();
     handle.setView(VIEW);
     handle.setShoe(true);
+    // Hoppa fram innan den nya filmen syns: den tar över direkt och hoppar till sitt slut.
+    let hurry = false;
+    skip.current = () => void (hurry = true);
 
     void Promise.all([handle.ready, handle.setBackground(background)]).then(async () => {
       if (!alive) return;
@@ -338,17 +393,33 @@ function Stage({ scene, doll, background, dealer, start, play, onDone, skip, onP
       const at = !reel ? 0 : start === 'end' ? reel.seconds : (reel.starts[start] ?? reel.seconds);
       if (clip) await clip.seek(at);
       if (!alive) return;
+      await turnOver(shown.current?.handle ?? null, most, 0.5 / fps, () => alive && !hurry);
+      if (!alive) return;
       layer.style.visibility = 'visible';
       const before = shown.current;
       shown.current = { handle, layer };
       before?.handle.dispose();
       before?.layer.remove();
-      if (!clip || !reel || !playing.current) return void done.current();
+      if (!clip || !reel) return void done.current();
+      // En följd som väntar går in i väntan när den har spelat klart, eller hoppats fram; annars står sista rutan kvar.
+      const rest = () => {
+        if (reel.wait !== undefined) clip.play();
+      };
+      if (!playing.current) {
+        rest();
+        return void done.current();
+      }
       const finish = () => {
         cancelAnimationFrame(watching);
         if (alive) done.current();
       };
-      skip.current = () => void clip.seek(reel.seconds).then(finish);
+      skip.current = () =>
+        void clip.seek(reel.seconds).then(() => {
+          if (!alive) return;
+          rest();
+          finish();
+        });
+      if (hurry) return skip.current();
       clip.play();
       const watch = () => {
         if (!alive) return;
@@ -368,7 +439,7 @@ function Stage({ scene, doll, background, dealer, start, play, onDone, skip, onP
         layer.remove();
       }
     };
-  }, [scene, doll, background, dealerKey, start, onProblem, skip]);
+  }, [scene, doll, background, dealerKey, start, most, fps, onProblem, skip]);
 
   useEffect(
     () => () => {

@@ -17,7 +17,7 @@ const project = resolve(import.meta.dirname, '..', '..');
 const readJson = (file: string): unknown => JSON.parse(readFileSync(join(project, 'content', file), 'utf8'));
 const FALLBACK = { seconds: 1.2, turn: 0.8, move: 0.8 };
 const rounded = (flying: ReturnType<typeof flyingAt>) => flying && { ...flying, progress: Math.round(flying.progress * 1e6) / 1e6 };
-const round: Round = { deal: { seed: 'prov', bets: [{ seat: 4, main: 10 }], hitBelow: 15 }, fallback: FALLBACK, film: { background: 'scene/backgrounds/prov-rum.jpg', fps: 24, hold: 1.5 } };
+const round: Round = { deal: { seed: 'prov', bets: [{ seat: 4, main: 10 }], hitBelow: 15 }, fallback: FALLBACK, film: { background: 'scene/backgrounds/prov-rum.jpg', fps: 24, hold: 1.5 }, wait: { most: 4 } };
 
 // Spelkärnans händelser och vy, i den form seats.ts ger dem. Bara det rundan läser är ifyllt.
 const card = (face: string, shoeDraw: number) => ({ r: face.slice(0, -1), s: face.slice(-1), serial: shoeDraw, shoeDraw });
@@ -255,6 +255,9 @@ test('content/runda.json går att läsa, och en runda som inte går att använda
   assert.throws(() => readRound({ ...whole, deal: { ...read.deal, bets: [{ seat: 1, main: 10 }, { seat: 1, main: 5 }] } }), /varje plats en gång/);
   assert.throws(() => readRound({ ...whole, fallback: { seconds: 0, turn: 1, move: 1 } }), /fallback/);
   assert.throws(() => readRound({ ...whole, film: { background: 'x.jpg', fps: 0, hold: 1 } }), /film\.fps/);
+  assert.ok(read.wait.most >= 0);
+  assert.throws(() => readRound({ ...whole, wait: { most: -1 } }), /wait\.most/);
+  assert.throws(() => readRound({ ...whole, wait: undefined }), /wait\.most/);
   assert.throws(() => readRound(null), /deal\.seed/);
 });
 

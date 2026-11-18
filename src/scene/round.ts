@@ -40,12 +40,14 @@ export type DealtRound = {
  * Rundan som content/runda.json beskriver den. `deal` är rundan som spelkärnan delar när ingen spelar: fröet till skon,
  * insatserna per plats, och hur spelarna spelar (Hit så länge handen är under `hitBelow`, annars Stand; ingen
  * försäkring). `fallback` är hur länge ett kort utan klipp går självt: från skon (`seconds`), vänt där det ligger
- * (`turn`) och flyttat när en hand delas (`move`). `film` är hur rundan sparas som film.
+ * (`turn`) och flyttat när en hand delas (`move`). `film` är hur rundan sparas som film. `wait.most` är hur länge ett
+ * nytt kort högst väntar på att väntans varv ska gå klart (reel.ts, nextStart), i sekunder.
  */
 export type Round = {
   deal: { seed: string; bets: { seat: number; main: number }[]; hitBelow: number };
   fallback: { seconds: number; turn: number; move: number };
   film: { background: string; fps: number; hold: number };
+  wait: { most: number };
 };
 
 /** Den första handen på en plats, och kortplatsen som ord: `plats 4, kort 1`, `plats 4, hand 2, kort 0`, `dealern, kort 1`. */
@@ -73,11 +75,13 @@ export function readRound(value: unknown): Round {
   const film = round.film;
   need(typeof film?.background === 'string' && film.background !== '', 'film.background');
   need(isPositive(film?.fps) && isNumber(film?.hold) && film.hold >= 0, 'film.fps och film.hold');
+  need(isNumber(round.wait?.most) && round.wait.most >= 0, 'wait.most');
   if (wrong.length > 0) throw new RoundError(`Rundan i content/runda.json går inte att använda: ${wrong.join('; ')}`);
   return {
     deal: { seed: deal!.seed, bets: bets.map((bet) => ({ seat: bet.seat, main: bet.main })), hitBelow: deal!.hitBelow },
     fallback: { seconds: fallback!.seconds, turn: fallback!.turn, move: fallback!.move },
     film: { background: film!.background, fps: film!.fps, hold: film!.hold },
+    wait: { most: round.wait!.most },
   };
 }
 

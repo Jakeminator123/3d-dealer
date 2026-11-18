@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { ClipCard } from './dealer.ts';
-import { flyingAt, glideAt, laidAt, lyingAt, makeReel, markerDown, placeIn, reelEnd } from './reel.ts';
+import { flyingAt, glideAt, laidAt, lyingAt, makeReel, markerDown, nextStart, placeIn, reelEnd } from './reel.ts';
 
 const SECONDS = 97 / 24;
 const card = (seat: number, index: number, face: string, at = 1.92): ClipCard => ({ seat, index, face, at });
@@ -173,4 +173,90 @@ test('ett kort vars plan är densamma som när filmen gjordes, i samma storlek, 
   for (let time = 0; time <= reel.seconds + 1; time += 1 / 24) {
     for (const index of [0, 1]) assert.deepEqual(laidAt(reel, index, time, GLIDE, place, place, 1), { place, scale: 1, still: true }, `del ${index}, ${time.toFixed(3)} s`);
   }
+});
+
+// Vänta-klippet: ett varv REDO → REDO på 4 s, som det är beställt.
+const WAIT = 4;
+const near = (actual: number, expected: number) => assert.ok(Math.abs(actual - expected) < 1e-5, `${actual} ≠ ${expected}`);
+
+test('utan vänta-klipp är allt som förut: sista rutan står kvar, och ett nytt klipp börjar direkt', () => {
+  const reel = makeReel([{ seconds: SECONDS, card: card(4, 0, 'A♠') }, { seconds: SECONDS }], 1.5);
+  assert.equal('wait' in reel, false);
+  assert.deepEqual(makeReel([{ seconds: SECONDS }], 1.5, undefined), makeReel([{ seconds: SECONDS }], 1.5));
+  // Ett vänta-klipp utan längd (filmen gick inte att läsa) är inget vänta-klipp.
+  for (const wait of [0, Number.NaN]) assert.deepEqual(makeReel([{ seconds: SECONDS }], 1.5, wait), makeReel([{ seconds: SECONDS }], 1.5));
+  for (const time of [reelEnd(reel), reelEnd(reel) + 1, reel.seconds + 7]) {
+    assert.deepEqual(placeIn(reel, time), { index: 1, local: SECONDS, held: true });
+    assert.equal(nextStart(reel, time, WAIT), time);
+  }
+  // Medan följdens klipp spelar börjar ett nytt när de är slut.
+  assert.equal(nextStart(reel, 1, WAIT), reelEnd(reel));
+});
+
+test('en följd som väntar: efter sista klippet spelas vänta-klippet varv för varv, med alla kort lagda', () => {
+  const reel = makeReel([{ seconds: SECONDS, card: card(4, 0, 'A♠') }, { seconds: SECONDS, card: card(4, 1, 'K♥', 1.5) }], 1.5, WAIT);
+  const end = 2 * SECONDS;
+  close(reelEnd(reel), end);
+  // Tiden efter sista klippet är hela varv som täcker hold, minst ett.
+  close(reel.seconds, end + WAIT);
+  close(makeReel([{ seconds: SECONDS }], 0, WAIT).hold, WAIT);
+  close(makeReel([{ seconds: SECONDS }], 4.5, WAIT).hold, 2 * WAIT);
+  close(makeReel([{ seconds: SECONDS }], 8, WAIT).hold, 2 * WAIT);
+  // Före slutet är det som förut.
+  const before = placeIn(reel, end - 0.5);
+  assert.equal(before.index, 1);
+  assert.equal('wait' in before, false);
+  // Vid sista klippets slut börjar första varvet, och skarven mellan två varv hör till nästa varv.
+  assert.deepEqual(placeIn(reel, end), { index: 1, local: SECONDS, held: false, wait: { turn: 0, local: 0 } });
+  const middle = placeIn(reel, end + 2.5).wait!;
+  assert.equal(middle.turn, 0);
+  near(middle.local, 2.5);
+  assert.equal(placeIn(reel, end + WAIT - 1e-6).wait!.turn, 0);
+  assert.deepEqual(placeIn(reel, end + WAIT).wait, { turn: 1, local: 0 });
+  // Förbi följdens längd väntar den vidare så länge ingen börjar om den.
+  const later = placeIn(reel, end + 3 * WAIT + 1).wait!;
+  assert.equal(later.turn, 3);
+  near(later.local, 1);
+  // Under väntan ligger alla kort framme i kortplanen, inget är på väg, och filmens märkkort är borta.
+  for (const time of [end, end + 1, end + 10]) {
+    assert.deepEqual(lyingAt(reel, time), [0, 1]);
+    assert.equal(flyingAt(reel, time), null);
+    assert.equal(markerDown(reel, time), true);
+    for (const index of [0, 1]) assert.equal(glideAt(reel, index, time, GLIDE), 1);
+  }
+  // Märkkortet är borta i väntan också när sista delen inte lägger något kort.
+  const bare = makeReel([{ seconds: SECONDS }], 0, WAIT);
+  assert.equal(markerDown(bare, SECONDS - 0.1), false);
+  assert.equal(markerDown(bare, SECONDS + 1), true);
+});
+
+test('ett kort som kommer medan följden väntar börjar när det pågående varvet har gått klart, högst ett varv senare', () => {
+  const reel = makeReel([{ seconds: SECONDS, card: card(4, 0, 'A♠') }], 0, WAIT);
+  const end = SECONDS;
+  // Mitt i ett varv: där varvet slutar.
+  near(nextStart(reel, end + 1.3, WAIT), end + WAIT);
+  near(nextStart(reel, end + 2 * WAIT + 0.2, WAIT), end + 3 * WAIT);
+  // Precis på en varvgräns: direkt.
+  near(nextStart(reel, end, WAIT), end);
+  near(nextStart(reel, end + WAIT, WAIT), end + WAIT);
+  // Fram till bytet går samma varv vidare, ända till sin sista ruta: det byts aldrig mitt i ett varv.
+  const arrives = end + 1.3;
+  const starts = nextStart(reel, arrives, WAIT);
+  for (let time = arrives; time < starts - 1e-6; time += 1 / 24) assert.equal(placeIn(reel, time).wait!.turn, 0, `${time.toFixed(3)} s`);
+  near(placeIn(reel, starts - 1e-6).wait!.local, WAIT);
+  // Det nya klippet börjar i sin första ruta med samma kort lagda som i väntan, och med sitt eget märkkort i luften.
+  const longer = makeReel([...reel.parts, { seconds: SECONDS, card: card(4, 1, 'K♥') }], 0, WAIT);
+  assert.deepEqual(placeIn(longer, longer.starts[1]!), { index: 1, local: 0, held: false });
+  assert.deepEqual(lyingAt(longer, longer.starts[1]!), lyingAt(reel, starts));
+  assert.equal(markerDown(longer, longer.starts[1]!), false);
+  // Det dröjer aldrig mer än ett varv.
+  for (let time = end; time < end + 3 * WAIT; time += 0.05) {
+    const at = nextStart(reel, time, WAIT);
+    assert.ok(at >= time - 1e-9 && at - time <= WAIT + 1e-9, `${time.toFixed(2)} s: ${at}`);
+  }
+  // Är mer kvar av varvet än most börjar kortet direkt, med ett hopp.
+  near(nextStart(reel, end + 1.3, 2), end + 1.3);
+  near(nextStart(reel, end + 2.5, 2), end + WAIT);
+  // Medan följdens egna klipp spelar: när de är slut.
+  near(nextStart(reel, 1, WAIT), end);
 });
