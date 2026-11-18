@@ -1,6 +1,6 @@
 # Produktion: från en bild till en spelbar dealer
 
-En linje, ingen annan ([beslut 2026-11-18](decisions.md)). Den är körd en gång: Paulinas giv till plats 4 ur vyn Spelaren. Det som är prövat i gamla projektet står i [underlaget](../information/underlag-inlasning-2026-11-18.md), avsnitt 4. Varje beställning, med modell, indata, text och kostnad, står i sin post i registret (`content/assets.json`, fältet `source`).
+En linje, ingen annan ([beslut 2026-11-18](decisions.md)). Den är körd en gång: Paulinas giv till plats 4 ur vyn Spelaren. Det som är prövat i gamla projektet står i [underlaget](../information/underlag-inlasning-2026-11-18.md), avsnitt 4. Varje beställning, med modell, indata, text och kostnad, står i registret (`npm run reg -- sql "SELECT * FROM orders"`), och hur en fil gjordes i dess post (`npm run reg -- show <fil>`).
 
 ## Stegen
 
@@ -15,7 +15,7 @@ Scen -> Identitet -> Förlaga -> Ankare -> Film -> Granska -> Spela
 | Förlaga | Dockan gör rörelsen i scenen, och scenen sparar den ur vyns närbild: ställningarna som bilder och rörelsen som film. | `output/forlagor/` |
 | Ankare | En bildmodell sätter dealern i dockans ställning, på grön skärm, med identitetsbilderna som referens. | `assets/dealers/<dealer>/anchors/` |
 | Film | Filmmodellen får första bild, sista bild och dockans film som rörelsereferens. | Tagningar i `assets/dealers/<dealer>/clips/` |
-| Granska | En oberoende granskare ser varje tagning i full storlek, mot dockans lägen och reglerna nedan. Måtten mot dockan tas med `output/work/giv-4/mat-ankare.ts`. | `status` i registret |
+| Granska | En oberoende granskare ser varje tagning i full storlek, mot dockans lägen och reglerna nedan. Måtten mot dockan tas med `output/work/giv-4/mat-ankare.ts` och förs in med `npm run reg -- measure`. | `status` i registret |
 | Spela | Tagningen läggs på den vikta ytan i scenen genom vyns närbild, och scenens kort läggs på kortplatsen. | En spelbar dealer |
 
 Varje vy som ska visa dealern går igenom Förlaga, Ankare och Film för sig. Dockan och rörelsen är desamma, så samma giv ser ut som en rörelse ur alla vyer.
@@ -55,10 +55,10 @@ Varje vy som ska visa dealern går igenom Förlaga, Ankare och Film för sig. Do
 - Skriv "blonde" om håret. "Warm golden-blonde" gav orange hår i två modeller.
 - Ge inte Nano Banana en identitetsbild som själv har bord och sko i bild, till exempel `identity/sida-kavaj-tatuerad.png`: den kopierade den bildens uppställning i stället för underlagets. Med handnärbilden som referens har den också lagt händerna som spökbilder över bakgrunden; se efter i varje bild.
 - Har bildmodellen flyttat skon, passas bilden in: `output/work/giv-4/passa-ankare.ts` flyttar bilden så att skon hamnar där scenens sko står (dess sökning efter skon ska bytas mot den i `mat-ankare.ts`), och `flytta-ruta.mjs` flyttar en del av bilden.
-- Tatueringar på en hand i en färdig bild: receptet står i registrets post för `dealers/paulina/anchors/redo-nyp-tatuerad.png`, och skripten i `output/work/nyp/`.
+- Tatueringar på en hand i en färdig bild: receptet står i den borttagna posten för `dealers/paulina/anchors/redo-nyp-tatuerad.png` (`npm run reg -- show`), och skripten i `output/work/nyp/`.
 - De lokala skripten ligger tills vidare i `output/work/giv-4/`. De hör hemma i `src/pipeline` när receptet har hållit för en dealer till.
 - Kostnad för ett ankare när receptet följs: cirka 30 krediter (20 + 9).
-- Ankaret förs in med `node src/pipeline/import.ts <post.json>`, med `use: "dealerfilm"` och vyn det är gjort i, till exempel `"view": { "kind": "plats", "seat": 7 }`.
+- Ankaret förs in med `npm run reg -- import <post.json>`, med `use: "dealerfilm"` och vyn det är gjort i, till exempel `"view": { "kind": "plats", "seat": 7 }`.
 
 ## Filmen
 
@@ -70,8 +70,8 @@ Varje vy som ska visa dealern går igenom Förlaga, Ankare och Film för sig. Do
 ## Runway
 
 - All generering går genom Runways MCP-server i agentchatten, på arbetsytan "Jakob", aldrig genom API-nycklar. Ramen står i [AGENTS.md](../AGENTS.md).
-- Kontots saldo delas med andra sessioner. Läs saldot direkt före och direkt efter en beställning; annars går kostnaden inte att skilja ut.
-- En lokal fil laddas upp först (`init_upload`, `curl.exe` med adressen inom enkla citattecken i PowerShell, `complete_upload`) och ges som referens. En tidigare Runway-bild pekas ut med sitt `taskId`. Uppladdade filers adresser sparas i `output/work/giv-4/uppladdat.json`.
+- Kontots saldo delas med andra sessioner. Läs saldot direkt före och direkt efter en beställning; annars går kostnaden inte att skilja ut. Beställningen förs in med `npm run reg -- order <beställning.json>` (fälten står i `Order` i `src/pipeline/registry.ts`): kostnaden är mätt bara när båda saldona är givna och skillnaden är krediterna.
+- En lokal fil laddas upp först (`init_upload`, `curl.exe` med adressen inom enkla citattecken i PowerShell, `complete_upload`) och ges som referens. En tidigare Runway-bild pekas ut med sitt `taskId`. Adressen förs in med `npm run reg -- upload <lokal fil> <adress> [assetId]`. Signaturen sparas inte (`origin` är publikt); en fil som behövs igen när adressen har gått ut laddas upp på nytt.
 - Kontrollera modellens indata med `whoami` och verktygets beskrivning före varje ny typ av beställning.
 - Verktygen svarar med hela texten och långa adresser. Upprepade beställningar görs av en underagent.
 

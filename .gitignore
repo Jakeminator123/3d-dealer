@@ -1,6 +1,11 @@
-# Media och råmaterial: registreras i content/assets.json, lagras utanför Git
+# Media och råmaterial: registreras i content/register.db, lagras utanför Git
 assets/
 glb/
+
+# Registrets journal finns bara medan en skrivning pågår
+*.db-journal
+*.db-wal
+*.db-shm
 
 # Sådant som kan göras om, och pågående jobb
 output/

@@ -5,6 +5,7 @@ import { createServer } from 'node:http';
 import { join, resolve } from 'node:path';
 import react from '@vitejs/plugin-react';
 import { createServer as createVite } from 'vite';
+import { studioRoot } from '../pipeline/registry.ts';
 import { createApi } from './api.ts';
 import { sendText } from './files.ts';
 
@@ -12,8 +13,8 @@ const root = resolve(import.meta.dirname, '..', '..');
 const host = '127.0.0.1';
 const port = Number(process.env.PORT) || 5310;
 
-// STUDIO_DATA pekar ut en annan mapp med content/ och assets/, för att pröva studion utan att röra de riktiga registren.
-const data = process.env.STUDIO_DATA ? resolve(process.env.STUDIO_DATA) : root;
+// STUDIO_DATA pekar ut en annan mapp med content/ och assets/, för att pröva studion utan att röra det riktiga registret.
+const data = studioRoot();
 const api = createApi(data);
 
 const server = createServer(async (request, response) => {

@@ -2,6 +2,18 @@
 
 Nyast överst. Ett beslut som ersätts stryks inte: skriv det nya överst och peka på det gamla.
 
+## 2026-11-18, registret blir en databas
+
+Jakob samma dag: "Överväg att använda SQL-databaser istället för stora JSON-filträd som ignoreras", "samla det i en enda källa", "Om vissa filmer inte fungerar, ska vi kunna granska materialet och identifiera problem", "automatiskt avlägsna de som inte används".
+
+| Beslut | Skäl |
+| --- | --- |
+| Registret är `content/register.db`, en SQLite-databas (`node:sqlite`, inget nytt beroende), spårad i Git som binär fil. Journalen står i DELETE-läge, så att inga sidofiler ligger kvar. `content/assets.json` är borttagen. | En källa som går att fråga, i stället för en JSON-fil som ingen fick läsa i sin helhet och arbetsmaterial utanför Git. |
+| `src/pipeline/registry.ts` är den enda vägen till databasen, och `npm run reg` det enda kommandot. Ersätter `npm run judge` och `node src/pipeline/import.ts`. | En väg för varje sak. |
+| Databasen bär också omdömenas historik, beställningarna med kostnad (mätt eller antagen), uppladdningarna, mätningarna och det som lämnat registret. Allt ur `content/assets.json` och `output/work/giv-4/` fördes in; jämförelsen fält för fält gav noll skillnader. | Beställningar, saldon och mätningar låg spridda i `output/work/`. |
+| En underkänd tagning arkiveras (`arkivera`, till `output/work/arkiv/`); annat som produktionslinjen inte använder tas bort (`ta-bort`). Båda för hela posten med sitt omdöme till `left_out`, och vägrar så länge kod, `content/` eller en annan post pekar på filen. Det som låg i `output/work/struket/` ligger nu i `output/work/arkiv/`. Ersätter `stryk` och mappen `struket/` längre ned. | Ta bort och arkivera skiljs åt (beslutet nedan). En tagning som inte fungerar ska gå att se på i efterhand. |
+| En Runway-adress sparas utan signatur, med när den slutar gälla. | `origin` är publikt, och en signerad adress checkas inte in. |
+
 ## 2026-11-18, en produktionslinje, och det som inte används tas bort
 
 Citat är Jakobs ord samma förmiddag (cirka 09:35–09:45), dikterade.

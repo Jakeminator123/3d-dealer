@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "about": "Scenen i verkliga meter: x åt höger i bild, y uppåt, z mot kameran, filten på y = 0, origo på filtens plan rakt under kameran. Det här är den enda platsen för scenens tal; det som går att räkna ur dem räknas i src/scene/geometry.ts. Varje grupp bär basis (mätt eller antaget) och en källa. Det som är mätt i bild är fört ut i meter genom kameran, som är antagen: lägena stämmer i kamerans bild, men avstånden i meter är inte säkrare än linsen. Tillgångar pekas ut med registrets file (content/assets.json).",
+  "about": "Scenen i verkliga meter: x åt höger i bild, y uppåt, z mot kameran, filten på y = 0, origo på filtens plan rakt under kameran. Det här är den enda platsen för scenens tal; det som går att räkna ur dem räknas i src/scene/geometry.ts. Varje grupp bär basis (mätt eller antaget) och en källa. Det som är mätt i bild är fört ut i meter genom kameran, som är antagen: lägena stämmer i kamerans bild, men avstånden i meter är inte säkrare än linsen. Tillgångar pekas ut med registrets file (content/register.db).",
   "camera": {
     "frame": { "width": 1764, "height": 1174 },
     "focalPx": 2334,

@@ -4,7 +4,7 @@ export const capitalize = (text: string): string => text.charAt(0).toUpperCase()
 
 export type Judge = (file: string, status: string) => void;
 
-/** Jakobs omdöme om en fil. Valen är registrets egna statusar; ett klick skrivs till content/assets.json. */
+/** Jakobs omdöme om en fil. Valen är registrets egna statusar; ett klick skrivs till registret (content/register.db) genom servern. */
 export function Verdict({ registry, asset, onJudge }: { registry: Registry; asset: Asset; onJudge: Judge }) {
   return (
     <div className="verdict" role="group" aria-label="Omdöme">

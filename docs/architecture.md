@@ -33,7 +33,7 @@ server ───> engine, pipeline
 | `src/scene` | Ritar scenen och spelar upp klipp och signaler | Avgör inga kort eller utfall |
 | `src/lab` | Stegen Scen, Dealer, Klipp, Granska, Spela | Har ingen egen scen eller uppspelning |
 | `src/casino` | En riktig runda från vald plats | Har ingen egen scen eller uppspelning |
-| `src/pipeline` | Förlaga, beställning, import, granskning | Spelar inte, avgör inget i spelet |
+| `src/pipeline` | Förlaga, beställning, och registret (`registry.ts`, den enda vägen till `content/register.db`) | Spelar inte, avgör inget i spelet |
 | `src/server` | Lokal spelsession, filer, jobb | Har ingen logik som hör till kärnan |
 
 Pilarna är importer. Labbet och Casinot når servern över HTTP (`/api`, `/media`, `/thumb`), inte genom import. Gränserna prövas av `src/boundaries.test.ts`.
@@ -79,8 +79,9 @@ Att byta kamera ändrar aldrig kortets plats, rörelsen som spelas eller utfalle
 | Tagning | Ett försök att göra ett klipp. En tagning granskas och blir godkänd eller inte. |
 | Signal | Det spelkärnan säger har hänt: deal, reveal, turn, settle, idle. Kärnan säger också speak, dealerns repliker; den hoppas över tills ljudet tas i bruk. |
 | Veck | Linjen vid bordskanten där dealerfilmen viks från upprätt till liggande. |
-| Ta bort | Radera: filen finns inte kvar. |
-| Arkivera | Flytta: filen finns kvar på ett annat ställe, i dag `output/work/struket/`. `node src/pipeline/import.ts stryk` arkiverar. |
+| Registret | `content/register.db`: en post per fil i `assets/`, omdömena, beställningarna, uppladdningarna, mätningarna och det som lämnat registret. Frågas med `npm run reg`. |
+| Ta bort | Radera: filen finns inte kvar. `npm run reg -- ta-bort`. |
+| Arkivera | Flytta: filen finns kvar, i `output/work/arkiv/`. `npm run reg -- arkivera`. |
 
 Kartan över ankare och klipp ritas ur klippregistret. Den har ingen egen lista.
 

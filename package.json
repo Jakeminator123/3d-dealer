@@ -9,7 +9,7 @@
     "dev": "node src/server/main.ts",
     "test": "node --test \"src/**/*.test.ts\"",
     "typecheck": "tsc --noEmit",
-    "judge": "node src/pipeline/judge.ts"
+    "reg": "node src/pipeline/registry.ts"
   },
   "dependencies": {
     "react": "^19.3.1",

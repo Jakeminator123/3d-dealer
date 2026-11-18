@@ -83,7 +83,7 @@ export function Review({ route }: { route: string[] }) {
           ))}
         </nav>
         <p className="hint">
-          Ett klick på ett omdöme sparas direkt i <code>content/assets.json</code>. Ingen fil tas bort härifrån.
+          Ett klick på ett omdöme sparas direkt i registret, <code>content/register.db</code>. Ingen fil tas bort härifrån.
         </p>
       </aside>
 

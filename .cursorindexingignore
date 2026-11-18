@@ -4,6 +4,9 @@
 assets/
 output/
 
+# Registret är en databas: fråga den med npm run reg, läs den aldrig som text
+content/register.db
+
 # Stora bakgrundstexter: läs med Grep eller offset/limit, inte i sin helhet
 information/filmhandbok-gamla-dealer.md
 information/Dealer_omstart_rekommendation_och_startprompt_2026-11-18.md

@@ -13,7 +13,7 @@ npm run dev
 
 Öppna sedan http://localhost:5310/lab/. Servern svarar bara på den här datorn och laddar inte om sin egen kod: starta om den efter en ändring i `src/server` eller `src/pipeline`. `npm test` kör testerna och `npm run typecheck` typkontrollen.
 
-Kommandona för produktionen (`node src/pipeline/shoot.ts`, `import.ts` och `npm run judge`) står i [docs/production.md](docs/production.md) och [AGENTS.md](AGENTS.md).
+Kommandona för produktionen (`node src/pipeline/shoot.ts`, och `npm run reg` för registret) står i [docs/production.md](docs/production.md) och [AGENTS.md](AGENTS.md).
 
 ## Läget
 
@@ -27,14 +27,14 @@ Labbet har två steg: Granska, där allt i bildregistret visas och döms, och Sc
 | `src/scene` | Den gemensamma 3D-scenen och uppspelningen: bord, sko, kort, marker, dealerfilm, kameror. | ja |
 | `src/lab` | Labbet. | ja |
 | `src/casino` | Casinot. Inte byggt; mappen finns inte än. | – |
-| `src/pipeline` | Vägen från scen till film: förlaga, import, granskning. | ja |
+| `src/pipeline` | Vägen från scen till film: förlaga och registret. | ja |
 | `src/server` | Liten lokal server: registret, filerna och förlagorna. Spelsessionen kommer hit. | ja |
-| `content/` | Små data som styr allt: scen, docka, rörelser och bildregistret. | ja |
-| `assets/` | Bilder, filmer och modeller. Varje fil har en post i `content/assets.json`. | nej |
+| `content/` | Små data som styr allt: scen, docka, rörelser, och registret (`register.db`, en databas). | ja |
+| `assets/` | Bilder, filmer och modeller. Varje fil har en post i registret. | nej |
 | `docs/` | Fyra dokument, ett ämne var. | ja |
 | `information/` | Bakgrund: samtal, extern granskning, underlaget från inläsningen och gamla filmhandboken. | ja |
 | `glb/` | Jakobs råmaterial (tunga modeller och bilder), orört. | nej |
-| `output/` | Sådant som kan göras om: förlagor, förhandsbilder, arbetsmaterial och arkiverade filer (`output/work/struket/`). | nej |
+| `output/` | Sådant som kan göras om: förlagor, förhandsbilder, arbetsmaterial och arkiverade filer (`output/work/arkiv/`). | nej |
 
 ## Dokument
 

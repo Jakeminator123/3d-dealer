@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer, request as httpRequest, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
@@ -6,6 +7,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { after, before, test } from 'node:test';
 import sharp from 'sharp';
+import { addEntry, createRegister, readRegistry } from '../pipeline/registry.ts';
 import { createApi } from './api.ts';
 
 let root: string;
@@ -13,13 +15,8 @@ let server: Server;
 let base: string;
 let port: number;
 
-const REGISTRY = {
-  statuses: { 'att granska': 'väntar', godkänd: 'ja', utgår: 'nej' },
-  assets: [
-    { file: 'scene/bild.png', group: 'backgrounds', title: 'Bild', status: 'att granska' },
-    { file: 'reference/film.mp4', group: 'reference', title: 'Film', status: 'att granska' },
-  ],
-};
+const STATUSES = { 'att granska': 'väntar', godkänd: 'ja', utgår: 'nej' };
+const sha = (content: string | Buffer): string => createHash('sha256').update(content).digest('hex');
 
 function put(path: string, content: string | Buffer): void {
   mkdirSync(dirname(join(root, path)), { recursive: true });
@@ -28,7 +25,7 @@ function put(path: string, content: string | Buffer): void {
 
 before(async () => {
   root = mkdtempSync(join(tmpdir(), 'api-'));
-  put('content/assets.json', JSON.stringify(REGISTRY, null, 2));
+  put('content/scene.json', JSON.stringify({ about: 'en scen' }));
   put('hemlig.txt', 'utanför assets');
   put('utanfor.json', '{"hemligt":true}');
   put('assets/reference/film.mp4', '0123456789');
@@ -36,6 +33,9 @@ before(async () => {
     .png()
     .toBuffer();
   put('assets/scene/bild.png', picture);
+  createRegister(root, { about: 'prov', statuses: STATUSES, asksWhy: [], groups: { backgrounds: 'bakgrunder', reference: 'referens' }, sources: { dealer: { what: 'gamla projektet' } } });
+  addEntry(root, { file: 'scene/bild.png', group: 'backgrounds', title: 'Bild', status: 'att granska', source: { from: 'dealer', sha256: sha(picture) } });
+  addEntry(root, { file: 'reference/film.mp4', group: 'reference', title: 'Film', status: 'att granska', source: { from: 'dealer', sha256: sha('0123456789') } });
 
   const api = createApi(root, () => '2026-11-18 05:30');
   server = createServer(async (request, response) => {
@@ -79,11 +79,12 @@ test('registret lämnas ut med uppgift om filerna finns', async () => {
 });
 
 test('beskrivningarna i content lämnas ut som de står, och bara JSON', async () => {
-  const response = await fetch(`${base}/content/assets.json`);
+  const response = await fetch(`${base}/content/scene.json`);
   assert.equal(response.status, 200);
   assert.match(response.headers.get('content-type')!, /^application\/json/);
-  assert.deepEqual((await response.json()).statuses, REGISTRY.statuses);
+  assert.deepEqual(await response.json(), { about: 'en scen' });
 
+  assert.equal(await raw('/content/register.db'), 404, 'registret lämnas ut genom /api/registry, inte som fil');
   assert.equal(await raw('/content/finns-inte.json'), 404);
   assert.equal(await raw('/content/..%2Futanfor.json'), 404, 'JSON utanför content');
   assert.equal(await raw('/content/..%2Fassets%2Fscene%2Fbild.png'), 404, 'annat än JSON');
@@ -169,9 +170,10 @@ test('ett omdöme sparas och det nya registret kommer tillbaka', async () => {
   assert.equal(view.assets[0].status, 'godkänd');
   assert.equal(view.assets[0].statusBy, 'Jakob i Labbet 2026-11-18');
 
-  const saved = JSON.parse(readFileSync(join(root, 'content', 'assets.json'), 'utf8'));
-  assert.equal(saved.assets[0].status, 'godkänd');
-  assert.equal(saved.assets[0].present, undefined, 'present hör till vyn, inte till filen');
+  const saved = readRegistry(root).assets[0]!;
+  assert.equal(saved.status, 'godkänd');
+  assert.equal(saved.statusBy, 'Jakob i Labbet 2026-11-18');
+  assert.equal('present' in saved, false, 'present hör till vyn, inte till registret');
 });
 
 test('Jakobs ord om en fil sparas med tid och kommer tillbaka i registret', async () => {

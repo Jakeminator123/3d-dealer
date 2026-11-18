@@ -1,4 +1,5 @@
-// Scenens beskrivning i content/scene.json: att den går att läsa, att varje tal är märkt och att tillgångarna finns i registret.
+// Scenens beskrivning i content/scene.json: att den går att läsa och att varje tal är märkt. Att bord och sko finns i
+// registret prövas i src/pipeline/registry.test.ts, eftersom scenen inte läser registret.
 
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -31,14 +32,6 @@ test('varje tal i beskrivningen står i en grupp som är märkt mätt eller anta
   const { schemaVersion: _version, ...groups } = readJson('scene.json') as Record<string, unknown>;
   walk(groups, '', false);
   assert.deepEqual(unmarked, []);
-});
-
-test('scenens tillgångar är poster i registret', () => {
-  const scene = readScene(readJson('scene.json'));
-  const registry = readJson('assets.json') as { assets: { file: string; group: string }[] };
-  for (const file of [scene.table.file, scene.shoe.file]) {
-    assert.equal(registry.assets.find((asset) => asset.file === file)?.group, 'models', `${file} ska vara en modell i registret`);
-  }
 });
 
 test('en beskrivning med hål i tas inte emot', () => {

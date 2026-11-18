@@ -7,3 +7,6 @@
 *.webp binary
 *.mp4 binary
 *.glb binary
+
+# Registret är en SQLite-databas: content/register.db. Fråga den med npm run reg -- sql.
+*.db binary
