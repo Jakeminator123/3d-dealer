@@ -24,10 +24,14 @@ const BLUE = [0.1, 0.2];
 const YELLOW = [0.33, 0.48];
 // Minsta skillnad i märkets tecken mellan kortet och dealern bredvid, när kortets andel i en kantpunkt räknas.
 const SIGN_SPAN = 0.1;
-// Hur nära linjen mellan skärmen och märkkortets blå en punkt ska ligga för att vara en blandning av dem, och hur mycket
-// blått den minst ska ha. Mätt 2026-11-18 i pilotens ruta 27: den turkosa spetsen ligger 0,08 från linjen, med 0,69 blått.
-const SCREEN_MIX = 0.1;
+// Hur nära triangeln mellan skärmen, märkkortets blå och dess gula en punkt ska ligga för att vara en blandning av dem,
+// hur mycket blått den minst ska ha, och hur mycket mer blått än rött. Mätt 2026-11-18 i pilotens ruta 27: den turkosa
+// spetsen ligger 0,08 från linjen mellan skärmen och det blå, med 0,69 blått. I plats 2, kort 0, ruta 26 är kortet mitt
+// i vändningen en turkos oskärpa som ligger upp till 0,15 från triangeln (output/work/sko-arm/smet.mjs). Hår, hud och
+// blus har mer rött än blått, och hårets kant mot skärmen ligger annars i triangeln.
+const SCREEN_MIX = 0.15;
 const SMEAR_LEAST = 0.15;
+const BLUE_OVER_RED = 0.2;
 // En punkt som är så här mycket kort ritas över det som står framför den vikta ytan.
 const FRONT = 0.3;
 
@@ -83,17 +87,32 @@ vec4 markCard(vec2 uv, vec3 c, vec3 colour, float alpha, float range, out float 
   vec2 My0 = markOf(texture2D(map, uv - vec2(0.0, four.y)).rgb);
   vec2 own = markOf(c);
   vec2 beside = max(max(max(mx1, mx0), max(my1, my0)), max(max(Mx1, Mx0), max(My1, My0)));
-  // Märkkortets blå utsmetat mot skärmen när kortet vänds: en blandning av det blå och skärmens gröna (turkos), som
-  // nyckeln inte tar som skärm. Den ligger på linjen mellan skärmen och det blå, också längre från kortet än proven når.
-  vec3 spanB = MARK_FACE - key;
-  float partB = clamp(dot(c - key, spanB) / max(dot(spanB, spanB), 1e-4), 0.0, 1.0);
-  bool smear = own.x < 0.99 && partB > ${SMEAR_LEAST} && length(c - key - partB * spanB) < ${SCREEN_MIX};
+  // Märkkortet utsmetat i rörelse när det vänds: en blandning av skärmens gröna, det blå och det gula (turkos), som
+  // nyckeln inte tar som skärm. Den ligger nära triangeln mellan de tre färgerna, också längre från kortet än proven når.
+  // Andelarna blått och gult räknas med minsta kvadrat; resten är skärm.
+  vec3 toB = MARK_FACE - key;
+  vec3 toY = MARK_BACK - key;
+  vec3 off = c - key;
+  float bb = dot(toB, toB);
+  float yy = dot(toY, toY);
+  float by = dot(toB, toY);
+  float det = max(bb * yy - by * by, 1e-6);
+  float partB = clamp((dot(off, toB) * yy - dot(off, toY) * by) / det, 0.0, 1.0);
+  float partY = clamp((dot(off, toY) * bb - dot(off, toB) * by) / det, 0.0, 1.0);
+  float partCard = partB + partY;
+  if (partCard > 1.0) {
+    partB /= partCard;
+    partY /= partCard;
+    partCard = 1.0;
+  }
+  bool smear = own.x < 0.99 && own.y < 0.99 && partB > ${SMEAR_LEAST} && c.b - c.r > ${BLUE_OVER_RED} && skinOf(c) < 0.5
+    && length(off - partB * toB - partY * toY) < ${SCREEN_MIX};
   if (!smear && max(max(own.x, own.y), max(beside.x, beside.y)) < 0.01) return vec4(colour, alpha);
 
   // Dealerns färg utan täckningen, och vilket märke punkten hör till: det som är mest här eller intill.
   vec3 u = colour / max(alpha, 0.004);
   vec2 which = max(own, beside);
-  bool face = smear || which.x > which.y;
+  bool face = smear ? partB >= partY : which.x > which.y;
   vec3 nominal = face ? MARK_FACE : MARK_BACK;
   vec2 keyed = markOf(u);
   float share = face ? max(own.x, keyed.x) : max(own.y, keyed.y);
@@ -124,9 +143,9 @@ vec4 markCard(vec2 uv, vec3 c, vec3 colour, float alpha, float range, out float 
       O = u;
     }
   }
-  // I det utsmetade blå är skärmens del genomskinlig och resten kort.
+  // I det utsmetade kortet är skärmens del genomskinlig och resten kort.
   if (smear) {
-    alpha = min(alpha, partB);
+    alpha = min(alpha, partCard);
     share = 1.0;
     O = u;
   }
@@ -138,7 +157,10 @@ vec4 markCard(vec2 uv, vec3 c, vec3 colour, float alpha, float range, out float 
   float solid = min(min(min(solidOf(tx1), solidOf(tx0)), min(solidOf(ty1), solidOf(ty0))),
     min(min(solidAt(uv + d), solidAt(uv - d)), min(solidAt(uv + vec2(d.x, -d.y)), solidAt(uv - vec2(d.x, -d.y)))));
   float rim = 1.0 - smoothstep(0.3, 0.9, solid);
-  vec3 paint = face ? mix(cardFace, cardEdge, rim) : mix(cardBack, cardFace, rim);
+  vec3 facePaint = mix(cardFace, cardEdge, rim);
+  vec3 backPaint = mix(cardBack, cardFace, rim);
+  // Det utsmetade kortet är framsida och baksida i sina andelar; annars den sida punkten hör till.
+  vec3 paint = smear ? mix(backPaint, facePaint, partB / max(partCard, 1e-4)) : face ? facePaint : backPaint;
   // Kortets ljus i filmen följer med: skugga och rörelseoskärpa.
   paint = min(paint * clamp(dot(M, LUMA) / max(dot(nominal, LUMA), 0.05), 0.55, 1.15), 1.0);
   // Det blå tas bort när kortet ligger; annars målas det.

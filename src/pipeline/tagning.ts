@@ -10,6 +10,10 @@
 //     Tar bort ljudet utan omkodning, mäter klippet mot bilderna, dockan och scenen och prövar måtten mot gränserna,
 //     gör ark och beviset i scenen, skriver matning.json och post.json, och för in klippet, beställningen och måtten
 //     i registret (registry.ts). Adresserna till de uppladdade filerna tas med om de står i paketets uppladdat.json.
+//   node src/pipeline/tagning.ts mät-om <id>
+//     Mäter om ett klipp som redan är taget emot, med dagens mätningar och scen: dockans film, klippet och beviset.
+//     Ersätter matning.json, måtten i post.json och registrets mätningar från tagning.ts. Klippet, beställningen,
+//     posten och omdömet rörs inte.
 //   node src/pipeline/tagning.ts pröva
 //     Kör forbered och ta-emot på pilottagningen (output/work/cykel/pilot/) och jämför talen med pilotens egna.
 //
@@ -29,7 +33,6 @@ import { closeView, lastPicture, readCycleParts, type CycleParts } from './cykel
 import {
   countIn,
   cornerError,
-  dollOf,
   eachFrame,
   firstFrame,
   grow,
@@ -38,6 +41,7 @@ import {
   judgeOne,
   layoutFor,
   probe,
+  readDollFilm,
   readFilm,
   readPicture,
   valuesOf,
@@ -48,6 +52,7 @@ import {
   type Limit,
   type Measure,
   type Picture,
+  type Probe,
   type Values,
 } from './matning.ts';
 import { about, addMeasurement, addOrder, addUpload, dropMeasurements, getEntry, importAsset, sha256Of, stamp, studioRoot, unsigned, type Order, type Post } from './registry.ts';
@@ -215,6 +220,27 @@ async function shootReference(content: TagningContent, cycle: string, view: Seat
   return result.saved.file;
 }
 
+/**
+ * Mäter dockans referensfilm i paketet som klippet sedan mäts (matning.ts, readDollFilm) och skriver docka.json, och med
+ * `sheet` arket ark-docka.jpg. Görs när paketet görs och igen när klippet mäts, så att dockans värden alltid är mätta med
+ * samma kod som klippets. Svaret har också masken över skons bildpunkter som dockans arm aldrig täcker.
+ */
+async function measureDoll(root: string, dir: string, layout: Layout, measure: Measure, sheet: boolean): Promise<{ doll: DollRead; shoeFree: Uint8Array }> {
+  const film = join(dir, 'referens.mp4');
+  const facts = await probe(film);
+  const tiles = sheetCollector(facts.frames, facts.fps, 6, 'docka');
+  const start = await firstFrame(film, layout.frame);
+  const { doll, shoeFree } = await readDollFilm(film, facts.fps, { layout, measure, key: null, start }, sheet ? (picture, index) => tiles.take(picture, index) : undefined);
+  write(join(dir, 'docka.json'), {
+    about:
+      'Dockans referensfilm mätt som klippet sedan mäts (src/pipeline/matning.ts): tiderna i sekunder och rutor, givhandens bredd i bp i varje ruta, hur stor del av nästa kort i mynningen som syns i varje ruta (next), handen bortom handleden i bp (beyond), dockans egna kortmått (own) och hur många bildpunkter i skons ruta hennes arm aldrig täcker (shoe). Mätt, inte antaget.',
+    film: posix(relative(root, film)),
+    ...doll,
+  });
+  if (sheet) await makeSheet(await Promise.all(tiles.tiles), join(dir, 'ark-docka.jpg'));
+  return { doll, shoeFree };
+}
+
 // ---------------------------------------------------------------------------------------------------------------------
 // forbered
 
@@ -282,16 +308,7 @@ async function prepare(spec: Spec, options: PrepareOptions, made: { dir?: string
 
   // Dockans film mätt som klippet sedan mäts, och sedd som ark.
   const layout = layoutFor(parts, view, spec.seat, spec.index, content.measure);
-  const sheet = sheetCollector(reference.frames, reference.fps, 6, 'docka');
-  const start = await firstFrame(at('referens.mp4'), layout.frame);
-  const read = await readFilm(at('referens.mp4'), reference.fps, { layout, measure: content.measure, key: null, start }, (picture, index) => sheet.take(picture, index));
-  const doll = dollOf(read, reference.fps, content.measure);
-  write(at('docka.json'), {
-    about: 'Dockans referensfilm mätt som klippet sedan mäts (src/pipeline/matning.ts): tiderna i sekunder och rutor, och givhandens bredd i bp i varje ruta. Mätt, inte antaget.',
-    film: posix(relative(root, at('referens.mp4'))),
-    ...doll,
-  });
-  await makeSheet(await Promise.all(sheet.tiles), at('ark-docka.jpg'));
+  const { doll } = await measureDoll(root, dir, layout, content.measure, true);
 
   const wrist = dollWrist(parts, spec.seat, spec.index);
   const checks = content.limits.dockansHandled ? [judgeOne('dockansHandled', wrist, content.limits.dockansHandled)] : [];
@@ -429,6 +446,83 @@ async function proofOf(root: string, dir: string, clip: string, asset: string, v
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
+// Mätningen av ett klipp i sitt paket: för ta-emot och mät-om
+
+type Ordered = {
+  id: string; dealer: string; view: SeatView; viewWord: string; seat: number; index: number; take: number; cycle: string; clip: string;
+  model: string; resolution: string; duration: number; ratio: string; prompt: string;
+  inputs: { startFrame: { file: string; asset: string }; endFrame: { file: string }; referenceVideos: { file: string; source: string }[] };
+};
+type Measured = { values: Values; judged: Judged[]; summary: string; landsAt: number | null; proof: Proof | null };
+
+/**
+ * Mäter klippet `clip` i paketet `dir` mot bilderna, dockan och scenen och prövar måtten mot gränserna: dockans film
+ * först (docka.json), sedan klippet (ark.jpg) och beviset i scenen när kortet har landat. Skriver matning.json.
+ * `heard` är om den nedladdade filmen hade ljud.
+ */
+async function measureTake(root: string, dir: string, ordered: Ordered, clip: string, film: Probe, heard: boolean, content: TagningContent, parts: CycleParts, proofToo: boolean, say: (text: string) => void): Promise<Measured> {
+  const at = (file: string) => join(dir, file);
+  const view = ordered.view;
+  const layout = layoutFor(parts, view, ordered.seat, ordered.index, content.measure);
+  const images = { first: await readPicture(at('forsta.png')), last: await readPicture(at('sista.png')) };
+  const { doll, shoeFree } = await measureDoll(root, dir, layout, content.measure, false);
+  const sheet = sheetCollector(film.frames, film.fps, 6, 'klipp');
+  const key = parts.scene.studio.colours.screen as [number, number, number];
+  const read = await readFilm(clip, film.fps, { layout, measure: content.measure, key, start: images.first, shoeFree }, (picture, index) => sheet.take(picture, index));
+  await makeSheet(await Promise.all(sheet.tiles), at('ark.jpg'));
+  const { values, times, seconds } = valuesOf(read, film, film.audio, layout, content.measure, images, doll);
+  const landsAt = seconds.lands;
+
+  // Beviset i scenen, när kortet har landat.
+  let proof: Proof | null = null;
+  if (proofToo && landsAt !== null) {
+    proof = await proofOf(root, dir, clip, ordered.clip, view, ordered.seat, ordered.index, landsAt, layout, content, say);
+    values.bevisBlatt = proof.cyanMost;
+    values.bevisHorn = proof.cornerError;
+  }
+  const judged = judge(values, content.limits, doll.own);
+  const outside = judged.filter((entry) => entry.verdict !== 'inom');
+  const summary = outside.length === 0 ? `alla ${judged.length} mått inom gränserna` : `${judged.length - outside.length} av ${judged.length} mått inom gränserna; ${outside.map((entry) => `${entry.key} ${shown(entry.value)} (${entry.verdict})`).join(', ')}`;
+
+  write(at('matning.json'), {
+    about: 'Klippet mätt av src/pipeline/tagning.ts ta-emot eller mät-om (mätningarna i src/pipeline/matning.ts, gränserna i content/tagning.json). Allt är mätt ur rutorna; tider i sekunder, ruta n vid n / fps; bp i 1920 × 1080. judged är varje mått mot sin gräns; values har också mått utan gräns.',
+    measured: stamp(),
+    clip: posix(relative(root, clip)),
+    sha256: sha256Of(clip),
+    film,
+    soundInDownload: heard,
+    times,
+    seconds,
+    doll: doll.seconds,
+    dollOwn: doll.own ?? null,
+    values,
+    judged,
+    proof,
+    layout: { corners: layout.corners, cardArea: layout.cardArea, regions: layout.regions, dealer: layout.dealer, low: layout.low, handBox: layout.handBox, waist: layout.waist, near: layout.near },
+    rows: read.rows,
+  });
+  return { values, judged, summary, landsAt, proof };
+}
+
+/** Måtten som registret tar emot dem: varje mått med gräns, och de som bara visas. */
+function measurementsOf(file: string, judged: Judged[], values: Values): PostFile['measurements'] {
+  return [
+    ...judged.map((entry) => ({ file, what: `${entry.key}: ${entry.what}`, value: { value: entry.value, unit: entry.unit, limit: entry.limit, verdict: entry.verdict }, who: WHO, basis: 'mätt' as const, note: `gränsen: ${entry.source}` })),
+    ...Object.entries(SHOWN)
+      .filter(([key]) => key in values)
+      .map(([key, what]) => ({ file, what: `${key}: ${what}`, value: { value: values[key] }, who: WHO, basis: 'mätt' as const, note: 'utan gräns' })),
+  ];
+}
+
+/** Måtten i ord, ett per rad, som ta-emot och mät-om skriver ut dem. */
+function sayMeasured(say: (text: string) => void, measured: Measured, pkg: string): void {
+  say(`Mätt: ${measured.summary}`);
+  for (const entry of measured.judged) say(`  ${entry.verdict.padEnd(8)} ${entry.key.padEnd(19)} ${shown(entry.value).padStart(8)} ${entry.unit.padEnd(7)} ${entry.limit}`);
+  for (const [key] of Object.entries(SHOWN)) if (key in measured.values) say(`  ${'visas'.padEnd(8)} ${key.padEnd(19)} ${shown(measured.values[key]).padStart(8)}`);
+  say(`Ark: ${pkg}/ark.jpg${measured.proof ? `, ${pkg}/ark-bevis.jpg` : ''}`);
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
 // ta-emot
 
 export type Receipt = { taskId: string; credits: number; before: number; after: number; at?: string };
@@ -439,9 +533,10 @@ export type PostFile = { post: Post; order: Order; measurements: { file: string;
 const SHOWN: Record<string, string> = {
   landsAt: 'lands.at: första rutan där det blå är platt och stilla till slutet, s',
   kortetLamnarSkon: 'kortet lämnar skon, filmen mot dockan, s',
-  handenLamnarKortet: 'handen lämnar kortet, filmen mot dockan, s',
+  kortetHeltSynligt: 'kortet helt synligt (det blå nästan som i sista rutan, och så till slutet) mot dockans tid då handen lämnar kortet, s',
   handenISkonMotDockan: 'handen åter i REDO, filmen mot dockan, s',
   handPaKortet: 'givhandens bredd på kortet mot dockans, medianer, gånger',
+  nastaKortJamfort: 'nästa kort: tiden för rutan där det syns mest, som tillkommet gult räknas mot, s',
   huvudet: 'huvudets vridning: största skillnad i ögonens läge mot huvudets kontur, bp',
   skarvMedel: 'skarven: sista rutan mot första utanför kortet, medelavvikelse per kanal (pilotens mått)',
   bevisHorn: 'beviset i scenen: scenens korthörn i sista rutan mot de räknade, bp',
@@ -464,14 +559,9 @@ export async function taEmot(id: string, download: string, receipt: Receipt, opt
     if (!Number.isInteger(value)) throw new TagningError(`${name} ska vara ett heltal`);
   }
   if (!receipt.taskId) throw new TagningError('taskId saknas');
-  const ordered = JSON.parse(readFileSync(at('bestallning.json'), 'utf8')) as {
-    id: string; dealer: string; view: SeatView; viewWord: string; seat: number; index: number; take: number; cycle: string; clip: string;
-    model: string; resolution: string; duration: number; ratio: string; prompt: string;
-    inputs: { startFrame: { file: string; asset: string }; endFrame: { file: string }; referenceVideos: { file: string; source: string }[] };
-  };
+  const ordered = JSON.parse(readFileSync(at('bestallning.json'), 'utf8')) as Ordered;
   const content = readTagning(root);
   const parts = readCycleParts(ordered.cycle, root);
-  const scene = parts.scene;
 
   // Ljudet tas bort utan omkodning.
   const source = resolve(download);
@@ -482,47 +572,13 @@ export async function taEmot(id: string, download: string, receipt: Receipt, opt
   if (heard && resolve(source) !== resolve(at('med-ljud.mp4'))) copyFileSync(source, at('med-ljud.mp4'));
   await run('ffmpeg', ['-v', 'error', '-y', '-i', source, '-map', '0:v:0', '-c', 'copy', '-an', clip]);
   const film = await probe(clip);
-  const sha256 = sha256Of(clip);
   say(`Klippet: ${posix(relative(root, clip))} (${film.width} × ${film.height}, ${shown(film.fps)} rutor/s, ${film.frames} rutor${heard ? ', ljudet borttaget' : ''})`);
 
   // Mätningen.
   const view = ordered.view;
-  const layout = layoutFor(parts, view, ordered.seat, ordered.index, content.measure);
-  const images = { first: await readPicture(at('forsta.png')), last: await readPicture(at('sista.png')) };
-  const doll = JSON.parse(readFileSync(at('docka.json'), 'utf8')) as DollRead;
-  const sheet = sheetCollector(film.frames, film.fps, 6, 'klipp');
-  const read = await readFilm(clip, film.fps, { layout, measure: content.measure, key: scene.studio.colours.screen as [number, number, number], start: images.first }, (picture, index) => sheet.take(picture, index));
-  await makeSheet(await Promise.all(sheet.tiles), at('ark.jpg'));
-  const { values, times, seconds } = valuesOf(read, film, film.audio, layout, content.measure, images, doll);
-  const landsAt = seconds.lands;
-
-  // Beviset i scenen, när kortet har landat.
-  let proof: Proof | null = null;
-  if (options.proof !== false && landsAt !== null) {
-    proof = await proofOf(root, dir, clip, ordered.clip, view, ordered.seat, ordered.index, landsAt, layout, content, say);
-    values.bevisBlatt = proof.cyanMost;
-    values.bevisHorn = proof.cornerError;
-  }
-  const judged = judge(values, content.limits);
-  const outside = judged.filter((entry) => entry.verdict !== 'inom');
-  const summary = outside.length === 0 ? `alla ${judged.length} mått inom gränserna` : `${judged.length - outside.length} av ${judged.length} mått inom gränserna; ${outside.map((entry) => `${entry.key} ${shown(entry.value)} (${entry.verdict})`).join(', ')}`;
-
+  const measured = await measureTake(root, dir, ordered, clip, film, heard, content, parts, options.proof !== false, say);
+  const { values, judged, summary, landsAt } = measured;
   const pkg = posix(relative(root, dir));
-  write(at('matning.json'), {
-    about: 'Klippet mätt av src/pipeline/tagning.ts ta-emot (mätningarna i src/pipeline/matning.ts, gränserna i content/tagning.json). Allt är mätt ur rutorna; tider i sekunder, ruta n vid n / fps; bp i 1920 × 1080. judged är varje mått mot sin gräns; values har också mått utan gräns.',
-    clip: posix(relative(root, clip)),
-    sha256,
-    film,
-    soundInDownload: heard,
-    times,
-    seconds,
-    doll: doll.seconds,
-    values,
-    judged,
-    proof,
-    layout: { corners: layout.corners, cardArea: layout.cardArea, regions: layout.regions, dealer: layout.dealer, low: layout.low, handBox: layout.handBox, waist: layout.waist, near: layout.near },
-    rows: read.rows,
-  });
 
   // Posten, beställningen och måtten, som registret tar emot dem.
   const date = stamp();
@@ -595,20 +651,12 @@ export async function taEmot(id: string, download: string, receipt: Receipt, opt
     result: ordered.clip,
     note: receipt.at ? null : 'at är tiden då filmen togs emot, inte då den beställdes',
   };
-  const measurements = [
-    ...judged.map((entry) => ({ file: ordered.clip, what: `${entry.key}: ${entry.what}`, value: { value: entry.value, unit: entry.unit, limit: entry.limit, verdict: entry.verdict }, who: WHO, basis: 'mätt' as const, note: `gränsen: ${entry.source}` })),
-    ...Object.entries(SHOWN)
-      .filter(([key]) => key in values)
-      .map(([key, what]) => ({ file: ordered.clip, what: `${key}: ${what}`, value: { value: values[key] }, who: WHO, basis: 'mätt' as const, note: 'utan gräns' })),
-  ];
+  const measurements = measurementsOf(ordered.clip, judged, values);
   const postFile: PostFile = { post, order, measurements, uploads: uploads.map(({ signed: _signed, ...rest }) => rest) };
   // Posten i filen bär sin film; registret får den räknad från registrets mapp.
   write(at('post.json'), { ...postFile, post: { ...post, from: posix(relative(root, clip)) } });
 
-  say(`Mätt: ${summary}`);
-  for (const entry of judged) say(`  ${entry.verdict.padEnd(8)} ${entry.key.padEnd(19)} ${shown(entry.value).padStart(8)} ${entry.unit.padEnd(7)} ${entry.limit}`);
-  for (const [key] of Object.entries(SHOWN)) if (key in values) say(`  ${'visas'.padEnd(8)} ${key.padEnd(19)} ${shown(values[key]).padStart(8)}`);
-  say(`Ark: ${pkg}/ark.jpg${proof ? `, ${pkg}/ark-bevis.jpg` : ''}`);
+  sayMeasured(say, measured, pkg);
 
   const registered = options.register === false ? [] : await registrera(options.registry ?? studioRoot(), postFile, clip, uploads.map((entry) => ({ ...entry, sha256: sums.get(entry.file) ?? null })));
   for (const line of registered) say(line);
@@ -646,6 +694,46 @@ export async function registrera(registry: string, postFile: PostFile, clip: str
     said.push(`Registret: uppladdningen av ${upload.file} införd.`);
   }
   return said;
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// mät-om: ett klipp som redan är taget emot, med dagens mätningar och scen
+
+/**
+ * Mäter om klippet i paketet `id` som ta-emot mäter (measureTake): dockans film, klippet och beviset i scenen, och skriver
+ * docka.json, matning.json och arken. Måtten i post.json och registrets mätningar från tagning.ts ersätts. Klippet,
+ * beställningen, posten och omdömet rörs inte.
+ */
+export async function matOm(id: string, options: Omit<ReceiveOptions, 'out'> & { out?: string } = {}): Promise<{ judged: Judged[]; values: Values; registered: string[] }> {
+  const root = options.root ?? ROOT;
+  const out = options.out ?? join(root, PACKAGES);
+  const say = options.say ?? ((text: string) => console.log(text));
+  const dir = join(out, id);
+  const at = (file: string) => join(dir, file);
+  if (!existsSync(at('post.json'))) throw new TagningError(`Paketet ${id} har ingen post.json: klippet är inte taget emot (ta-emot)`);
+  const ordered = JSON.parse(readFileSync(at('bestallning.json'), 'utf8')) as Ordered;
+  const clip = at(ordered.clip.split('/').at(-1)!);
+  if (!existsSync(clip)) throw new TagningError(`${posix(relative(root, clip))} finns inte`);
+  const posted = JSON.parse(readFileSync(at('post.json'), 'utf8')) as PostFile;
+  const before = existsSync(at('matning.json')) ? (JSON.parse(readFileSync(at('matning.json'), 'utf8')) as { soundInDownload?: boolean }) : {};
+  const content = readTagning(root);
+  const parts = readCycleParts(ordered.cycle, root);
+  const film = await probe(clip);
+  const measured = await measureTake(root, dir, ordered, clip, film, before.soundInDownload ?? false, content, parts, options.proof !== false, say);
+  const measurements = measurementsOf(ordered.clip, measured.judged, measured.values);
+  write(at('post.json'), { ...posted, measurements });
+  sayMeasured(say, measured, posix(relative(root, dir)));
+
+  const registered: string[] = [];
+  if (options.register !== false) {
+    const registry = options.registry ?? studioRoot();
+    if (!getEntry(registry, ordered.clip)) throw new TagningError(`${ordered.clip} står inte i registret: ta emot klippet först`);
+    const replaced = dropMeasurements(registry, ordered.clip, WHO);
+    for (const measurement of measurements) addMeasurement(registry, measurement);
+    registered.push(`Registret: ${measurements.length} mått införda i stället för de ${replaced} förra. Posten och omdömet är orörda.`);
+  }
+  for (const line of registered) say(line);
+  return { judged: measured.judged, values: measured.values, registered };
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -734,6 +822,7 @@ export async function prova(options: { root?: string; registry?: string; say?: (
 const USAGE = `Använd:
   node src/pipeline/tagning.ts forbered <dealer> <vy> <plats> <kort>
   node src/pipeline/tagning.ts ta-emot <id> <film> --task <taskId> --krediter <n> --saldo-fore <n> --saldo-efter <n> [--tid "ÅÅÅÅ-MM-DD TT:MM"]
+  node src/pipeline/tagning.ts mät-om <id>
   node src/pipeline/tagning.ts pröva
 Vyn är spelaren eller plats-N; kort är kortplatsens nummer på platsen, 0 för den första.`;
 
@@ -752,6 +841,8 @@ if (import.meta.main) {
       const taskId = flag(args, '--task');
       if (!taskId) throw new TagningError('--task <taskId> saknas');
       await taEmot(args[0]!, args[1]!, { taskId, credits: number('--krediter'), before: number('--saldo-fore'), after: number('--saldo-efter'), at: flag(args, '--tid') });
+    } else if ((word === 'mät-om' || word === 'mat-om') && args.length === 1) {
+      await matOm(args[0]!);
     } else if (word === 'pröva' || word === 'prova') {
       await prova();
     } else {

@@ -55,6 +55,15 @@ export type Measure = {
   headInner: number;
   dark: number;
   proofReach: number;
+  visibleShare: number;
+  nextShare: number;
+  nextAround: number;
+  nextGrow: number;
+  armDiff: number;
+  armGrow: number;
+  handReach: number;
+  wristNear: number;
+  handEnd: number;
 };
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -530,6 +539,126 @@ export function countIn(picture: Picture, box: Box, test: (r: number, g: number,
   return n;
 }
 
+/**
+ * Kort, inte delar: delar vars rutor ligger inom `reach` bp från varandra är ett kort. Ett finger eller en tumme kan dela
+ * ett kort i två delar (granskaren av omgång 1: plats 1, ruta 22).
+ */
+export function cardCount(found: Part[], reach: number): number {
+  const group = found.map((_, k) => k);
+  const top = (k: number): number => (group[k] === k ? k : (group[k] = top(group[k]!)));
+  const gap = (a: Box, b: Box): number => Math.max(0, a.x0 - b.x1, b.x0 - a.x1, a.y0 - b.y1, b.y0 - a.y1);
+  for (let a = 0; a < found.length; a++) for (let b = a + 1; b < found.length; b++) if (gap(found[a]!.box, found[b]!.box) <= reach) group[top(a)] = top(b);
+  return new Set(found.map((_, k) => top(k))).size;
+}
+
+/** Medel av största kanalskillnaden mellan två bilder inom `box`, bara där masken `keep` (över hela bilden) är satt. */
+export function meanMaxIn(a: Picture, b: Picture, box: Box, keep: Uint8Array | null): number | null {
+  const area = clipBox(box, a);
+  let sum = 0;
+  let n = 0;
+  for (let y = area.y0; y < area.y1; y++) {
+    for (let x = area.x0; x < area.x1; x++) {
+      if (keep && !keep[y * a.width + x]) continue;
+      const i = (y * a.width + x) * 3;
+      sum += Math.max(Math.abs(a.data[i]! - b.data[i]!), Math.abs(a.data[i + 1]! - b.data[i + 1]!), Math.abs(a.data[i + 2]! - b.data[i + 2]!));
+      n++;
+    }
+  }
+  return n ? round(sum / n) : null;
+}
+
+/** Överlappet (IoU) mellan det blå i två bilder inom `box`: bildpunkter blå i båda mot blå i någon. Null utan blått. */
+export function blueOverlap(a: Picture, b: Picture, box: Box): number | null {
+  const area = clipBox(box, a);
+  let both = 0;
+  let either = 0;
+  for (let y = area.y0; y < area.y1; y++) {
+    for (let x = area.x0; x < area.x1; x++) {
+      const i = (y * a.width + x) * 3;
+      const inA = isBlue(a.data[i]!, a.data[i + 1]!, a.data[i + 2]!);
+      const inB = isBlue(b.data[i]!, b.data[i + 1]!, b.data[i + 2]!);
+      if (inA && inB) both++;
+      if (inA || inB) either++;
+    }
+  }
+  return either ? round(both / either, 3) : null;
+}
+
+/** Handleden i bild och underarmens riktning genom den (armbåge → handled, längd 1). */
+export type Wrist = { wrist: Pixel; along: Pixel };
+/** Handen bortom handleden: längst ut längs underarmen och bredden tvärs över den, i bp. */
+export type Beyond = { reach: number; width: number };
+
+/**
+ * Handen bortom handleden `at`: den största huddelen inom `reach` bp från handleden som har en bildpunkt inom `near` bp
+ * från den och minst `least` bp, utan den hud masken `other` lämnar utanför. Gult och blått är inte hud. Räckvidden är
+ * dess längsta punkt längs underarmen räknat från handleden, bredden dess utsträckning tvärs underarmen bortom handleden.
+ * Så räknas inte handleden och underarmen in i handen (granskaren av omgång 1).
+ */
+export function handBeyond(picture: Picture, other: Uint8Array | null, at: Wrist, reach: number, near: number, least: number): Beyond | null {
+  const { width, data } = picture;
+  const { wrist, along } = at;
+  const area = clipBox({ x0: wrist.x - reach, y0: wrist.y - reach, x1: wrist.x + reach + 1, y1: wrist.y + reach + 1 }, picture);
+  const bw = area.x1 - area.x0;
+  const bh = area.y1 - area.y0;
+  if (bw <= 0 || bh <= 0) return null;
+  // Delarna numreras: 0 är inte hud, -1 är hud som inte har fått sin del än.
+  const label = new Int32Array(bw * bh);
+  for (let y = 0; y < bh; y++) {
+    for (let x = 0; x < bw; x++) {
+      const p = (area.y0 + y) * width + area.x0 + x;
+      const i = p * 3;
+      const r = data[i]!;
+      const g = data[i + 1]!;
+      const b = data[i + 2]!;
+      if (isSkin(r, g, b) && !isYellow(r, g, b) && !isBlue(r, g, b) && !(other && other[p])) label[y * bw + x] = -1;
+    }
+  }
+  const stack = new Int32Array(bw * bh);
+  let best = 0;
+  let bestN = 0;
+  let next = 0;
+  for (let start = 0; start < bw * bh; start++) {
+    if (label[start] !== -1) continue;
+    const id = ++next;
+    let top = 0;
+    stack[top++] = start;
+    label[start] = id;
+    let n = 0;
+    let close = false;
+    while (top > 0) {
+      const p = stack[--top]!;
+      const x = p % bw;
+      const y = (p - x) / bw;
+      n++;
+      if (!close && Math.hypot(area.x0 + x - wrist.x, area.y0 + y - wrist.y) <= near) close = true;
+      if (x > 0 && label[p - 1] === -1) (label[p - 1] = id), (stack[top++] = p - 1);
+      if (x < bw - 1 && label[p + 1] === -1) (label[p + 1] = id), (stack[top++] = p + 1);
+      if (y > 0 && label[p - bw] === -1) (label[p - bw] = id), (stack[top++] = p - bw);
+      if (y < bh - 1 && label[p + bw] === -1) (label[p + bw] = id), (stack[top++] = p + bw);
+    }
+    if (close && n >= least && n > bestN) (best = id), (bestN = n);
+  }
+  if (!best) return null;
+  let far = 0;
+  let low = Infinity;
+  let high = -Infinity;
+  for (let y = 0; y < bh; y++) {
+    for (let x = 0; x < bw; x++) {
+      if (label[y * bw + x] !== best) continue;
+      const dx = area.x0 + x - wrist.x;
+      const dy = area.y0 + y - wrist.y;
+      const length = dx * along.x + dy * along.y;
+      if (length <= 0) continue;
+      const across = -dx * along.y + dy * along.x;
+      if (length > far) far = length;
+      if (across < low) low = across;
+      if (across > high) high = across;
+    }
+  }
+  return far > 0 ? { reach: Math.round(far), width: Math.round(high - low) } : null;
+}
+
 // ---------------------------------------------------------------------------------------------------------------------
 // Filmer
 
@@ -630,6 +759,8 @@ export type Layout = {
   inner: number;
   /** Där blått letas i beviset. */
   near: Box;
+  /** Dockans givhand: handleden och underarmens riktning i bild vid tiden t i cykeln (dollPose, sedd genom vyns närbild). */
+  arm: (t: number) => Wrist | null;
 };
 
 /** Bordskantens rad i en kolumn, mellan två punkter på kanten. */
@@ -688,7 +819,16 @@ export function layoutFor(parts: CycleParts, view: SeatView, seat: number, index
   const handTop = Math.min(...redo.hands.left.map((point) => at(point).y));
   const waist = measure.waist.map((x) => onEdge(x)) as [Pixel, Pixel];
   const eyeRow = at([redo.head[0], doll.body.eyeHeight, redo.head[2]]).y;
+  const arm = (t: number): Wrist | null => {
+    const { elbow, wrist } = poseAt(scene, doll, move, t).arms.left;
+    const w = see(eye, wrist);
+    const e = see(eye, elbow);
+    if (!w || !e) return null;
+    const length = Math.hypot(w.x - e.x, w.y - e.y) || 1;
+    return { wrist: w, along: { x: (w.x - e.x) / length, y: (w.y - e.y) / length } };
+  };
   return {
+    arm,
     frame,
     corners,
     cardBox,
@@ -720,6 +860,12 @@ export type FrameRow = {
   /** Kortdelar (≥ cardPart) i rutan, blå och gula. */
   blue: number;
   yellow: number;
+  /** Kort i rutan: delarna, blå och gula, där delar inom mouthReach bp från varandra är ett kort (cardCount). */
+  cards?: number;
+  /** Hur stor del av mynningens kort i första rutan som är gult i rutan: 1 när det syns som då, mindre när något täcker det. */
+  nextShare?: number | null;
+  /** Givhanden bortom dockans handled vid samma tid (handBeyond). */
+  beyond?: Beyond | null;
   /** Det största blå: yta, tyngdpunkt och största hörnfel mot de räknade hörnen. */
   card: (Lite & { corners: Pixel[]; error: number; inside: number; share: number }) | null;
   /** Den gula delen närmast mynningens kort i första rutan, och hur långt bort den ligger. */
@@ -744,6 +890,8 @@ export type Watch = {
   key: Rgb | null;
   /** Bilden som givhandens grepp i REDO och den övriga huden läses ur: första bilden, eller dockans första ruta. */
   start: Picture;
+  /** Bildpunkterna i skons ruta som skon mäts i (1), över hela bilden: de dockans arm aldrig täcker. Utan mask hela rutan. */
+  shoeFree?: Uint8Array | null;
 };
 
 export type FilmRead = {
@@ -754,6 +902,9 @@ export type FilmRead = {
   mouth: Lite | null;
   /** Givhanden i startbilden. */
   startHand: { n: number; c: Pixel; w: number; h: number } | null;
+  /** Mynningens ruta (regions.mouth i bilden) och det gula i den i varje ruta, 1 per gul bildpunkt, rad för rad. */
+  mouthBox: Box;
+  mouthYellow: Uint8Array[];
 };
 
 /**
@@ -772,6 +923,11 @@ export async function readFilm(path: string, fps: number, watch: Watch, onFrame?
   let still: Uint8Array | null = null;
   const width = layout.frame.width;
   const free = (x: number, y: number): boolean => !still || !still[y * width + x];
+  // Mynningens kort i första rutan som bildpunkter, och mynningens ruta, där det gula sparas för varje ruta.
+  const mouthCard: number[] = [];
+  const mouthBox = clipBox(layout.regions.mouth, layout.frame);
+  const mouthYellow: Uint8Array[] = [];
+  const yellowAt = (picture: Picture, p: number): boolean => isYellow(picture.data[p * 3]!, picture.data[p * 3 + 1]!, picture.data[p * 3 + 2]!);
   await eachFrame(path, layout.frame, async (picture, i) => {
     if (i === 0) {
       first = picture;
@@ -780,7 +936,13 @@ export async function readFilm(path: string, fps: number, watch: Watch, onFrame?
       const found = nearest && distance(nearest.c, layout.mouth) <= 3 * measure.mouthReach ? nearest : null;
       mouth = found ? { n: found.n, c: found.c } : null;
       still = maskBut(picture, (r, g, b) => isYellow(r, g, b) || isBlue(r, g, b), found, 2);
+      if (found) for (let y = found.box.y0; y < found.box.y1; y++) for (let x = found.box.x0; x < found.box.x1; x++) if (yellowAt(picture, y * width + x)) mouthCard.push(y * width + x);
     }
+    const seen = new Uint8Array((mouthBox.x1 - mouthBox.x0) * (mouthBox.y1 - mouthBox.y0));
+    for (let y = mouthBox.y0; y < mouthBox.y1; y++) {
+      for (let x = mouthBox.x0; x < mouthBox.x1; x++) if (yellowAt(picture, y * width + x) && free(x, y)) seen[(y - mouthBox.y0) * (mouthBox.x1 - mouthBox.x0) + x - mouthBox.x0] = 1;
+    }
+    mouthYellow.push(seen);
     const blue = parts(picture, layout.low, (r, g, b, x, y) => isBlue(r, g, b) && free(x, y), measure.cardPart);
     const yellow = parts(picture, layout.low, (r, g, b, x, y) => isYellow(r, g, b) && free(x, y), measure.cardPart);
     const centre = mouth?.c ?? layout.mouth;
@@ -789,11 +951,15 @@ export async function readFilm(path: string, fps: number, watch: Watch, onFrame?
     const merged = Boolean(nearest && mouth && nearest.n > measure.merged * mouth.n);
     const next = merged ? undefined : nearest;
     const big = blue[0];
+    const wrist = layout.arm(i / fps);
     const row: FrameRow = {
       i,
       t: round(i / fps, 3),
       blue: blue.length,
       yellow: yellow.length,
+      cards: cardCount([...blue, ...yellow], measure.mouthReach),
+      nextShare: mouthCard.length ? round(mouthCard.filter((p) => yellowAt(picture, p)).length / mouthCard.length, 3) : null,
+      beyond: wrist ? handBeyond(picture, other, wrist, measure.handReach, measure.wristNear, measure.cardPart) : null,
       card: big ? { n: big.n, c: big.c, corners: big.corners, error: cornerError(big.corners, layout.corners), inside: insideShare(picture, big, layout.place, free), share: round(big.n / layout.cardArea, 3) } : null,
       next: next ? { n: next.n, c: next.c, d: round(distance(next.c, centre), 1) } : null,
       away: {
@@ -805,7 +971,7 @@ export async function readFilm(path: string, fps: number, watch: Watch, onFrame?
     };
     if (key) {
       row.step = previous ? round(stepBetween(picture, previous, layout.dealer), 3) : 0;
-      row.shoe = difference(picture, first!, layout.regions.shoe).meanMax;
+      row.shoe = meanMaxIn(picture, first!, layout.regions.shoe, watch.shoeFree ?? null) ?? 0;
       row.gap = gapIn(picture, key, layout.waist, (x) => edgeRow(layout, x), measure.gapRows, measure.gapLeast);
       if (i % measure.greenEvery === 0) row.green = greenOff(picture, key, measure.greenInner, measure.greenOff);
       row.head = headTurn(picture, key, layout.eyeRows, layout.headXs, layout.inner, measure.dark);
@@ -819,7 +985,45 @@ export async function readFilm(path: string, fps: number, watch: Watch, onFrame?
   // Sista rutan räknas alltid för det gröna.
   const end = rows.at(-1)!;
   if (key && end.green === undefined) end.green = greenOff(last, key, measure.greenInner, measure.greenOff);
-  return { rows, first, last, mouth, startHand };
+  return { rows, first, last, mouth, startHand, mouthBox, mouthYellow };
+}
+
+/**
+ * Dockans film mätt som klippet, och var hennes arm går i skons ruta: bildpunkter där någon ruta skiljer mer än armDiff
+ * från ruta 0, vuxna armGrow bp. Svaret har dockans mått (dollOf) och masken över bildpunkterna i skons ruta som armen
+ * aldrig täcker (1 = räknas), som klippets sko sedan mäts i.
+ */
+export async function readDollFilm(path: string, fps: number, watch: Watch, onFrame?: (picture: Picture, index: number) => void | Promise<void>): Promise<{ doll: DollRead; shoeFree: Uint8Array; read: FilmRead }> {
+  const { layout, measure } = watch;
+  const { width, height } = layout.frame;
+  const box = clipBox(layout.regions.shoe, layout.frame);
+  const covered = new Uint8Array(width * height);
+  let zero: Picture | null = null;
+  const read = await readFilm(path, fps, watch, async (picture, i) => {
+    if (i === 0) zero = picture;
+    const a = picture.data;
+    const b = zero!.data;
+    for (let y = box.y0; y < box.y1; y++) {
+      for (let x = box.x0; x < box.x1; x++) {
+        const p = y * width + x;
+        const k = p * 3;
+        if (Math.max(Math.abs(a[k]! - b[k]!), Math.abs(a[k + 1]! - b[k + 1]!), Math.abs(a[k + 2]! - b[k + 2]!)) > measure.armDiff) covered[p] = 1;
+      }
+    }
+    await onFrame?.(picture, i);
+  });
+  const swept = grown(covered, width, height, measure.armGrow);
+  const shoeFree = new Uint8Array(width * height);
+  let counted = 0;
+  for (let y = box.y0; y < box.y1; y++) {
+    for (let x = box.x0; x < box.x1; x++) {
+      if (swept[y * width + x]) continue;
+      shoeFree[y * width + x] = 1;
+      counted++;
+    }
+  }
+  const doll = { ...dollOf(read, fps, measure), shoe: { counted, of: (box.x1 - box.x0) * (box.y1 - box.y0) } };
+  return { doll, shoeFree, read };
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -834,6 +1038,11 @@ export type Times = {
   leavesCard: number | null;
   /** Handen är åter i REDO: tyngdpunkten inom homePx från sista rutans, och så till slutet. */
   home: number | null;
+  /**
+   * Kortet helt synligt: första rutan från lands.at där det blå är minst visibleShare av sista rutans, och så till slutet.
+   * Saknas i en docka.json från före 2026-11-18.
+   */
+  visible?: number | null;
 };
 
 /** Tiderna i en film, som rutor. */
@@ -860,7 +1069,17 @@ export function framesOf(rows: FrameRow[], measure: Measure): Times {
       home = i;
     }
   }
-  return { leavesShoe, lands, leavesCard, home };
+  // Fingrar som vilar på kortet täcker en del av det, och det blås tyngdpunkt flyttar sig med dem (granskaren av omgång 1).
+  let visible: number | null = null;
+  const whole = end.card?.n;
+  if (lands !== null && whole) {
+    for (let i = rows.length - 1; i >= lands; i--) {
+      const card = rows[i]!.card;
+      if (!card || card.n < measure.visibleShare * whole) break;
+      visible = i;
+    }
+  }
+  return { leavesShoe, lands, leavesCard, home, visible };
 }
 
 /** Rutor till sekunder. */
@@ -873,15 +1092,99 @@ const median = (values: number[]): number | null => {
   return sorted[Math.floor(sorted.length / 2)]!;
 };
 
-/** Dockans film, mätt på samma sätt: tiderna och givhandens bredd i varje ruta. Skrivs i paketet när det görs. */
-export type DollRead = { fps: number; frames: number; times: Times; seconds: Times; hands: { t: number; w: number | null }[] };
+export type Values = Record<string, number | string | boolean | null>;
+
+/**
+ * Dockans film, mätt på samma sätt: tiderna, givhandens bredd i varje ruta, och (sedan granskningen av omgång 1) hur
+ * mycket av hennes nästa kort som syns och hennes hand bortom handleden i varje ruta, hennes egna kort- och skomått
+ * (`own`), och hur många bildpunkter i skons ruta som hennes arm aldrig täcker (`shoe`). Skrivs i paketet som docka.json.
+ * Fälten efter `hands` saknas i en docka.json från före 2026-11-18.
+ */
+export type DollRead = {
+  fps: number;
+  frames: number;
+  times: Times;
+  seconds: Times;
+  hands: { t: number; w: number | null }[];
+  next?: (number | null)[];
+  beyond?: (Beyond | null)[];
+  own?: Values;
+  shoe?: { counted: number; of: number };
+};
 
 export function dollOf(read: FilmRead, fps: number, measure: Measure): DollRead {
   const times = framesOf(read.rows, measure);
-  return { fps, frames: read.rows.length, times, seconds: secondsOf(times, fps), hands: read.rows.map((row) => ({ t: row.t, w: row.hand?.w ?? null })) };
+  return {
+    fps,
+    frames: read.rows.length,
+    times,
+    seconds: secondsOf(times, fps),
+    hands: read.rows.map((row) => ({ t: row.t, w: row.hand?.w ?? null })),
+    next: read.rows.map((row) => row.nextShare ?? null),
+    beyond: read.rows.map((row) => row.beyond ?? null),
+    own: cardValues(read.rows, times, measure),
+  };
 }
 
-export type Values = Record<string, number | string | boolean | null>;
+const most = (values: (number | null | undefined)[]): number | null => {
+  const known = values.filter((value): value is number => typeof value === 'number');
+  return known.length ? Math.max(...known) : null;
+};
+
+/** Kortens mått som dockans film också har: flest kort i en ruta, gula former, vändningar tillbaka, rutor utan nästa kort. */
+function cardValues(rows: FrameRow[], times: Times, measure: Measure): Values {
+  const firstBlue = rows.find((row) => row.blue > 0)?.i ?? null;
+  return {
+    kortdelar: most(rows.map((row) => row.cards ?? row.blue + row.yellow)),
+    gulForm: rows.filter((row) => row.merged).length,
+    gulFormEfterDraget: rows.filter((row) => row.merged && times.leavesShoe !== null && row.i > times.leavesShoe).length,
+    vandningTillbaka: firstBlue === null ? 0 : rows.filter((row) => row.i > firstBlue && row.away.yellow > 0).length,
+    nastaKortSaknas: rows.filter((row) => !row.merged && (!row.next || row.next.d > measure.mouthReach)).length,
+  };
+}
+
+/**
+ * Om dockans nästa kort syns runt filmens tid `t`: till minst nextShare av sin yta i dockans ruta 0 i var och en av
+ * dockans rutor inom ±nextAround av filmens rutor (`fps`). Utan dockans värden (en docka.json från före 2026-11-18)
+ * prövas varje ruta.
+ */
+export function dollShowsNext(doll: Pick<DollRead, 'fps' | 'next'>, t: number, fps: number, measure: Pick<Measure, 'nextAround' | 'nextShare'>): boolean {
+  const next = doll.next;
+  if (!next || next.length === 0) return true;
+  const reach = measure.nextAround / fps;
+  const at = (time: number): number => Math.min(next.length - 1, Math.max(0, Math.round(time * doll.fps)));
+  for (let j = at(t - reach); j <= at(t + reach); j++) {
+    const share = next[j];
+    if (share === null || share === undefined || share < measure.nextShare) return false;
+  }
+  return true;
+}
+
+/**
+ * Tillkommet gult vid nästa kort: gula bildpunkter i mynningens ruta utanför nästa korts gula, vuxet nextGrow bp, i den
+ * ruta där det syns mest. Prövas från första rutan där det dragna kortet är blått och bara en gul del finns kvar, i rutor
+ * utan gult på väg och där `tested` säger ja. En hand som täcker kortet tar bort gult men lägger aldrig till; ett kort
+ * som flyttar sig eller lyfts lägger till. Svaret är det mesta i en ruta, i bp, och rutan som jämfördes med.
+ */
+export function nextAdded(read: Pick<FilmRead, 'rows' | 'mouthBox' | 'mouthYellow'>, tested: (row: FrameRow) => boolean, measure: Pick<Measure, 'nextGrow'>): { most: number; from: number } | null {
+  const { rows, mouthBox, mouthYellow } = read;
+  const start = rows.find((row) => row.blue > 0 && row.yellow <= 1)?.i;
+  if (start === undefined) return null;
+  const candidates = rows.filter((row) => row.i >= start && row.away.yellow === 0 && mouthYellow[row.i] && tested(row));
+  if (candidates.length === 0) return null;
+  const count = (mask: Uint8Array): number => mask.reduce((sum, value) => sum + value, 0);
+  const counts = new Map(candidates.map((row) => [row.i, count(mouthYellow[row.i]!)]));
+  const reference = candidates.reduce((best, row) => (counts.get(row.i)! > counts.get(best.i)! ? row : best));
+  const allowed = grown(mouthYellow[reference.i]!, mouthBox.x1 - mouthBox.x0, mouthBox.y1 - mouthBox.y0, measure.nextGrow);
+  let most = 0;
+  for (const row of candidates) {
+    const seen = mouthYellow[row.i]!;
+    let extra = 0;
+    for (let p = 0; p < seen.length; p++) if (seen[p] && !allowed[p]) extra++;
+    if (extra > most) most = extra;
+  }
+  return { most, from: reference.i };
+}
 
 /**
  * Måtten för en tagning, med samma namn som gränserna i content/tagning.json (limits), och några till som bara visas.
@@ -894,34 +1197,36 @@ export function valuesOf(read: FilmRead, film: Probe, sound: boolean, layout: La
   const seconds = secondsOf(times, fps);
   const end = rows.at(-1)!;
   const lastT = end.t;
-  const after = (from: number | null) => (from === null ? [] : rows.filter((row) => row.i >= from));
-  const most = (values: (number | null | undefined)[]): number | null => {
-    const known = values.filter((value): value is number => typeof value === 'number');
-    return known.length ? Math.max(...known) : null;
-  };
+  const after = (from: number | null | undefined) => (from === null || from === undefined ? [] : rows.filter((row) => row.i >= from));
 
-  // Korten.
-  const firstBlue = rows.find((row) => row.blue > 0)?.i ?? null;
-  const flipsBack = firstBlue === null ? 0 : rows.filter((row) => row.i > firstBlue && row.away.yellow > 0).length;
+  // Korten. Det lagda kortet mäts från att det är helt synligt; sista rutans kort mot märkkortet i sista bilden, som är
+  // målat där dockan lägger kortet: filmen ska sluta som det. Överlappet i stället för hörnen, för att kortet vid plats 1
+  // och 7 är en sned parallellogram med spetsiga hörn, där en mjuk kant på 2–3 bp flyttar ett hörn dubbelt så långt.
+  const own = cardValues(rows, times, measure);
   const lastCard = end.card;
-  // Kortet helt synligt: från en kvarts sekund efter att handen har lämnat det, annars från lands.at. Hörnen jämförs med
-  // märkkortet i sista bilden, letat på samma sätt: det är målat där dockan lägger kortet, och filmen ska sluta som det.
-  const settled = after(times.leavesCard === null ? times.lands : times.leavesCard + Math.round(0.25 * fps)).filter((row) => row.card);
-  const painted = parts(images.last, layout.low, isBlue, measure.cardPart)[0]?.corners ?? layout.corners;
-  const clear = times.leavesCard === null ? [] : after(times.leavesCard + Math.round(0.25 * fps));
-  const area = median(clear.filter((row) => row.card).map((row) => row.card!.n));
+  const settled = after(times.visible).filter((row) => row.card);
+  const painted = parts(images.last, layout.low, isBlue, measure.cardPart)[0] ?? null;
+  const area = median(settled.map((row) => row.card!.n));
+  // Nästa kort prövas bara där dockans nästa kort syns: en arm framför mynningen döljer det hos henne som hos dockan.
+  const tested = (row: FrameRow): boolean => dollShowsNext(doll, row.t, fps, measure);
+  const added = nextAdded(read, tested, measure);
 
-  // Händerna. Dockans bredaste inom handWindow s från filmens tid.
+  // Händerna. Givhanden bortom dockans handled, längs och tvärs underarmen, mot dockans största inom handWindow s.
   const ratio = (a: number | undefined, b: number | undefined): number | null => (a && b ? round(a / b, 3) : null);
   const redo = [ratio(rows[0]!.hand?.w, read.startHand?.w), ratio(end.hand?.w, read.startHand?.w)];
   const handIRedo = redo.every((value) => value !== null) ? redo.reduce((worst, value) => (Math.abs(value! - 1) > Math.abs(worst! - 1) ? value : worst))! : null;
-  // På kortet och på återvägen: från lands.at tills handen är åter i REDO, i filmen eller hos dockan, det som kommer först.
-  const back = Math.min(seconds.home ?? lastT, doll.seconds.home ?? lastT);
-  const span = rows.filter((row) => row.t >= (seconds.lands ?? doll.seconds.lands ?? Infinity) && row.t < back);
-  const againstDoll = span.map((row) => {
-    const near = doll.hands.filter((hand) => hand.w !== null && Math.abs(hand.t - row.t) <= measure.handWindow + 1e-9).map((hand) => hand.w!);
-    return row.hand && near.length ? row.hand.w / Math.max(...near) : null;
-  });
+  // På kortet och på återvägen: från lands.at till handEnd s före dockans home; i REDO visar ankaret handryggen, dockan inte.
+  const beyond = doll.beyond ?? [];
+  const span = rows.filter((row) => row.t >= (seconds.lands ?? doll.seconds.lands ?? Infinity) && row.t < (doll.seconds.home ?? lastT) - measure.handEnd);
+  const againstDoll = (key: keyof Beyond): number | null => {
+    const ratios = span.map((row) => {
+      const best = most(beyond.map((entry, j) => (entry && Math.abs(j / doll.fps - row.t) <= measure.handWindow + 1e-9 ? entry[key] : null)));
+      const value = row.beyond?.[key];
+      return value && best ? value / best : null;
+    });
+    const worst = most(ratios);
+    return worst === null ? null : round(worst, 3);
+  };
   const onCard = rows.filter((row) => times.lands !== null && times.leavesCard !== null && row.i >= times.lands && row.i < times.leavesCard);
   const dollOnCard = doll.hands.filter((hand) => doll.seconds.lands !== null && doll.seconds.leavesCard !== null && hand.t >= doll.seconds.lands && hand.t < doll.seconds.leavesCard && hand.w !== null).map((hand) => hand.w!);
   const filmOnCard = median(onCard.filter((row) => row.hand).map((row) => row.hand!.w));
@@ -938,17 +1243,19 @@ export function valuesOf(read: FilmRead, film: Probe, sound: boolean, layout: La
     format: `${film.width}×${film.height} ${Number.isInteger(film.fps) ? film.fps : film.fps}/s ${rows.length}`,
     ljud: sound,
     takt: cadence(rows.map((row) => row.step ?? 0).slice(1), measure.cadencePeriod, measure.cadenceStill).most,
-    kortdelar: most(rows.map((row) => row.blue + row.yellow)),
-    gulForm: rows.filter((row) => row.merged).length,
-    gulFormEfterDraget: rows.filter((row) => row.merged && times.leavesShoe !== null && row.i > times.leavesShoe).length,
-    vandningTillbaka: flipsBack,
+    kortdelar: own.kortdelar!,
+    gulForm: own.gulForm!,
+    gulFormEfterDraget: own.gulFormEfterDraget!,
+    vandningTillbaka: own.vandningTillbaka!,
     kortetsRorelse: lastCard && settled.length ? round(Math.max(...settled.map((row) => distance(row.card!.c, lastCard.c))), 1) : null,
-    kortetsHorn: settled.length ? Math.max(...settled.map((row) => cornerError(row.card!.corners, painted))) : null,
+    kortetsOverlapp: blueOverlap(last, images.last, layout.low),
+    kortetsMitt: lastCard && painted ? round(distance(lastCard.c, painted.c), 1) : null,
     kortetsYta: area === null ? null : round(area / layout.cardArea, 3),
-    nastaKortSaknas: rows.filter((row) => !row.merged && (!row.next || row.next.d > measure.mouthReach)).length,
-    nastaKortFlyttar: most(rows.filter((row) => !row.merged && row.next && row.next.d <= measure.mouthReach).map((row) => row.next!.d)),
+    nastaKortSaknas: rows.filter((row) => tested(row) && !row.merged && (!row.next || row.next.d > measure.mouthReach)).length,
+    nastaKortFlyttar: added?.most ?? null,
     handIRedo,
-    handMotDockan: againstDoll.some((value) => value !== null) ? round(most(againstDoll)!, 3) : null,
+    handMotDockan: againstDoll('reach'),
+    handBreddMotDockan: againstDoll('width'),
     skarvRegion: Math.max(...seams.map((seam) => seam.meanMax)),
     skarvLjus: Math.max(...seams.flatMap((seam) => seam.signed.map(Math.abs))),
     skarvHand: handA && handB ? round(distance(handA.c, handB.c), 1) : null,
@@ -963,7 +1270,8 @@ export function valuesOf(read: FilmRead, film: Probe, sound: boolean, layout: La
     // Bara för att visas.
     landsAt: seconds.lands,
     kortetLamnarSkon: delta(seconds.leavesShoe, doll.seconds.leavesShoe),
-    handenLamnarKortet: delta(seconds.leavesCard, doll.seconds.leavesCard),
+    kortetHeltSynligt: delta(seconds.visible ?? null, doll.seconds.leavesCard),
+    nastaKortJamfort: added === null ? null : round(added.from / fps, 3),
     handenISkonMotDockan: delta(seconds.home, doll.seconds.home),
     handPaKortet: filmOnCard !== null && dollOnCardWidth !== null ? round(filmOnCard / dollOnCardWidth, 3) : null,
     huvudet: heads.length ? round(Math.max(...heads) - Math.min(...heads), 1) : null,
@@ -976,7 +1284,7 @@ export function valuesOf(read: FilmRead, film: Probe, sound: boolean, layout: La
 // Gränserna
 
 /** En gräns så som den står i content/tagning.json: minst, högst, exakt, och en övre gräns där klippet ska ses i full fart. */
-export type Limit = { what: string; unit?: string; least?: number; most?: number; see?: number; is?: string | number | boolean; source: string };
+export type Limit = { what: string; unit?: string; least?: number; most?: number; see?: number; is?: string | number | boolean; doll?: number; source: string };
 export type Verdict = 'inom' | 'se efter' | 'utanför' | 'saknas';
 export type Judged = { key: string; what: string; value: number | string | boolean | null; unit: string; limit: string; verdict: Verdict; source: string };
 
@@ -993,9 +1301,20 @@ export function limitText(limit: Limit): string {
   return parts.join(' ');
 }
 
-/** Ett mått mot sin gräns. Ett mått som inte gick att ta är `saknas`. */
-export function judgeOne(key: string, value: number | string | boolean | null | undefined, limit: Limit): Judged {
-  const base = { key, what: limit.what, value: value ?? null, unit: limit.unit ?? '', limit: limitText(limit), source: limit.source };
+/**
+ * Gränsen för en plats: en gräns med `doll` höjs till dockans eget värde för samma mått plus `doll`, när det är större.
+ * Det dockan själv gör vid platsen (till exempel kortet som dras ut rakt framför mynningen vid plats 7) är inget fel.
+ */
+export function limitFor(limit: Limit, dollValue?: number | string | boolean | null): Limit {
+  if (limit.doll === undefined || typeof dollValue !== 'number' || limit.most === undefined) return limit;
+  return { ...limit, most: Math.max(limit.most, dollValue + limit.doll) };
+}
+
+/** Ett mått mot sin gräns. Ett mått som inte gick att ta är `saknas`. `dollValue` är dockans eget värde (limitFor). */
+export function judgeOne(key: string, value: number | string | boolean | null | undefined, given: Limit, dollValue?: number | string | boolean | null): Judged {
+  const limit = limitFor(given, dollValue);
+  const raised = limit.most !== given.most ? ` (dockan ${shown(dollValue as number)} + ${shown(given.doll!)})` : '';
+  const base = { key, what: limit.what, value: value ?? null, unit: limit.unit ?? '', limit: `${limitText(limit)}${raised}`, source: limit.source };
   if (value === null || value === undefined) return { ...base, verdict: 'saknas' };
   if (limit.is !== undefined) return { ...base, verdict: value === limit.is ? 'inom' : 'utanför' };
   if (typeof value !== 'number') return { ...base, verdict: 'utanför' };
@@ -1004,9 +1323,9 @@ export function judgeOne(key: string, value: number | string | boolean | null | 
   return { ...base, verdict: 'inom' };
 }
 
-/** Alla mått som har en gräns, i gränsernas ordning. */
-export function judge(values: Values, limits: Record<string, Limit>): Judged[] {
+/** Alla mått som har en gräns, i gränsernas ordning. `doll` är dockans egna värden för samma plats (DollRead, own). */
+export function judge(values: Values, limits: Record<string, Limit>, doll: Values = {}): Judged[] {
   return Object.entries(limits)
     .filter(([key]) => key in values)
-    .map(([key, limit]) => judgeOne(key, values[key], limit));
+    .map(([key, limit]) => judgeOne(key, values[key], limit, doll[key]));
 }

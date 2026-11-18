@@ -88,7 +88,10 @@ export type SceneHandle = {
   setStudio(studio: Studio | null): void;
   /** Ställer vyn i en av de fasta. Med musen vrider och zoomar man sedan fritt därifrån. */
   setView(view: View): void;
-  /** Visar eller döljer scenens sko. Dealerfilmen bär sin egen sko i bilden, där scenens står; den döljs inte här. */
+  /**
+   * Visar eller döljer scenens sko. Dealerfilmen bär sin egen sko i bilden, där scenens står; den döljs inte här. Sedd
+   * från platsen där dealerfilmen är gjord ritas scenens sko aldrig: där gäller filmens egen (se placeShoe).
+   */
   setShoe(shown: boolean): void;
   /** Visar eller döljer kortplatserna: konturen av ett kort på var och en av beskrivningens platser, på filten. */
   setPlaces(shown: boolean): void;
@@ -105,6 +108,8 @@ export type SceneHandle = {
 const NEAR = 0.1;
 const FAR = 100;
 const EMPTY = 0x0a0b0d;
+// Två ögon närmare än så här, i meter, står på samma plats.
+const SAME_PLACE = 1e-6;
 
 function disposeModel(model: THREE.Object3D): void {
   model.traverse((node) => {
@@ -207,11 +212,14 @@ export function buildScene(host: HTMLElement, scene: SceneDescription, options: 
   // Dealerfilmen ligger på den vikta ytan, lagd genom närbilden av vyn den är gjord i. Ytans liggande del lutar med bordet.
   const anisotropy = renderer.capabilities.getMaxAnisotropy();
   const chosen = options.dealer ?? null;
+  // Platsen dealerfilmen är gjord från. Vyn och dess närbild står där båda.
+  const filmEye = chosen?.kind === 'film' ? viewEye(scene, { ...chosen.view, close: true }) : null;
+  const filmPlace = filmEye ? new THREE.Vector3(...filmEye.position) : null;
   const film =
-    chosen?.kind === 'film'
+    chosen?.kind === 'film' && filmEye
       ? createFilm(
           scene,
-          viewEye(scene, { ...chosen.view, close: true }),
+          filmEye,
           chosen.clips.map((clip) => ({ url: options.urlOf(clip.file), ...(clip.card ? { card: clip.card } : {}) })),
           chosen.hold ?? 0,
           anisotropy,
@@ -377,8 +385,22 @@ export function buildScene(host: HTMLElement, scene: SceneDescription, options: 
     film.setMarker(markerDown(reel, time));
   }
 
+  /**
+   * Scenens sko, om den inte är dold med setShoe. Sedd från platsen där dealerfilmen är gjord är filmen bilden som den är,
+   * med hennes egen sko på samma ställe som scenens: där ritas scenens sko inte, så att det som i filmen rör sig framför
+   * skon (arm, hand, kort) syns framför den. Scenens sko står framför den vikta ytan och skulle annars dölja det; en
+   * svart ärm över en svart sko går inte att skilja från skon i bilden. Sedd från något annat håll är filmen platt, och
+   * scenens sko står där. Görs före varje ritad ruta.
+   */
+  function placeShoe(from: THREE.Camera): void {
+    if (!shoeStand) return;
+    const filmsOwn = film !== null && film.upright.visible && filmPlace !== null && from.position.distanceTo(filmPlace) < SAME_PLACE;
+    shoeStand.visible = shoeShown && !filmsOwn;
+  }
+
   function draw(): void {
     settle();
+    placeShoe(camera);
     stale = false;
     renderer.render(world, camera);
   }
@@ -433,6 +455,7 @@ export function buildScene(host: HTMLElement, scene: SceneDescription, options: 
         eye,
         take() {
           settle();
+          placeShoe(shot);
           renderer.render(world, shot);
           // Bilden läses av direkt efter ritningen, innan webbläsaren har hunnit tömma ytan.
           return new Promise((resolve, reject) => {

@@ -10,7 +10,7 @@ import { after, before, test } from 'node:test';
 import sharp from 'sharp';
 import { probe } from './matning.ts';
 import { about, createRegister, getEntry } from './registry.ts';
-import { clipFile, forbered, nextTake, packageId, promptFor, readTagning, registrera, taEmot, type PostFile } from './tagning.ts';
+import { clipFile, forbered, matOm, nextTake, packageId, promptFor, readTagning, registrera, taEmot, type PostFile } from './tagning.ts';
 
 const root = resolve(import.meta.dirname, '..', '..');
 const content = readTagning(root);
@@ -27,7 +27,7 @@ test('texten är pilotens med granskarens två fraser och rättelsen, och samma 
 });
 
 test('gränserna: granskarens alla mått, med källa, och dockans film i filmmodellens takt', () => {
-  for (const key of ['format', 'ljud', 'takt', 'kortdelar', 'gulForm', 'kortetsRorelse', 'kortetsHorn', 'kortetsYta', 'nastaKortSaknas', 'nastaKortFlyttar', 'handIRedo', 'handMotDockan', 'skarvRegion', 'skarvLjus', 'skarvHand', 'forstaRutan', 'sistaRutan', 'gront', 'skon', 'glipaRutor', 'glipaHojd', 'kortetLigger', 'handenISkon', 'bevisBlatt']) {
+  for (const key of ['format', 'ljud', 'takt', 'kortdelar', 'gulForm', 'kortetsRorelse', 'kortetsOverlapp', 'kortetsMitt', 'kortetsYta', 'nastaKortSaknas', 'nastaKortFlyttar', 'handIRedo', 'handMotDockan', 'handBreddMotDockan', 'skarvRegion', 'skarvLjus', 'skarvHand', 'forstaRutan', 'sistaRutan', 'gront', 'skon', 'glipaRutor', 'glipaHojd', 'kortetLigger', 'handenISkon', 'bevisBlatt']) {
     const limit = content.limits[key];
     assert.ok(limit, `gränsen ${key} saknas`);
     assert.ok(limit.source.length > 0, `${key}: källa`);
@@ -175,4 +175,25 @@ test('registreringen: klippet som post att granska, beställningen och måtten, 
   assert.match(again.join('\n'), new RegExp(`i stället för de ${received!.measurements.length} förra`));
   assert.equal(about(register, received!.post.file).measurements.length, received!.measurements.length);
   assert.equal(about(register, received!.uploads[0]!.file).uploads.length, 1);
+});
+
+test('mät-om: måtten tas om och ersätter de förra i post.json och registret; klippet, posten och omdömet rörs inte', async () => {
+  const id = 'paulina_spelaren_cykel-nyp_4-1_t1';
+  const dir = join(project, 'output', 'tagningar', id);
+  const register = join(project, 'register');
+  const before = JSON.parse(readFileSync(join(dir, 'post.json'), 'utf8')) as PostFile;
+  const entryBefore = getEntry(register, before.post.file)!;
+  const clipBefore = readFileSync(clip);
+  const result = await matOm(id, { root: project, registry: register, proof: false, say: quiet });
+  const after = JSON.parse(readFileSync(join(dir, 'post.json'), 'utf8')) as PostFile;
+  assert.deepEqual([after.post, after.order, after.uploads], [before.post, before.order, before.uploads]);
+  assert.equal(after.measurements.length, result.judged.length + after.measurements.filter((entry) => entry.note === 'utan gräns').length);
+  assert.ok(result.judged.some((entry) => entry.key === 'kortetsOverlapp') && !result.judged.some((entry) => entry.key === 'kortetsHorn'), 'dagens mått');
+  assert.match(result.registered.join('\n'), /i stället för de \d+ förra/);
+  assert.equal(getEntry(register, before.post.file)!.status, entryBefore.status);
+  assert.equal(about(register, before.post.file).measurements.length, after.measurements.length);
+  assert.ok(readFileSync(clip).equals(clipBefore), 'klippet är detsamma');
+  const doll = JSON.parse(readFileSync(join(dir, 'docka.json'), 'utf8'));
+  assert.ok(Array.isArray(doll.next) && Array.isArray(doll.beyond) && doll.own && doll.shoe, 'docka.json har dockans värden per ruta');
+  await assert.rejects(matOm('finns-inte', { root: project, registry: register, proof: false, say: quiet }), /ingen post.json/);
 });

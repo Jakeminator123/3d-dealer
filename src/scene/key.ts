@@ -17,6 +17,10 @@ const HI = 0.82;
 const ERODE = 0.6;
 // Steget mellan nyckelns prov, i rutans bildpunkter. Kanten letas två och fyra steg ut och färgen hämtas fem steg in.
 const STEP = 1.4;
+// Grönheten (skärmens = 1) under vilken en punkt inte bär skärmens grönt och behåller sin egen färg i kanten, och över
+// vilken den får färgen längre in helt. Blond hud och hår ligger kring −0,2 till −0,4, en mättat rosa tumspets kring −0,7
+// (mätt 2026-11-18 i plats 1, kort 1, ruta 46: tumspetsen 250,154,149 är −0,72).
+const TINGED = [-0.6, -0.3];
 
 /**
  * Hur mycket av en bildpunkt som är skärm, som nyckeln räknar det (screenOf nedan): 0 är dealer, 1 är skärm. Färgerna är
@@ -81,6 +85,8 @@ void main() {
   // Konturens färg. Punkterna närmast skärmen är en blandning av dealer och skärm, och bilden bär skärmens gröna en bit in
   // i hår och hud: en blek gulgrön linje där för lite grönt togs bort, en rosa där för mycket. Inom ungefär fem bildpunkter
   // från skärmen tar en punkt därför färgen av bilden några punkter längre in, bort från skärmen, och behåller sin egen ljushet.
+  // Bara en punkt som bär skärmens grönt gör det: en punkt klart mindre grön än så, som en tumspets intill det blå kortet,
+  // behåller sin egen färg. Längre in kan annars ligga kortets blå reflex i huden, som ljusheten förstärker till starkt rosa.
   vec2 two = texel * 2.0;
   vec2 four = texel * 4.0;
   float x1 = screenAt(uv + vec2(two.x, 0.0), range), x0 = screenAt(uv - vec2(two.x, 0.0), range);
@@ -96,7 +102,11 @@ void main() {
     inner.g = min(inner.g, max(inner.r, inner.b));
     float own = dot(colour, LUMA);
     float theirs = max(dot(inner, LUMA), 0.02);
-    colour = mix(colour, inner * min(own / theirs, 2.0), smoothstep(0.02, 0.2, close) * (1.0 - furtherScreen));
+    float tinged = smoothstep(float(${TINGED[0]}), float(${TINGED[1]}), greenness);
+    // Hud tar aldrig färgen av märkkortet längre in: en nagel mot kortets hörn blir annars ljusblå (plats 6, kort 0, ruta 54).
+    vec2 furtherMark = markOf(further);
+    float fromCard = skinOf(c) * max(furtherMark.x, furtherMark.y);
+    colour = mix(colour, inner * min(own / theirs, 2.0), smoothstep(0.02, 0.2, close) * (1.0 - furtherScreen) * tinged * (1.0 - fromCard));
   }
 
   // Den indragna konturen tunnar ut punkten, den färgar inte om den.
