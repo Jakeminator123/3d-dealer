@@ -698,7 +698,7 @@ export function pointersTo(root: string, file: string, corpus = corpusOf(root)):
   return found;
 }
 
-export type Unused = { file: string; status: string; group: string; why: string; then: 'arkivera' | 'ta-bort'; notes: string[] };
+export type Unused = { file: string; status: string; group: string; why: string; then: 'arkivera' | 'ta-bort' | 'behåll'; notes: string[] };
 
 const viewName = (view: unknown): string | null => {
   const seen = view as { kind?: unknown; seat?: unknown } | undefined;
@@ -760,7 +760,11 @@ export function unused(root: string): Unused[] {
       const notes = pointersTo(root, entry.file, corpus)
         .filter((pointer) => pointer.blocks)
         .map((pointer) => `${pointer.where} pekar på den: ${group === 'clips' ? 'arkivera' : 'ta-bort'} vägrar tills pekaren är borta`);
-      return { file: entry.file, status: entry.status, group, why, then: group === 'clips' ? 'arkivera' : 'ta-bort', notes };
+      // Jakob 2026-11-18: "Rensa gammalt material men behåll det som är bra". Ett underkänt klipp arkiveras,
+      // det som fått utgår och ankare som ingenting använder tas bort, och godkänt eller odömt material som
+      // ännu inte används står kvar tills det är dömt.
+      const then = group === 'clips' ? 'arkivera' : entry.status === 'utgår' || group === 'anchors' ? 'ta-bort' : 'behåll';
+      return { file: entry.file, status: entry.status, group, why, then, notes };
     });
 }
 
@@ -1205,7 +1209,8 @@ async function command(root: string, words: string[]): Promise<number> {
       say(`- ${item.file} [${item.status}]: ${item.why}. Förslag: ${item.then}.`);
       for (const note of item.notes) say(`    obs: ${note}`);
     }
-    say(`${found.length} poster används inte av produktionslinjen. En underkänd tagning arkiveras (arkivera), så att felet går att se på; annat oanvänt tas bort (ta-bort).`);
+    const kept = found.filter((item) => item.then === 'behåll').length;
+    say(`${found.length} poster används inte av produktionslinjen. En underkänd tagning arkiveras (arkivera), så att felet går att se på; det som fått utgår och oanvända ankare tas bort (ta-bort); ${kept} är godkända eller odömda och står kvar tills de är dömda (behåll).`);
   } else if (word === 'order' && rest.length === 1) {
     for (const order of readJsonFile(rest[0]!)) {
       const id = addOrder(root, order as Order);

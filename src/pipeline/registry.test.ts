@@ -377,7 +377,7 @@ test('det oanvända räknas upp med skäl: utgår, och det som ingenting använt
     [
       ['dealers/p/anchors/gammal.png', 'ta-bort'],
       ['dealers/p/clips/fel.mp4', 'arkivera'],
-      ['reference/gammal-film.mp4', 'ta-bort'],
+      ['reference/gammal-film.mp4', 'behåll'],
     ],
   );
   assert.equal(found[1]!.why, 'status utgår');
