@@ -19,6 +19,8 @@ Den första serien finns och spelas: Paulina delar två kort till var och en av 
 - Servern (`src/server`): svarar bara på localhost och startar om sig själv när dess kod ändras. `npm start` och `npm stop` ([README.md](../README.md)).
 - Spelkärnan (`src/engine`): förd över ur gamla Dealer med sju testfiler; ursprung och avvikelser står i `src/engine/provenance.json`.
 - Prov: `npm test`, `npm run typecheck`, och `npm run reg -- check` för `assets/` mot registret.
+- Mallen för en ny dealer: dealerns fil (`content/dealers/<id>.json`), `src/pipeline/identitet.ts` och `ankare.ts` (från en bild av en person till identitetsbilder och ett REDO-ankare), och Labbets steg Dealer, som visar var en dealer står och nästa kommando. Torrprovad utan betald generering; inte körd på riktigt för en andra dealer.
+- Klippens fart i uppspelningen (`speed.clips` i `content/runda.json`, reglage i steget Kortplan), och ett statiskt bygge av det riktiga Casinot (`npm run build:statisk`); ingenting är utlagt.
 - En sida för mobilen med filmer och läge, privat för Jakob: källan ligger i `output/work/mobilsida/`.
 
 ## Finns inte än
@@ -43,8 +45,8 @@ Tre bakgrunder och fyra material har `utgår` och tas bort vid nästa arbetspass
 
 ## Näst
 
-1. Jakob ser provklipp D (`output/work/rorelse/provklipp-forut-a-a2-d.mp4` och `provklipp-d-tre-varv.mp4`, också på mobilsidan) och säger ja, nej eller vad som ska ändras. Mätt fryser D aldrig (2,1 % av tiden helt stilla, mot 12,4 % förut).
-2. Serien med D: 17 paket ligger förberedda (`output/tagningar/paulina_spelaren_cykel-nyp-flytande_*`): spelarnas två kort utom plats 4 kort 0, dealerns öppna kort, hålkortet, vändningen och vänta-klippet. Beställ ytterlägena först och låt en oberoende granskare döma dem. När serien är godkänd arkiveras de 14 äldre klippen.
+1. Jakob har provklippen (D i `output/work/rorelse/`, E i `output/work/variant-e/`) och har bett agenten fortsätta; "stopp" från honom bromsar. E är gjord efter en mätt verklig dealer (`output/work/verklig-dealer/rapport.md`): blicken går aldrig mot skon.
+2. Serien med E (`cykel-nyp-rask`, 3 s, ankaret `spelaren-redo-3.png`), i omgångar med en oberoende granskare emellan: spelarnas två kort, dealerns öppna kort, hålkortet, vändningen och vänta-klippet. Plats 4 och plats 1 (första kortet) finns som provklipp. Sedan en hel runda sparad som en film. När serien är godkänd arkiveras de 14 äldre klippen och provklippen A–D.
 3. Mätningen för sidovyer, och ett nytt ankare och en serie ur Plats 7 på den nya geometrin.
 4. Labbets steg Dealer, Klipp och Spela, och det som händer mellan givarna.
 

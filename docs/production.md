@@ -32,7 +32,7 @@ Varje vy som ska visa dealern går igenom Förlaga, Ankare och Film för sig. Do
 - Kroppens egen skuggning stannar i filmen. Skuggan på bordet läggs av scenen. Aldrig båda.
 - Filmen har inget ljud. Kling 4 lägger alltid på ljud; `ta-emot` tar bort det utan omkodning.
 - Identiteten avgör vad som ska synas på dealern. För Paulina: tatueringar på hals, bröst och båda händerna.
-- Takten står i `content/moves/cykel-nyp.json`: cykeln är 4,0 s.
+- Takten står i cykelns fil i `content/moves/`. Produktionen använder `cykel-nyp-rask` (3,0 s), gjord efter en mätt verklig dealer: hon ser aldrig på skon, och vägen tillbaka är hälften så lång som vägen ut. I REDO ser dealern mot bordets mitt.
 
 ## Identitet
 
@@ -84,7 +84,7 @@ Med cykeln behövs ett ankare per vy: REDO. Sista bilden är REDO med märkkorte
 2. Agenten laddar upp filerna och beställer med `generate_video` exakt som `bestallning.json` säger: Kling 4, 1080p, 4 s, `startFrame`, `endFrame` och dockans film som `referenceVideos`. 85 krediter (mätt).
 3. `node src/pipeline/tagning.ts ta-emot <id> <film> --task <taskId> --krediter <n> --saldo-fore <n> --saldo-efter <n>` tar bort ljudet, mäter klippet, gör ark och bevis i scenen, och för in klippet (`att granska`), beställningen och måtten i registret.
 
-- Texten, gränsvärdena, vyernas ankare och bildfrekvensen står i `content/tagning.json`. Gränsvärdena är den oberoende granskarens, satta efter piloten.
+- Texten, gränsvärdena och bildfrekvensen står i `content/tagning.json`, och vyernas ankare och orden om dealern i `content/dealers/<id>.json`. Paketet görs genom ankarets eget öga (ankarets post i registret), så ett ankare gäller också när kortplanen har ändrats; hamnar kortplatsen utanför ankarets ruta vägrar `forbered`. Gränsvärdena är den oberoende granskarens, satta efter piloten.
 - `ta-emot` mäter bland annat takten, skarven (klippet två gånger i rad), när och var kortet ligger (`lands`), handen utan handled mot dockans, skons rörelse och det gröna. Ett mått utanför sin gräns underkänner inte klippet, men det syns direkt.
 - `node src/pipeline/tagning.ts mät-om <id>` mäter om ett mottaget klipp och gör om beviset i scenen, utan att röra filen, beställningen eller omdömet. Används när mätningen eller scenen har ändrats.
 - Rörelsens dynamik mäts för sig (`src/pipeline/rorelse.ts`), på dockans film vid `forbered` och på klippet vid `ta-emot`: hur länge hon står helt stilla, huvudets rörelse i vila, tvära stopp, knyck mot minsta ryck, att huvudet går före handen och att bålen landar efter. Kling kopierar dockans dynamik nästan exakt (mätt), så det som ska bli mjukt i filmen görs mjukt i dockan.
