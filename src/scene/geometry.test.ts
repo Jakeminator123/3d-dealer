@@ -245,10 +245,12 @@ test('varje kortplats syns i rutan från sin egen plats, och dealerns kortplatse
   }
   // Spelaren ser alla kortplatser på bordet.
   for (const place of places()) assert.ok(inFrame(see(player, placeOnTable(scene, place))), `spelaren: kortplatsen (${place})`);
-  // Gamla linsen såg dem alla på det olutade bordet, nedanför bordskantens rad.
-  for (const place of places()) {
+  // Gamla linsen (camera) såg dem alla när kortplanen var mätt genom den. Sedan 2026-11-18 räknas kortplatserna ur en
+  // båge 8,75 cm närmare spelarna (content/scene.json, places), och plats 3–5 ligger nedanför linsens ruta: linsen är
+  // ingen vy, och ingenting görs genom den. Dealerns kortplatser ser den fortfarande, nedanför bordskantens rad.
+  for (const place of scene.places.dealer) {
     const seen = see(eye, placeOnTable(level, place))!;
-    assert.ok(inFrame(seen) && seen.y > EDGE_ROW, `gamla linsen: kortplatsen (${place})`);
+    assert.ok(inFrame(seen) && seen.y > EDGE_ROW, `gamla linsen: dealerns kortplats (${place})`);
   }
 });
 
@@ -274,8 +276,9 @@ test('från varje plats ryms hela dealern, med samma luft över huvudet som spel
 });
 
 test('ett kort på plats 4 ritas som kortet som mättes i film', () => {
-  // Kortet mättes genom gamla linsen, på bordet som det stod då: olutat.
-  const place = cardsOf(4)[0]!;
+  // Kortet mättes genom gamla linsen, på bordet som det stod då: olutat, på plats 4:s första kortplats i gamla kortplanen
+  // (content/scene.json vid commit ab56003; kortplanen är sedan 2026-11-18 en båge 8,75 cm närmare spelarna).
+  const place: FeltPoint = [-0.019, -1.4468];
   const corners = cardCorners(level, place);
   near(Math.hypot(corners[0]![0] - corners[1]![0], corners[0]![2] - corners[1]![2]), scene.card.width, 1e-12, 'bredd i meter');
   near(Math.hypot(corners[1]![0] - corners[2]![0], corners[1]![2] - corners[2]![2]), scene.card.height, 1e-12, 'höjd i meter');
@@ -428,21 +431,10 @@ test('närbilden står i vyns öga och rymmer dealerns arbetsyta med luft mot ru
   assert.ok(closeUp.focalPx * 0.25 / Math.hypot(player.position[1], scene.player.distance) > 200, 'huvudet blir minst 200 bildpunkter högt');
 });
 
-// Klippen är gjorda genom närbilderna så som de räknades när de gjordes (2026-11-18, före skons flytt och dealerns och
-// spelarnas senare kortplatser). Flyttar sig ögat hamnar klippen fel i scenen. Talen är avlästa ur viewEye då.
-const LOCKED: { view: { kind: 'spelaren'; close: true } | { kind: 'plats'; seat: number; close: true }; position: Vec3; forward: Vec3; focalPx: number }[] = [
-  { view: { kind: 'spelaren', close: true }, position: [0, 0.6, 0.056199999999999806], forward: [0.01781823892179732, -0.18167834580641787, -0.9831965668302396], focalPx: 2065.8972734109907 },
-  { view: { kind: 'plats', seat: 7, close: true }, position: [1.896141525921063, 0.6, -1.0486293029564782], forward: [-0.8724696186533367, -0.17359821776160222, -0.45679363318340666], focalPx: 1936.202296652254 },
-];
-
-test('närbilderna är låsta: Spelarens och Plats 7:s öga är de som klippen gjordes i, och alla kortplatser ligger i dem', () => {
-  for (const { view, position, forward, focalPx } of LOCKED) {
-    const eye = viewEye(scene, view);
-    assert.ok(Math.hypot(...eye.position.map((value, k) => value - position[k]!)) < 1e-12, `${JSON.stringify(view)}: ögats läge`);
-    assert.ok(Math.hypot(...eye.forward.map((value, k) => value - forward[k]!)) < 1e-12, `${JSON.stringify(view)}: ögats riktning`);
-    assert.ok(Math.abs(eye.focalPx - focalPx) < 1e-9, `${JSON.stringify(view)}: brännvidden ${eye.focalPx}`);
-  }
-  // Kortplatserna efter de två första flyttar inte närbilden (film.reach.cards), men de ligger i den ur varje vy.
+// Ett klipp är gjort genom närbilden så som den räknades då; posten bär det ögat (registrets eye), och uppspelningen
+// lägger filmen genom det (build.ts). Närbilden i scenen får därför ändras med scenens tal.
+test('närbilden räknas ur de två första kortplatserna på varje plats, och alla kortplatser ligger i den', () => {
+  // Kortplatserna efter de två första gör inte närbilden större (film.reach.cards), men de ligger i den ur varje vy.
   assert.equal(scene.film.reach.cards, 2);
   const every = [...scene.places.dealer, ...scene.places.seats.flatMap((entry) => entry.cards)];
   for (const view of [{ kind: 'spelaren' as const }, ...seatsOf(scene).map((seat) => ({ kind: 'plats' as const, seat }))]) {

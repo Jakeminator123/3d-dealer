@@ -7,7 +7,7 @@ import { execFile } from 'node:child_process';
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { promisify } from 'node:util';
-import type { CardNote, CardSpot, ClipCard, DealerNote as Dealer, FilmClip, FilmNote, OneClipNote, Rgb, Studio } from '../scene/dealer.ts';
+import type { CardNote, CardSpot, ClipCard, DealerNote as Dealer, FilmClip, FilmEye, FilmNote, FilmShoe, OneClipNote, Rgb, Studio } from '../scene/dealer.ts';
 import type { Frame, Vec3 } from '../scene/description.ts';
 import { viewName, type SeatView, type View } from '../scene/geometry.ts';
 
@@ -147,8 +147,13 @@ const isSpot = (spot: Partial<CardSpot> | undefined): boolean =>
   Number.isInteger(spot!.index) &&
   spot!.index! >= 0 &&
   (spot!.hand === undefined || (Number.isInteger(spot!.hand) && spot!.hand >= 0));
+const isPair = (value: unknown): boolean => Array.isArray(value) && value.length === 2 && value.every(isNumber);
 const isClipCard = (card: Partial<ClipCard> | undefined): card is ClipCard =>
-  isSpot(card) && (card!.face === null || isFace(card!.face)) && isNumber(card!.at) && card!.at >= 0;
+  isSpot(card) && (card!.face === null || isFace(card!.face)) && isNumber(card!.at) && card!.at >= 0 && (card!.place === undefined || isPair(card!.place));
+// Ögat och skon en följds filmer är gjorda med (dealer.ts, FilmEye och FilmShoe).
+const isFilmEye = (eye: Partial<FilmEye> | undefined): boolean =>
+  isVector(eye?.position) && isVector(eye?.forward) && isNumber(eye?.focalPx) && eye!.focalPx > 0 && isNumber(eye!.frame?.width) && isNumber(eye!.frame?.height);
+const isFilmShoe = (shoe: Partial<FilmShoe> | undefined): boolean => isPair(shoe?.at) && isNumber(shoe?.yawDeg) && isNumber(shoe?.length) && shoe!.length! > 0;
 // Ett klipp är en fil med sitt kort, eller en del utan fil där kortet går självt (spelkärnans fallback).
 const isClip = (clip: Partial<FilmClip> | undefined): clip is FilmClip =>
   clip?.file === null
@@ -166,14 +171,16 @@ function isDealer(dealer: Partial<DealerNote> | null | undefined): dealer is Dea
   }
   if (dealer.kind !== 'film' || !isSeatView(dealer.view)) return false;
   if ('clips' in dealer) {
-    const { clips, hold, loop } = dealer as Partial<FilmNote>;
+    const { clips, hold, loop, eye, shoe } = dealer as Partial<FilmNote>;
     return (
       Array.isArray(clips) &&
       clips.length >= 1 &&
       clips.length <= MOST_CLIPS &&
       clips.every(isClip) &&
       (hold === undefined || (isNumber(hold) && hold >= 0)) &&
-      (loop === undefined || typeof loop === 'boolean')
+      (loop === undefined || typeof loop === 'boolean') &&
+      (eye === undefined || isFilmEye(eye)) &&
+      (shoe === undefined || isFilmShoe(shoe))
     );
   }
   const { file } = dealer as Partial<OneClipNote>;
@@ -194,7 +201,7 @@ function dealerNote(dealer: DealerNote): DealerNote {
     };
   }
   if ('clips' in dealer) {
-    const cardOf = (card: ClipCard): ClipCard => ({ ...spotOf(card), face: card.face, at: card.at });
+    const cardOf = (card: ClipCard): ClipCard => ({ ...spotOf(card), face: card.face, at: card.at, ...(card.place ? { place: [card.place[0], card.place[1]] as [number, number] } : {}) });
     const clips = dealer.clips.map((clip): FilmClip =>
       clip.file === null
         ? { file: null, seconds: clip.seconds, card: cardOf(clip.card), from: clip.from === 'skon' ? 'skon' : spotOf(clip.from) }
@@ -206,6 +213,10 @@ function dealerNote(dealer: DealerNote): DealerNote {
       clips,
       ...(dealer.hold === undefined ? {} : { hold: dealer.hold }),
       ...(dealer.loop === undefined ? {} : { loop: dealer.loop }),
+      ...(dealer.eye
+        ? { eye: { position: [...dealer.eye.position] as Vec3, forward: [...dealer.eye.forward] as Vec3, focalPx: dealer.eye.focalPx, frame: { width: dealer.eye.frame.width, height: dealer.eye.frame.height } } }
+        : {}),
+      ...(dealer.shoe ? { shoe: { at: [dealer.shoe.at[0], dealer.shoe.at[1]] as [number, number], yawDeg: dealer.shoe.yawDeg, length: dealer.shoe.length } } : {}),
       ...time,
     };
   }

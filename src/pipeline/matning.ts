@@ -15,7 +15,7 @@ import type { Frame, Vec3 } from '../scene/description.ts';
 import { poseAt } from '../scene/dollPose.ts';
 import { see, tilted, type Pixel, type SeatView } from '../scene/geometry.ts';
 import { screenShare } from '../scene/key.ts';
-import { cornersIn, cycleMove, forlagaEye, isSkin, type CycleCard, type CycleParts } from './cykel.ts';
+import { cornersIn, cycleEye, cycleMove, isSkin, type CycleCard, type CycleParts } from './cykel.ts';
 
 export class MeasureError extends Error {}
 
@@ -785,7 +785,7 @@ export function edgeRow(layout: Pick<Layout, 'edge'>, x: number): number {
 /** Rutorna en tagning mäts i, för en cykel till en kortplats (plats, kort och handling) sedd ur vyns närbild. */
 export function layoutFor(parts: CycleParts, view: SeatView, card: CycleCard, measure: Measure): Layout {
   const { scene, doll } = parts;
-  const eye = forlagaEye(scene, { ...view, close: true });
+  const eye = cycleEye(parts, view);
   const frame = eye.frame;
   const at = (point: Vec3): Pixel => {
     const pixel = see(eye, point);

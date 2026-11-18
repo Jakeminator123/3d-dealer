@@ -90,9 +90,37 @@ export type SceneDescription = {
     /** Skuggan mot filten där kortet ligger (cards.ts): hur långt ut den når och hur mycket mot spelaren, i meter, och hur mörk. */
     shadow: { reach: number; strength: number; offset: number };
   };
-  /** Kortplatser: kortets mitt på filten, för dealern och för varje spelarplats, i den ordning korten läggs. */
-  places: Marked & { dealer: FeltPoint[]; seats: { seat: number; cards: FeltPoint[] }[] };
+  /**
+   * Kortplatser: kortets mitt på filten, för dealern och för varje spelarplats, i den ordning korten läggs. I
+   * content/scene.json står spelarnas som en båge (`arc`) och dealerns som en rad (`row`), och `seats` och `dealer`
+   * räknas ur dem när scenen läses (placesOf). En beskrivning utan båge och rad bär platserna själv.
+   */
+  places: Marked & { arc?: PlaceArc; row?: PlaceRow; dealer: FeltPoint[]; seats: { seat: number; cards: FeltPoint[] }[] };
 };
+
+/**
+ * Spelarnas kortplatser som en båge på filten, på ett olutat bord. Platserna 1–`seats` ligger med lika avstånd i sidled
+ * över bredden `width` kring `centreX`, med plats 1 längst till vänster i bild. Första kortets djup är `depth` i bågens
+ * mitt och böjs tillbaka mot dealern `bend` meter vid ytterplatserna: djupet är depth − bend · |u|^round, där u går från
+ * −1 vid plats 1 till 1 vid sista platsen. Med `round` 1 är bågen ett V, med 2 rund: platserna i mitten nästan lika djupt.
+ * Varje plats har `cards` kortplatser; nästa ligger `step` (x, z) från det förra.
+ */
+export type PlaceArc = { centreX: number; depth: number; width: number; bend: number; round: number; step: [number, number]; seats: number; cards: number };
+/** Dealerns kortplatser som en rad: första kortet `first` (x, z), och nästa `step` från det förra, `cards` i allt. */
+export type PlaceRow = { first: FeltPoint; step: [number, number]; cards: number };
+
+/** Kortplatserna ur bågen och raden, avrundade till 0,1 mm. */
+export function placesOf(arc: PlaceArc, row: PlaceRow): { dealer: FeltPoint[]; seats: { seat: number; cards: FeltPoint[] }[] } {
+  const tenth = (value: number): number => Math.round(value * 10000) / 10000;
+  const seats = Array.from({ length: arc.seats }, (_, k) => {
+    const u = arc.seats === 1 ? 0 : (2 * k) / (arc.seats - 1) - 1;
+    const x = arc.centreX + (u * arc.width) / 2;
+    const z = arc.depth - arc.bend * Math.abs(u) ** arc.round;
+    return { seat: k + 1, cards: Array.from({ length: arc.cards }, (_, i): FeltPoint => [tenth(x + i * arc.step[0]), tenth(z + i * arc.step[1])]) };
+  });
+  const dealer = Array.from({ length: row.cards }, (_, i): FeltPoint => [tenth(row.first[0] + i * row.step[0]), tenth(row.first[1] + i * row.step[1])]);
+  return { dealer, seats };
+}
 
 const isNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
 const isPoint = (value: unknown, length: number): boolean =>
@@ -164,6 +192,16 @@ export function readScene(value: unknown): SceneDescription {
   need(isNumber(film?.margin) && film.margin >= 0 && film.margin < 0.5, 'film.margin');
   marked(film, 'film');
   need([card?.width, card?.height, card?.thickness, card?.corner].every(isNumber), 'card');
+  // Kortplatserna ur bågen och raden, när beskrivningen bär dem.
+  const { arc, row } = places ?? {};
+  if (arc !== undefined || row !== undefined) {
+    const counts = (value: unknown): boolean => Number.isInteger(value) && (value as number) >= 1;
+    const arcOk = [arc?.centreX, arc?.depth, arc?.width, arc?.bend, arc?.round].every(isNumber) && arc!.width > 0 && arc!.round > 0 && isPoint(arc?.step, 2) && counts(arc?.seats) && counts(arc?.cards);
+    const rowOk = isPoint(row?.first, 2) && isPoint(row?.step, 2) && counts(row?.cards);
+    need(arcOk, 'places.arc: centreX, depth, width, bend, round, step, seats och cards');
+    need(rowOk, 'places.row: first, step och cards');
+    if (arcOk && rowOk) Object.assign(places!, placesOf(arc!, row!));
+  }
   // Kortplatsens sista kort ligger ovanpå de andra, en tjocklek högre för varje, och ska fortfarande ligga under filmen.
   const stacked = Math.max(1, ...(places?.seats ?? []).map((entry) => (Array.isArray(entry?.cards) ? entry.cards.length : 1)));
   need(

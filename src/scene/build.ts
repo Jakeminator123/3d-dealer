@@ -252,8 +252,11 @@ export function buildScene(host: HTMLElement, scene: SceneDescription, options: 
   // Dealerfilmen ligger på den vikta ytan, lagd genom närbilden av vyn den är gjord i. Ytans liggande del lutar med bordet.
   const anisotropy = renderer.capabilities.getMaxAnisotropy();
   const chosen = options.dealer ?? null;
-  // Platsen dealerfilmen är gjord från. Vyn och dess närbild står där båda.
-  const filmEye = chosen?.kind === 'film' ? viewEye(scene, { ...chosen.view, close: true }) : null;
+  // Platsen dealerfilmen är gjord från. Vyn och dess närbild står där båda. Bär följden ögat filmerna gjordes genom
+  // (registrets eye) läggs den tillbaka genom det, också om scenen har ändrats sedan; annars genom vyns närbild i dag.
+  const filmEye = chosen?.kind === 'film' ? (chosen.eye ? { ...chosen.eye, frame: { ...chosen.eye.frame } } : viewEye(scene, { ...chosen.view, close: true })) : null;
+  // Skon som filmerna bär (registrets shoe): kortet i dess mynning är det nyckeln ser i filmen.
+  const filmShoeScene = chosen?.kind === 'film' && chosen.shoe ? { ...scene, shoe: { ...scene.shoe, ...chosen.shoe } } : scene;
   const filmPlace = filmEye ? new THREE.Vector3(...filmEye.position) : null;
   const film =
     chosen?.kind === 'film' && filmEye
@@ -269,7 +272,7 @@ export function buildScene(host: HTMLElement, scene: SceneDescription, options: 
           anisotropy,
           changed,
           problem,
-          options.doll ? pickUpCard(scene, options.doll).corners : null,
+          options.doll ? pickUpCard(filmShoeScene, options.doll).corners : null,
           chosen.loop ?? true,
         )
       : null;
@@ -399,7 +402,7 @@ export function buildScene(host: HTMLElement, scene: SceneDescription, options: 
     });
   }
   // Där ett kort som går självt börjar: kortet i skons mynning (hämtstället), eller skons fot utan dockans mått.
-  const shoeMouth = new THREE.Vector3(...(options.doll ? pickUpCard(scene, options.doll).centre : placeOnTable(scene, scene.shoe.at)));
+  const shoeMouth = new THREE.Vector3(...(options.doll ? pickUpCard(filmShoeScene, options.doll).centre : placeOnTable(scene, filmShoeScene.shoe.at)));
 
   let shoeShown = true;
   let shoeStand: THREE.Group | null = null;

@@ -32,9 +32,10 @@ import { dirname, join, relative, resolve } from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import sharp from 'sharp';
+import type { FilmEye } from '../scene/dealer.ts';
 import { readScene } from '../scene/description.ts';
 import { ACTIONS, cardPlace, poseAt, type Action, type Seat } from '../scene/dollPose.ts';
-import type { SeatView } from '../scene/geometry.ts';
+import { viewEye, type Eye, type SeatView } from '../scene/geometry.ts';
 import { closeView, cycleMove, paintedPicture, placeWords, readCycleParts, type CycleCard, type CycleParts } from './cykel.ts';
 import {
   countIn,
@@ -418,6 +419,12 @@ async function prepare(spec: Spec, options: PrepareOptions, made: { dir?: string
       ],
     },
     doll: { file: `${pkg}/docka.json`, seconds: doll.seconds, wristDeg: wrist, sheet: `${pkg}/ark-docka.jpg` },
+    scene: {
+      shoe: shoeOf(scene.shoe),
+      eye: eyeOf(viewEye(scene, { ...view, close: true })),
+      place: cardPlace(scene, spec.seat, spec.index),
+      source: 'content/scene.json när paketet gjordes: skon, som är inbakad i ankaret och klippet, vyns närbild som filmen görs i, och kortplatsen kortet läggs på. Klippet mäts mot dem (partsOf), och posten bär dem (eye, shoe, place)',
+    },
     checks,
     uploads: `${pkg}/uppladdat.json: [{ "role": "startFrame" | "endFrame" | "referenceVideos", "url": "<adressen>", "assetId": "<id>", "at": "ÅÅÅÅ-MM-DD TT:MM" }]`,
   };
@@ -452,13 +459,17 @@ type Proof = { file: string; frames: number; cyanMost: number; cyanFrames: numbe
  * Scenen läser filmen ur en egen datamapp i paketet (STUDIO_DATA), så att assets/ inte rörs; mappen tas bort efteråt.
  * Mätt: blått eller cyan kring kort och hand i varje ruta där kortet ligger, och scenens korthörn i sista rutan.
  */
-async function proofOf(root: string, dir: string, clip: string, asset: string, view: SeatView, card: CycleCard, landsAt: number, layout: Layout, content: TagningContent, say: (text: string) => void): Promise<Proof> {
-  const scene = readScene(JSON.parse(readFileSync(join(root, 'content', 'scene.json'), 'utf8')));
+async function proofOf(root: string, dir: string, clip: string, asset: string, view: SeatView, card: CycleCard, landsAt: number, layout: Layout, content: TagningContent, shoe: Shoe, say: (text: string) => void): Promise<Proof> {
+  // Scenen med skon där klippet gjordes (partsOf), och dockans mått: där kortet i skons mynning står, som nyckeln målar
+  // kortets kant efter (src/scene/marker.ts).
+  const written = JSON.parse(readFileSync(join(root, 'content', 'scene.json'), 'utf8'));
+  written.shoe = { ...written.shoe, ...shoeOf(shoe) };
+  const scene = readScene(written);
   const data = join(dir, 'scen');
   rmSync(data, { recursive: true, force: true });
   mkdirSync(join(data, 'content'), { recursive: true });
-  // Scenen, och dockans mått: där kortet i skons mynning står, som nyckeln målar kortets kant efter (src/scene/marker.ts).
-  for (const file of ['scene.json', 'doll.json']) copyFileSync(join(root, 'content', file), join(data, 'content', file));
+  writeFileSync(join(data, 'content', 'scene.json'), JSON.stringify(written, null, 2));
+  copyFileSync(join(root, 'content', 'doll.json'), join(data, 'content', 'doll.json'));
   const link = (from: string, file: string) => {
     const to = join(data, 'assets', file);
     mkdirSync(dirname(to), { recursive: true });
@@ -521,9 +532,29 @@ type Ordered = {
   id: string; dealer: string; view: SeatView; viewWord: string; seat: Seat; index: number; action?: Action; take: number; cycle: string; clip: string; anchor?: string;
   model: string; resolution: string; duration: number; ratio: string; prompt: string;
   inputs: { startFrame: { file: string; asset?: string }; endFrame: { file: string }; referenceVideos: { file: string; source: string }[] };
+  scene?: { shoe: Shoe; eye?: FilmEye; place?: [number, number]; source: string };
 };
 const cardOf = (ordered: Ordered): CycleCard => ({ seat: ordered.seat, index: ordered.index, action: ordered.action ?? 'deal' });
 const anchorOf = (ordered: Ordered): string => ordered.anchor ?? ordered.inputs.startFrame.asset!;
+
+/** Skons läge i scenen (content/scene.json, shoe): mitten på filten, vridningen och längden. */
+export type Shoe = { at: [number, number]; yawDeg: number; length: number };
+const shoeOf = (shoe: Shoe): Shoe => ({ at: [shoe.at[0], shoe.at[1]], yawDeg: shoe.yawDeg, length: shoe.length });
+
+/**
+ * Cykelns delar som paketet gjordes med: scenen med skon där den stod när paketet gjordes (bestallning.json, scene.shoe),
+ * dockan och cykeln som de står i content/. Skon är inbakad i klippet, och var kortet hämtas räknas ur den: ett klipp
+ * mäts mot sin egen sko också när skon i scenen har flyttats. Ett paket utan skons läge går inte att mäta.
+ */
+function partsOf(ordered: Ordered, root: string): CycleParts {
+  const parts = readCycleParts(ordered.cycle, root);
+  if (!ordered.scene?.shoe) throw new TagningError(`${ordered.id}: bestallning.json säger inte var skon stod (scene.shoe)`);
+  if (!ordered.scene.eye) throw new TagningError(`${ordered.id}: bestallning.json säger inte vilket öga filmen görs genom (scene.eye)`);
+  return { ...parts, scene: { ...parts.scene, shoe: { ...parts.scene.shoe, ...shoeOf(ordered.scene.shoe) } }, eye: { ...ordered.scene.eye } };
+}
+
+/** Ett öga som en post och en följd bär det (dealer.ts, FilmEye). */
+const eyeOf = (eye: Eye): FilmEye => ({ position: [...eye.position] as [number, number, number], forward: [...eye.forward] as [number, number, number], focalPx: eye.focalPx, frame: { width: eye.frame.width, height: eye.frame.height } });
 type Measured = { values: Values; judged: Judged[]; summary: string; landsAt: number | null; proof: Proof | null };
 
 /**
@@ -547,7 +578,7 @@ async function measureTake(root: string, dir: string, ordered: Ordered, clip: st
   // Beviset i scenen, när kortet har landat.
   let proof: Proof | null = null;
   if (proofToo && landsAt !== null) {
-    proof = await proofOf(root, dir, clip, ordered.clip, view, cardOf(ordered), landsAt, layout, content, say);
+    proof = await proofOf(root, dir, clip, ordered.clip, view, cardOf(ordered), landsAt, layout, content, parts.scene.shoe, say);
     values.bevisBlatt = proof.cyanMost;
     values.bevisHorn = proof.cornerError;
   }
@@ -569,6 +600,7 @@ async function measureTake(root: string, dir: string, ordered: Ordered, clip: st
     values,
     judged,
     proof,
+    shoe: shoeOf(parts.scene.shoe),
     layout: { corners: layout.corners, cardArea: layout.cardArea, regions: layout.regions, dealer: layout.dealer, low: layout.low, handBox: layout.handBox, waist: layout.waist, near: layout.near },
     rows: read.rows,
   });
@@ -576,8 +608,10 @@ async function measureTake(root: string, dir: string, ordered: Ordered, clip: st
 }
 
 /** Måtten som registret tar emot dem: varje mått med gräns, och de som bara visas. */
-function measurementsOf(file: string, judged: Judged[], values: Values): PostFile['measurements'] {
+function measurementsOf(file: string, judged: Judged[], values: Values, scene: CycleParts['scene']): PostFile['measurements'] {
   return [
+    // Skons läge som klippet är gjort och mätt med: det står kvar i registret när paketet i output/ är borta.
+    { file, what: 'skonsLage: skons läge i scenen när klippet gjordes, som klippet mäts mot (content/scene.json, shoe)', value: shoeOf(scene.shoe), who: WHO, basis: scene.shoe.basis, note: scene.shoe.source.slice(0, 300) },
     ...judged.map((entry) => ({ file, what: `${entry.key}: ${entry.what}`, value: { value: entry.value, unit: entry.unit, limit: entry.limit, verdict: entry.verdict }, who: WHO, basis: 'mätt' as const, note: `gränsen: ${entry.source}` })),
     ...Object.entries(SHOWN)
       .filter(([key]) => key in values)
@@ -598,7 +632,7 @@ function sayMeasured(say: (text: string) => void, measured: Measured, pkg: strin
 
 export type Receipt = { taskId: string; credits: number; before: number; after: number; at?: string };
 export type ReceiveOptions = { root?: string; out?: string; registry?: string; register?: boolean; proof?: boolean; say?: (text: string) => void };
-export type PostFile = { post: Post; order: Order; measurements: { file: string; what: string; value: unknown; who: string; basis: 'mätt'; note: string }[]; uploads: { file: string; url: string; assetId: string | null; at: string | null }[] };
+export type PostFile = { post: Post; order: Order; measurements: { file: string; what: string; value: unknown; who: string; basis: 'mätt' | 'antaget'; note: string }[]; uploads: { file: string; url: string; assetId: string | null; at: string | null }[] };
 
 /** Måtten utan gräns, med vad de är. */
 const SHOWN: Record<string, string> = {
@@ -632,7 +666,7 @@ export async function taEmot(id: string, download: string, receipt: Receipt, opt
   if (!receipt.taskId) throw new TagningError('taskId saknas');
   const ordered = JSON.parse(readFileSync(at('bestallning.json'), 'utf8')) as Ordered;
   const content = readTagning(root);
-  const parts = readCycleParts(ordered.cycle, root);
+  const parts = partsOf(ordered, root);
 
   // Ljudet tas bort utan omkodning.
   const source = resolve(download);
@@ -694,6 +728,11 @@ export async function taEmot(id: string, download: string, receipt: Receipt, opt
     use: 'dealerfilm',
     view,
     lands: { seat: ordered.seat, index: ordered.index, at: landsAt === null ? null : Number(landsAt.toFixed(2)) },
+    // Ögat filmen är gjord genom, skon den bär och var kortet landar: uppspelningen lägger filmen och kortet efter dem,
+    // också när scenens tal ändras (round.ts, build.ts).
+    eye: ordered.scene!.eye!,
+    shoe: shoeOf(ordered.scene!.shoe),
+    place: ordered.scene!.place ?? cardPlace(parts.scene, ordered.seat, ordered.index),
     licence: 'Ingen tredjepartslicens: genererad på Jakobs Runway-konto',
     source: {
       from: 'runway',
@@ -730,7 +769,7 @@ export async function taEmot(id: string, download: string, receipt: Receipt, opt
     result: ordered.clip,
     note: receipt.at ? null : 'at är tiden då filmen togs emot, inte då den beställdes',
   };
-  const measurements = measurementsOf(ordered.clip, judged, values);
+  const measurements = measurementsOf(ordered.clip, judged, values, parts.scene);
   const postFile: PostFile = { post, order, measurements, uploads: uploads.map(({ signed: _signed, ...rest }) => rest) };
   // Posten i filen bär sin film; registret får den räknad från registrets mapp.
   write(at('post.json'), { ...postFile, post: { ...post, from: posix(relative(root, clip)) } });
@@ -796,10 +835,10 @@ export async function matOm(id: string, options: Omit<ReceiveOptions, 'out'> & {
   const posted = JSON.parse(readFileSync(at('post.json'), 'utf8')) as PostFile;
   const before = existsSync(at('matning.json')) ? (JSON.parse(readFileSync(at('matning.json'), 'utf8')) as { soundInDownload?: boolean }) : {};
   const content = readTagning(root);
-  const parts = readCycleParts(ordered.cycle, root);
+  const parts = partsOf(ordered, root);
   const film = await probe(clip);
   const measured = await measureTake(root, dir, ordered, clip, film, before.soundInDownload ?? false, content, parts, options.proof !== false, say);
-  const measurements = measurementsOf(ordered.clip, measured.judged, measured.values);
+  const measurements = measurementsOf(ordered.clip, measured.judged, measured.values, parts.scene);
   write(at('post.json'), { ...posted, measurements });
   sayMeasured(say, measured, posix(relative(root, dir)));
 

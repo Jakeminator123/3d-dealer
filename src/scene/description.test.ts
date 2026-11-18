@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { test } from 'node:test';
-import { readScene } from './description.ts';
+import { placesOf, readScene, type PlaceArc, type PlaceRow } from './description.ts';
 
 const root = resolve(import.meta.dirname, '..', '..');
 const readJson = (name: string): unknown => JSON.parse(readFileSync(join(root, 'content', name), 'utf8'));
@@ -39,7 +39,9 @@ test('en beskrivning med hål i tas inte emot', () => {
   assert.throws(() => readScene(null), /går inte att använda/);
   assert.throws(() => readScene({ ...whole, camera: { ...whole.camera, focalPx: '2334' } }), /camera\.focalPx/);
   assert.throws(() => readScene({ ...whole, dealerEdge: { z: -1.8 } }), /dealerEdge: basis och source/);
-  assert.throws(() => readScene({ ...whole, places: { ...whole.places, seats: [] } }), /places\.seats/);
+  const places = whole.places as { arc: Record<string, unknown>; row: Record<string, unknown> };
+  assert.throws(() => readScene({ ...whole, places: { ...places, arc: { ...places.arc, seats: 0 } } }), /places\.arc/);
+  assert.throws(() => readScene({ ...whole, places: { ...places, row: { ...places.row, first: [0] } } }), /places\.row/);
   assert.throws(() => readScene({ ...whole, shoe: { ...whole.shoe, basis: 'gissat' } }), /shoe: basis och source/);
   assert.throws(() => readScene({ ...whole, background: undefined }), /background\.liftDeg/);
   assert.throws(() => readScene({ ...whole, player: { ...whole.player, fovDeg: 0 } }), /player\.pitchDeg och player\.fovDeg/);
@@ -95,9 +97,27 @@ test('kortplatserna: tre för varje spelarplats och fyra för dealern, lagda som
     near(c[0] - b[0], b[0] - a[0], `plats ${entry.seat} i sidled`);
     near(c[1] - b[1], b[1] - a[1], `plats ${entry.seat} i djup`);
   }
-  // Dealern: en rad framför henne, och extrakorten lika långt från det förra (närmare än kort 0 och 1, så att armen går fri).
+  // Dealern: en rad framför henne, med korten lika långt från varandra.
   const [d0, d1, d2, d3] = scene.places.dealer as [number, number][];
   for (const place of [d1, d2, d3]) near(place[1], d0[1], 'dealerns rad');
-  near(d3[0] - d2[0], d2[0] - d1[0], 'dealerns extrakort');
-  assert.ok(d2[0] - d1[0] <= d1[0] - d0[0]);
+  near(d3[0] - d2[0], d2[0] - d1[0], 'dealerns kort');
+  near(d2[0] - d1[0], d1[0] - d0[0], 'dealerns kort');
+});
+
+test('spelarnas kortplatser är en rund båge ur några tal: mitten nästan lika djupt, ytterplatserna böjda tillbaka', () => {
+  const whole = readJson('scene.json') as { places: { arc: PlaceArc; row: PlaceRow } };
+  const { arc, row } = whole.places;
+  const scene = readScene(readJson('scene.json'));
+  assert.deepEqual(placesOf(arc, row), { dealer: scene.places.dealer, seats: scene.places.seats });
+  const first = (seat: number) => scene.places.seats.find((entry) => entry.seat === seat)!.cards[0]!;
+  // Symmetrisk kring bågens mitt, och djupast (närmast spelarna) vid plats 4.
+  for (const [a, b] of [[1, 7], [2, 6], [3, 5]] as const) assert.ok(Math.abs(first(a)[1] - first(b)[1]) < 1e-9 && Math.abs(first(a)[0] + first(b)[0] - 2 * arc.centreX) < 1e-3);
+  // Rund, inte ett V: plats 3 och 5 ligger mindre än hälften så långt tillbaka som ett V skulle lägga dem (en tredjedel
+  // av ytterplatsernas), och ytterplatserna ligger bend tillbaka.
+  const back = (seat: number) => first(4)[1] - first(seat)[1];
+  assert.ok(back(3) > 0 && back(3) < back(1) / 3 / 2, `plats 3 ligger ${(back(3) * 100).toFixed(1)} cm bakom plats 4, plats 1 ${(back(1) * 100).toFixed(1)} cm`);
+  assert.ok(Math.abs(back(1) - arc.bend) < 1e-4);
+  // Ett tal flyttar hela bågen: djupet.
+  const moved = placesOf({ ...arc, depth: arc.depth + 0.01 }, row);
+  moved.seats.forEach((entry, k) => entry.cards.forEach((card, i) => assert.ok(Math.abs(card[1] - scene.places.seats[k]!.cards[i]![1] - 0.01) < 2e-4)));
 });

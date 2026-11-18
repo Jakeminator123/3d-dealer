@@ -27,8 +27,11 @@ export class CycleError extends Error {}
 
 const root = resolve(import.meta.dirname, '..', '..');
 
-/** Det som behövs för att räkna en cykel: scenen, dockan, cykeln och dess giv, lästa ur content/. */
-export type CycleParts = { scene: SceneDescription; doll: DollDescription; cycle: DollCycle; base: DollMove };
+/**
+ * Det som behövs för att räkna en cykel: scenen, dockan, cykeln och dess giv, lästa ur content/, och när ett paket säger
+ * det ögat det gjordes genom (vyns närbild då).
+ */
+export type CycleParts = { scene: SceneDescription; doll: DollDescription; cycle: DollCycle; base: DollMove; eye?: Eye };
 
 export function readCycleParts(name: string, from = root): CycleParts {
   if (!/^[a-z0-9][a-z0-9-]{0,79}$/.test(name)) throw new CycleError(`Ogiltigt namn på cykeln: ${name}`);
@@ -47,6 +50,12 @@ export function closeView(word = 'spelaren'): SeatView {
 
 /** Ögat en förlaga ur vyn ritas genom: vyns öga i förlagans ruta, som scenen tar det (build.ts, shoot). */
 export const forlagaEye = (scene: SceneDescription, view: SeatView): Eye => framed(viewEye(scene, view), scene.forlaga.frame);
+
+/**
+ * Ögat en cykels bilder och mått räknas genom: närbilden paketet gjordes i (CycleParts.eye) när den finns, annars vyns
+ * närbild i dag. Ett paket bär sitt öga, så att det mäts som det gjordes också när scenen har ändrats.
+ */
+export const cycleEye = (parts: CycleParts, view: SeatView): Eye => (parts.eye ? framed(parts.eye, parts.scene.forlaga.frame) : forlagaEye(parts.scene, { ...view, close: true }));
 
 /** Cykeln som dockan gör den: rörelsen till kortplatsen, med handlingen. */
 export const cycleMove = (parts: CycleParts, card: CycleCard): DollMove =>
@@ -142,7 +151,7 @@ export function paintQuad(data: Buffer, width: number, height: number, quad: Pix
 export async function paintedPicture(parts: CycleParts, anchor: string, card: CycleCard, when: 'first' | 'last', out: string, view: SeatView) {
   const lying = when === 'last' ? laidCard(parts, card) : lyingCard(parts, card, when);
   if (!lying) return null;
-  const eye = forlagaEye(parts.scene, view);
+  const eye = cycleEye(parts, view);
   const { width, height } = eye.frame;
   const quad = cornersIn(eye, lying);
   const image = sharp(anchor);

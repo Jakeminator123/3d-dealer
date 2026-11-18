@@ -1,0 +1,755 @@
+// Hur mänsklig en rörelse är. Måtten tar det granskarna hittills inte mätte: fart, acceleration och ryck över tid för
+// kroppens delar, hur länge allt står dödstilla, hur samlad rörelsen är i tiden, hur jämn den är, och i vilken ordning
+// blick, huvud, bål och hand börjar och slutar. Samma mått gäller dockan (ur poseAt, i meter) och en film (ur bilden,
+// i bildpunkter), så att en cykel kan prövas innan den beställs och klippet när det kommer.
+//
+// Måttens grund (antagen ur litteraturen, inte mätt här): en mänsklig sträckning följer i stort en klockformad fartkurva
+// med minsta möjliga ryck (Flash och Hogan 1985); jämnheten mäts som fartkurvans spektrala båglängd, SPARC
+// (Balasubramanian m.fl. 2012 och 2015), där minsta ryck ger cirka −1,6 och en hackig rörelse lägre tal. Blicken går före
+// handen till målet, huvudet följer blicken och stannar före handen, och bålen börjar med eller före armen och stannar
+// efter den. Ingenting står helt stilla: andning och små viktförskjutningar finns alltid.
+//
+// Ett spår är en följd av punkter med jämn takt (`fps`); en punkt som saknas i en ruta (null) fylls mellan grannarna.
+// Kommandot:
+//   node src/pipeline/rorelse.ts docka [cykel] <plats> [kort] [--fps n] [--giv]
+//   node src/pipeline/rorelse.ts film <film.mp4>
+// Ingenting här avgör något i spelet.
+
+import { pathToFileURL } from 'node:url';
+import type { Frame, Vec3 } from '../scene/description.ts';
+import { moveFor, poseAt, type Seat } from '../scene/dollPose.ts';
+import { cycleMove, isSkin, readCycleParts, type CycleParts } from './cykel.ts';
+import { eachFrame, isBlue, isYellow, probe, type Picture } from './matning.ts';
+
+export class MotionError extends Error {}
+
+/** Ett spår: en punkt (2 eller 3 tal) per ruta, eller null där den inte syns. */
+export type Track = { fps: number; points: (number[] | null)[] };
+/** Ett spår för en vinkel i grader, när delen vrids i stället för flyttas (blickens riktning). */
+export type Tracks = Record<string, Track>;
+
+const round = (value: number, digits = 3): number => Math.round(value * 10 ** digits) / 10 ** digits;
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Fart, acceleration och ryck
+
+/** Spåret med luckorna fyllda: rakt mellan närmaste kända grannar, och som den närmaste i ändarna. */
+export function filled(track: Track): number[][] {
+  const { points } = track;
+  const known = points.map((point, k) => (point ? k : -1)).filter((k) => k >= 0);
+  if (known.length === 0) throw new MotionError('Spåret saknar punkter');
+  return points.map((point, k) => {
+    if (point) return point;
+    const after = known.find((j) => j > k);
+    const before = known.findLast((j) => j < k);
+    if (before === undefined) return points[after!]!;
+    if (after === undefined) return points[before]!;
+    const share = (k - before) / (after - before);
+    return points[before]!.map((value, d) => value + (points[after]![d]! - value) * share);
+  });
+}
+
+/** Spåret utjämnat med en binomialkärna (1 4 6 4 1)/16, `times` gånger. Ändarna hålls kvar. Mot brus i bildspår. */
+export function smoothed(points: number[][], times = 1): number[][] {
+  let out = points;
+  for (let pass = 0; pass < times; pass++) {
+    const was = out;
+    out = was.map((point, k) => {
+      if (k < 2 || k >= was.length - 2) return point;
+      return point.map((_, d) => (was[k - 2]![d]! + 4 * was[k - 1]![d]! + 6 * was[k]![d]! + 4 * was[k + 1]![d]! + was[k + 2]![d]!) / 16);
+    });
+  }
+  return out;
+}
+
+const norm = (v: number[]): number => Math.hypot(...v);
+
+/** Farten i varje ruta, enheter per sekund: centrala differenser, framåt och bakåt i ändarna. */
+export function speedOf(points: number[][], fps: number): number[] {
+  const n = points.length;
+  return points.map((_, k) => {
+    const a = points[Math.max(0, k - 1)]!;
+    const b = points[Math.min(n - 1, k + 1)]!;
+    const span = Math.min(n - 1, k + 1) - Math.max(0, k - 1);
+    return span === 0 ? 0 : (norm(b.map((value, d) => value - a[d]!)) * fps) / span;
+  });
+}
+
+/** Accelerationens och ryckets storlek i varje ruta (andra och tredje derivatan av läget), enheter per s² och s³. */
+export function derivatives(points: number[][], fps: number): { acceleration: number[]; jerk: number[] } {
+  const n = points.length;
+  const at = (k: number): number[] => points[Math.max(0, Math.min(n - 1, k))]!;
+  const acceleration = points.map((point, k) => norm(point.map((value, d) => (at(k + 1)[d]! - 2 * value + at(k - 1)[d]!) * fps * fps)));
+  const jerk = points.map((point, k) => norm(point.map((_, d) => ((at(k + 2)[d]! - 2 * at(k + 1)[d]! + 2 * at(k - 1)[d]! - at(k - 2)[d]!) * fps ** 3) / 2)));
+  return { acceleration, jerk };
+}
+
+/** En rörelse i ett fartspår: rutorna från och med `from` till och med `to`. */
+export type Segment = { from: number; to: number; peak: number; at: number };
+
+/**
+ * Rörelserna i ett fartspår: sammanhängande rutor där farten är över `share` av spårets största, med glapp kortare än
+ * `bridge` sekunder överbryggade och rörelser kortare än `least` sekunder bortlagda.
+ */
+export function segments(speed: number[], fps: number, share = 0.05, bridge = 0.12, least = 0.12): Segment[] {
+  const top = Math.max(...speed);
+  if (!(top > 0)) return [];
+  const runs: [number, number][] = [];
+  let start = -1;
+  speed.forEach((value, k) => {
+    if (value > share * top && start < 0) start = k;
+    if ((value <= share * top || k === speed.length - 1) && start >= 0) {
+      runs.push([start, value > share * top ? k : k - 1]);
+      start = -1;
+    }
+  });
+  const merged: [number, number][] = [];
+  for (const run of runs) {
+    const last = merged.at(-1);
+    if (last && (run[0] - last[1] - 1) / fps < bridge) last[1] = run[1];
+    else merged.push([...run]);
+  }
+  return merged
+    .filter(([from, to]) => (to - from + 1) / fps >= least)
+    .map(([from, to]) => {
+      let at = from;
+      for (let k = from; k <= to; k++) if (speed[k]! > speed[at]!) at = k;
+      return { from, to, peak: speed[at]!, at };
+    });
+}
+
+/**
+ * Jämnheten i en rörelses fartkurva: SPARC, den spektrala båglängden (Balasubramanian m.fl. 2015). Fartkurvans
+ * normerade spektrum upp till `cutoff` Hz, där det är över `floor` av sitt största, mäts som en båglängd; ju fler
+ * toppar och knyckar, desto längre båge och desto lägre (mer negativt) tal. En kurva med minsta ryck ger cirka −1,6.
+ */
+export function sparc(speed: number[], fps: number, cutoff = 10, floor = 0.05, pad = 4): number {
+  const n = 2 ** (Math.ceil(Math.log2(Math.max(2, speed.length))) + pad);
+  const top = Math.min(cutoff, fps / 2);
+  const bins = Math.floor((top * n) / fps);
+  const magnitude: number[] = [];
+  for (let f = 0; f <= bins; f++) {
+    let re = 0;
+    let im = 0;
+    for (let k = 0; k < speed.length; k++) {
+      const turn = (-2 * Math.PI * f * k) / n;
+      re += speed[k]! * Math.cos(turn);
+      im += speed[k]! * Math.sin(turn);
+    }
+    magnitude.push(Math.hypot(re, im));
+  }
+  const most = Math.max(...magnitude) || 1;
+  const m = magnitude.map((value) => value / most);
+  const first = m.findIndex((value) => value >= floor);
+  const last = m.findLastIndex((value) => value >= floor);
+  if (first < 0 || last <= first) return 0;
+  const width = last - first;
+  let arc = 0;
+  for (let f = first + 1; f <= last; f++) arc += Math.hypot(1 / width, m[f]! - m[f - 1]!);
+  return -arc;
+}
+
+/** Topparna i en rörelses fartkurva: lokala största som reser sig minst `rise` av rörelsens största över dalen före. */
+export function peaksIn(speed: number[], segment: Segment, rise = 0.1): number {
+  let peaks = 0;
+  let valley = speed[segment.from]!;
+  let climbing = true;
+  for (let k = segment.from + 1; k <= segment.to; k++) {
+    const value = speed[k]!;
+    if (climbing && value < speed[k - 1]! && speed[k - 1]! - valley >= rise * segment.peak) {
+      peaks++;
+      climbing = false;
+      valley = value;
+    } else if (!climbing && value > speed[k - 1]!) {
+      climbing = true;
+    }
+    if (value < valley) valley = value;
+  }
+  // En rörelse som slutar i full fart har sin topp sist.
+  if (climbing && speed[segment.to]! - valley >= rise * segment.peak) peaks++;
+  return Math.max(1, peaks);
+}
+
+// Största acceleration gånger varaktighet delat med största fart, för en rörelse med minsta ryck mätt som i `snap`:
+// rörelsen räknas från 5 % av toppfarten (0,84 av hela tiden), accelerationen ur farten ruta för ruta. Se testet.
+const MINIMUM_JERK_SNAP = 2.6;
+
+/**
+ * Knycken i en rörelse: den största ändringen av farten mellan två rutor, som acceleration, mot den en rörelse med
+ * minsta ryck med samma toppfart och längd har. 1 är som minsta ryck; en del som går från full fart till stilla på en ruta
+ * ger tal långt över.
+ */
+export function snap(speed: number[], fps: number, segment: Segment): number {
+  let most = 0;
+  for (let k = Math.max(1, segment.from); k <= Math.min(speed.length - 1, segment.to + 1); k++) most = Math.max(most, Math.abs(speed[k]! - speed[k - 1]!) * fps);
+  const seconds = (segment.to - segment.from + 1) / fps;
+  return segment.peak > 0 ? (most * seconds) / (segment.peak * MINIMUM_JERK_SNAP) : 0;
+}
+
+/**
+ * Tvära stopp och starter: rutor där farten går från minst `high` av rörelsens topp till under `low` av den, eller
+ * tvärtom, på högst `within` rutor. En människa gör inte det; en docka vars del slutar räknas gör det.
+ */
+export function abrupt(speed: number[], segment: Segment, high = 0.3, low = 0.08, within = 2): number {
+  let count = 0;
+  for (let k = segment.from; k <= Math.min(speed.length - 1, segment.to + within); k++) {
+    for (let j = 1; j <= within && k - j >= 0; j++) {
+      const before = speed[k - j]!;
+      const now = speed[k]!;
+      const stop = before >= high * segment.peak && now < low * segment.peak;
+      const start = before < low * segment.peak && now >= high * segment.peak;
+      if (stop || start) {
+        count++;
+        k += within;
+        break;
+      }
+    }
+  }
+  return count;
+}
+
+/** Hur stor del av tiden som bär `share` av hela vägen: de snabbaste rutorna först. Litet tal: rörelsen sker i stötar. */
+export function busiest(speed: number[], share = 0.8): number {
+  const total = speed.reduce((sum, value) => sum + value, 0);
+  if (!(total > 0)) return 0;
+  const sorted = [...speed].sort((a, b) => b - a);
+  let sum = 0;
+  for (let k = 0; k < sorted.length; k++) {
+    sum += sorted[k]!;
+    if (sum >= share * total) return (k + 1) / speed.length;
+  }
+  return 1;
+}
+
+/** Den längsta följden rutor där `still` är sant, i sekunder. En cykel kedjas, så följden får gå runt från slut till början. */
+export function longestRun(still: boolean[], fps: number, cyclic = true): number {
+  const n = still.length;
+  if (still.every(Boolean)) return n / fps;
+  let best = 0;
+  let run = 0;
+  const laps = cyclic ? 2 : 1;
+  for (let k = 0; k < n * laps; k++) {
+    run = still[k % n] ? run + 1 : 0;
+    best = Math.max(best, Math.min(run, n));
+  }
+  return best / fps;
+}
+
+/** Första och sista rutan i fönstret där farten är över `share` av fönstrets största. */
+export function onsetOffset(speed: number[], from: number, to: number, share = 0.1): { on: number; off: number; peak: number } | null {
+  let top = 0;
+  for (let k = from; k <= to; k++) top = Math.max(top, speed[k] ?? 0);
+  if (!(top > 0)) return null;
+  let on = -1;
+  let off = -1;
+  for (let k = from; k <= to; k++) {
+    if ((speed[k] ?? 0) > share * top) {
+      if (on < 0) on = k;
+      off = k;
+    }
+  }
+  return { on, off, peak: top };
+}
+
+/** Pearsons korrelation mellan två lika långa följder. */
+export function correlation(a: number[], b: number[]): number {
+  const n = Math.min(a.length, b.length);
+  const ma = a.slice(0, n).reduce((s, v) => s + v, 0) / n;
+  const mb = b.slice(0, n).reduce((s, v) => s + v, 0) / n;
+  let ab = 0;
+  let aa = 0;
+  let bb = 0;
+  for (let k = 0; k < n; k++) {
+    ab += (a[k]! - ma) * (b[k]! - mb);
+    aa += (a[k]! - ma) ** 2;
+    bb += (b[k]! - mb) ** 2;
+  }
+  return aa > 0 && bb > 0 ? ab / Math.sqrt(aa * bb) : 0;
+}
+
+/** Fördröjningen i sekunder där `follower` liknar `leader` mest (korskorrelation inom ±`most` s); positiv: följaren kommer efter. */
+export function lagBetween(leader: number[], follower: number[], fps: number, most = 0.5): { lag: number; r: number } {
+  let best = { lag: 0, r: -2 };
+  const reach = Math.round(most * fps);
+  for (let shift = -reach; shift <= reach; shift++) {
+    const a: number[] = [];
+    const b: number[] = [];
+    for (let k = 0; k < leader.length; k++) {
+      const j = k + shift;
+      if (j < 0 || j >= follower.length) continue;
+      a.push(leader[k]!);
+      b.push(follower[j]!);
+    }
+    const r = correlation(a, b);
+    if (r > best.r) best = { lag: shift / fps, r };
+  }
+  return { lag: round(best.lag), r: round(best.r) };
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Måtten
+
+/**
+ * Vilka spår som är vad. `hand` är den givande handen (eller kortet den bär), `head` huvudet, `trunk` bålen eller axeln,
+ * `gaze` blickens riktning i grader när den finns. `body` är alla spår som räknas när det mäts om hela kroppen står still.
+ */
+export type Roles = { hand: string; head: string; trunk: string; gaze?: string; body: string[] };
+
+/** Ett mått: talet och vad det betyder. */
+export type Value = { value: number | null; what: string };
+
+/** Hur stilla en del är: under `still` av handens toppfart räknas den som stilla. */
+export type MotionOptions = { still: number; smooth: number; units: string };
+
+/**
+ * Måtten för en rörelse. Allt i sekunder, andelar eller rena tal, så att de jämförs lika för docka och film. Rörelserna
+ * räknas ur handens fart: den första är vägen ut, den sista vägen tillbaka.
+ */
+export function motionValues(tracks: Tracks, roles: Roles, options: MotionOptions): Record<string, Value> {
+  const fps = tracks[roles.hand]!.fps;
+  const pointsOf = (name: string): number[][] => smoothed(filled(tracks[name]!), options.smooth);
+  const speeds: Record<string, number[]> = {};
+  for (const name of new Set([roles.hand, roles.head, roles.trunk, ...(roles.gaze ? [roles.gaze] : []), ...roles.body])) speeds[name] = speedOf(pointsOf(name), fps);
+  const hand = speeds[roles.hand]!;
+  const n = hand.length;
+  const moves = segments(hand, fps);
+  const handTop = Math.max(...hand);
+
+  // Hela kroppen stilla: varje del under sin egen gräns, en andel av sin egen toppfart i cykeln, men aldrig under
+  // brusgolvet (still av handens toppfart).
+  const stillAt = (name: string): boolean[] => {
+    const speed = speeds[name]!;
+    const limit = Math.max(options.still * handTop, 0.02 * Math.max(...speed));
+    return speed.map((value) => value <= limit);
+  };
+  const bodyStill = roles.body.map(stillAt);
+  const frozen = hand.map((_, k) => bodyStill.every((still) => still[k]!));
+  const out = moves[0];
+  const back = moves.length > 1 ? moves.at(-1)! : null;
+
+  // Ordningen på vägen ut och tillbaka: när delarna börjar och slutar mot handen, i sekunder (positivt: före handen).
+  const window = (segment: Segment): [number, number] => [Math.max(0, segment.from - Math.round(0.6 * fps)), Math.min(n - 1, segment.to + Math.round(0.6 * fps))];
+  const order = (name: string, segment: Segment | null | undefined): { lead: number; trail: number } | null => {
+    if (!segment) return null;
+    const [from, to] = window(segment);
+    const part = onsetOffset(speeds[name]!, from, to);
+    const own = onsetOffset(hand, segment.from, segment.to);
+    if (!part || !own) return null;
+    return { lead: round((own.on - part.on) / fps), trail: round((part.off - own.off) / fps) };
+  };
+  const headOut = order(roles.head, out);
+  const trunkOut = order(roles.trunk, out);
+  const gazeOut = roles.gaze ? order(roles.gaze, out) : null;
+  const headBack = order(roles.head, back);
+  const trunkBack = order(roles.trunk, back);
+
+  const perMove = (f: (segment: Segment) => number): number | null => (moves.length ? Math.min(...moves.map(f)) : null);
+  const worstSnap = Math.max(
+    ...Object.entries(speeds).map(([, speed]) => Math.max(0, ...segments(speed, fps).map((segment) => snap(speed, fps, segment)))),
+  );
+  const abrupts = Object.values(speeds).reduce((sum, speed) => sum + segments(speed, fps).reduce((s, segment) => s + abrupt(speed, segment), 0), 0);
+  const lock = lagBetween(hand, speeds[roles.head]!, fps);
+
+  return {
+    stillaHelt: { value: round(frozen.filter(Boolean).length / n), what: 'andel av cykeln då hela kroppen står still' },
+    langstaStillhet: { value: round(longestRun(frozen, fps)), what: 'längsta tid hela kroppen står still, i sekunder, med cykeln kedjad' },
+    handStilla: { value: round(longestRun(stillAt(roles.hand), fps)), what: 'längsta tid handen står still, i sekunder, med cykeln kedjad' },
+    rorelser: { value: moves.length, what: 'handens rörelser i cykeln (fart över 5 % av toppen, glapp under 0,12 s överbryggade)' },
+    samlad: { value: round(busiest(hand, 0.8)), what: 'andel av tiden som bär 80 % av handens väg' },
+    jamnhet: { value: perMove((segment) => round(sparc(hand.slice(segment.from, segment.to + 1), fps), 2)), what: 'handens jämnhet, SPARC, sämsta rörelsen (minsta ryck cirka −1,6; lägre är hackigare)' },
+    toppar: { value: moves.length ? Math.max(...moves.map((segment) => peaksIn(hand, segment))) : null, what: 'flest fartoppar i en av handens rörelser (en är en klocka)' },
+    knyck: { value: round(worstSnap, 2), what: 'största knyck i någon del: acceleration mot minsta ryck med samma toppfart och längd (1 är som minsta ryck)' },
+    tvara: { value: abrupts, what: 'tvära stopp och starter i alla delar: från 30 % av toppfarten till under 8 % (eller tvärtom) på två rutor' },
+    huvudFore: { value: headOut?.lead ?? null, what: 'huvudet börjar före handen på vägen ut, i sekunder (negativt: efter)' },
+    huvudStannar: { value: headOut ? round(-headOut.trail) : null, what: 'huvudet stannar före handen på vägen ut, i sekunder (negativt: efter)' },
+    balFore: { value: trunkOut?.lead ?? null, what: 'bålen börjar före handen på vägen ut, i sekunder' },
+    balEfter: { value: trunkOut?.trail ?? null, what: 'bålen stannar efter handen på vägen ut, i sekunder' },
+    blickFore: { value: gazeOut?.lead ?? null, what: 'blicken börjar före handen på vägen ut, i sekunder' },
+    huvudForeTillbaka: { value: headBack?.lead ?? null, what: 'huvudet börjar före handen på vägen tillbaka, i sekunder' },
+    balEfterTillbaka: { value: trunkBack?.trail ?? null, what: 'bålen stannar efter handen på vägen tillbaka, i sekunder' },
+    samtakt: { value: lock.r, what: 'huvudets fart mot handens, största korrelation inom ±0,5 s (1: i takt som en maskin)' },
+    samtaktFordrojning: { value: lock.lag, what: 'fördröjningen där huvudets fart liknar handens mest, i sekunder (positivt: huvudet efter)' },
+  };
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Dockan
+
+/** Blickens riktning som två vinklar i grader: sidled (kring lodlinjen) och höjd. */
+function aim(from: Vec3, to: Vec3): number[] {
+  const d = [to[0] - from[0], to[1] - from[1], to[2] - from[2]];
+  return [(Math.atan2(d[0]!, d[2]!) * 180) / Math.PI, (Math.atan2(d[1]!, Math.hypot(d[0]!, d[2]!)) * 180) / Math.PI];
+}
+
+/** Dockans delar över en rörelse, `fps` prov per sekund: lägen i meter, blicken i grader. */
+export function dollTracks(parts: Pick<CycleParts, 'scene' | 'doll'>, move: Parameters<typeof poseAt>[2], fps: number): Tracks {
+  const n = Math.round(move.seconds * fps) + 1;
+  const names = ['grepp', 'handled', 'armbage', 'axel', 'andraAxeln', 'huvud', 'bal', 'blick', 'vilandeHand', 'kort'] as const;
+  const tracks = Object.fromEntries(names.map((name) => [name, { fps, points: [] as number[][] }])) as Record<(typeof names)[number], { fps: number; points: number[][] }>;
+  for (let k = 0; k < n; k++) {
+    const pose = poseAt(parts.scene, parts.doll, move, Math.min(move.seconds, k / fps));
+    const left = pose.hands.left;
+    tracks.grepp.points.push(left[4]!.map((value, d) => (value + left[8]![d]!) / 2));
+    tracks.handled.points.push([...pose.arms.left.wrist]);
+    tracks.armbage.points.push([...pose.arms.left.elbow]);
+    tracks.axel.points.push([...pose.arms.left.shoulder]);
+    tracks.andraAxeln.points.push([...pose.arms.right.shoulder]);
+    tracks.huvud.points.push([...pose.head]);
+    tracks.bal.points.push([...pose.torso]);
+    tracks.blick.points.push(aim(pose.head, pose.gaze));
+    tracks.vilandeHand.points.push([...pose.arms.right.wrist]);
+    tracks.kort.points.push([...(pose.laid ?? pose.card ?? pose.shoeCard).centre]);
+  }
+  return tracks;
+}
+
+export const DOLL_ROLES: Roles = { hand: 'grepp', head: 'huvud', trunk: 'axel', gaze: 'blick', body: ['grepp', 'armbage', 'axel', 'andraAxeln', 'huvud', 'bal', 'blick', 'vilandeHand'] };
+
+// ---------------------------------------------------------------------------------------------------------------------
+// En film
+
+/** Skärmen: grön (Klings klipp) eller ateljéns grå skärm och bord (dockans film, content/tagning.json, reference.studio). */
+export type Screen = { grey: number[][]; tolerance: number };
+
+const isScreen = (screen: Screen, r: number, g: number, b: number): boolean =>
+  g - Math.max(r, b) > 50 || screen.grey.some((c) => Math.abs(r - c[0]!) <= screen.tolerance && Math.abs(g - c[1]!) <= screen.tolerance && Math.abs(b - c[2]!) <= screen.tolerance);
+
+const STEP = 2;
+
+type Sampled = { width: number; height: number; fg: Uint8Array; skin: Uint8Array; card: Uint8Array; light: Uint8Array; dark: Uint8Array };
+
+/** Rutan provad i var STEP:e bildpunkt: förgrund (inte skärm), hud, kort (gult eller blått), ljust (blus, docka) och mörkt (kavaj). */
+function sample(picture: Picture, screen: Screen): Sampled {
+  const width = Math.floor(picture.width / STEP);
+  const height = Math.floor(picture.height / STEP);
+  const fg = new Uint8Array(width * height);
+  const skin = new Uint8Array(width * height);
+  const card = new Uint8Array(width * height);
+  const light = new Uint8Array(width * height);
+  const dark = new Uint8Array(width * height);
+  const { data } = picture;
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const k = (y * STEP * picture.width + x * STEP) * 3;
+      const r = data[k]!;
+      const g = data[k + 1]!;
+      const b = data[k + 2]!;
+      const i = y * width + x;
+      if (isScreen(screen, r, g, b)) continue;
+      fg[i] = 1;
+      if (isSkin(r, g, b)) skin[i] = 1;
+      if (isBlue(r, g, b) || isYellow(r, g, b)) card[i] = 1;
+      if (r > 200 && g > 185 && b > 170 && r - b < 45) light[i] = 1;
+      if (r + g + b < 150) dark[i] = 1;
+    }
+  }
+  return { width, height, fg, skin, card, light, dark };
+}
+
+/** Var huvudet och kroppen står i första rutan: huvudets topp, mitt och bredd, och axlarnas rad, i provade bildpunkter. */
+type Figure = { top: number; x: number; width: number; shoulders: number };
+
+function figureOf(s: Sampled): Figure {
+  const rowCount = (y: number, x0 = 0, x1 = s.width): number => {
+    let count = 0;
+    for (let x = Math.max(0, x0); x < Math.min(s.width, x1); x++) count += s.fg[y * s.width + x]!;
+    return count;
+  };
+  // Det översta förgrunden är huvudet (skon och korten ligger lägre).
+  let top = 0;
+  while (top < s.height && rowCount(top) < 3) top++;
+  if (top >= s.height) throw new MotionError('Ingen förgrund i första rutan');
+  let sum = 0;
+  let count = 0;
+  for (let y = top; y < Math.min(s.height, top + 12); y++) {
+    for (let x = 0; x < s.width; x++) {
+      if (s.fg[y * s.width + x]) {
+        sum += x;
+        count++;
+      }
+    }
+  }
+  const x = Math.round(sum / count);
+  // Bredden på den sammanhängande förgrunden kring huvudets mitt, rad för rad.
+  const run = (y: number): number => {
+    if (!s.fg[y * s.width + x]) return 0;
+    let a = x;
+    let b = x;
+    while (a > 0 && s.fg[y * s.width + a - 1]) a--;
+    while (b < s.width - 1 && s.fg[y * s.width + b + 1]) b++;
+    return b - a + 1;
+  };
+  let width = 0;
+  for (let y = top; y < Math.min(s.height, top + Math.round(s.height * 0.15)); y++) width = Math.max(width, run(y));
+  let shoulders = top + Math.round(width * 0.6);
+  while (shoulders < s.height - 1 && run(shoulders) < 2 * width) shoulders++;
+  return { top, x, width, shoulders };
+}
+
+/** Grenar runt en punkt: den sammanhängande delen av `mask` närmast `near` inom `reach`, minst `least` prov; tyngdpunkten. */
+function nearestPart(mask: Uint8Array, width: number, height: number, near: number[], reach: number, least: number): number[] | null {
+  const seen = new Uint8Array(mask.length);
+  let best: { d: number; c: number[] } | null = null;
+  const x0 = Math.max(0, Math.round(near[0]! - reach));
+  const x1 = Math.min(width - 1, Math.round(near[0]! + reach));
+  const y0 = Math.max(0, Math.round(near[1]! - reach));
+  const y1 = Math.min(height - 1, Math.round(near[1]! + reach));
+  const stack: number[] = [];
+  for (let y = y0; y <= y1; y++) {
+    for (let x = x0; x <= x1; x++) {
+      const start = y * width + x;
+      if (!mask[start] || seen[start]) continue;
+      let n = 0;
+      let sx = 0;
+      let sy = 0;
+      let closest = Infinity;
+      stack.push(start);
+      seen[start] = 1;
+      while (stack.length) {
+        const i = stack.pop()!;
+        const px = i % width;
+        const py = (i - px) / width;
+        n++;
+        sx += px;
+        sy += py;
+        closest = Math.min(closest, Math.hypot(px - near[0]!, py - near[1]!));
+        for (const j of [i - 1, i + 1, i - width, i + width]) {
+          if (j < 0 || j >= mask.length || seen[j] || !mask[j]) continue;
+          if (Math.abs((j % width) - px) > 1) continue;
+          seen[j] = 1;
+          stack.push(j);
+        }
+      }
+      if (n >= least && (!best || closest < best.d)) best = { d: closest, c: [sx / n, sy / n] };
+    }
+  }
+  return best ? best.c : null;
+}
+
+/** Masken vuxen `by` prov åt alla håll. */
+function grownMask(mask: Uint8Array, width: number, height: number, by: number): Uint8Array {
+  const out = new Uint8Array(mask.length);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      if (!mask[y * width + x]) continue;
+      for (let yy = Math.max(0, y - by); yy <= Math.min(height - 1, y + by); yy++) out.fill(1, yy * width + Math.max(0, x - by), yy * width + Math.min(width - 1, x + by) + 1);
+    }
+  }
+  return out;
+}
+
+/** Tyngdpunkten av `mask` i en ruta av provade bildpunkter, eller null när färre än `least` prov är satta. */
+function centreIn(mask: Uint8Array, width: number, box: { x0: number; y0: number; x1: number; y1: number }, least: number): number[] | null {
+  let sx = 0;
+  let sy = 0;
+  let n = 0;
+  for (let y = Math.max(0, box.y0); y < box.y1; y++) {
+    for (let x = Math.max(0, box.x0); x < Math.min(width, box.x1); x++) {
+      if (!mask[y * width + x]) continue;
+      sx += x;
+      sy += y;
+      n++;
+    }
+  }
+  return n >= least ? [sx / n, sy / n] : null;
+}
+
+/** Masken med allt ovanför raden `row` borttaget. */
+const below = (mask: Uint8Array, width: number, row: number): Uint8Array => {
+  const out = new Uint8Array(mask);
+  out.fill(0, 0, Math.max(0, row) * width);
+  return out;
+};
+
+/**
+ * Spåren i en film av en dealer på skärm, i bildpunkter. Delarna letas ur första rutan (figureOf) och följs sedan:
+ * - `huvud`: tyngdpunkten av förgrunden i huvudets övre del, kring förra rutans mitt.
+ * - `ansikte`: hudens tyngdpunkt i huvudet mot huvudets, i sidled, i hundradelar av huvudets bredd: vridningen.
+ * - `flank`: den vilande sidans flank (vänster i bild) i raderna under axlarna, i sidled: bålens lutning åt sidan.
+ * - `axel`: kavajens övre kant ovanför den flanken: axelns höjd.
+ * - `brost`: tyngdpunkten av blusen (det ljusa) mellan slagen: bålen.
+ * - `kort`: det gula eller blå som inte var det i första rutan, under axlarna (blont hår kan se gult ut), närmast förra läget.
+ * - `hand`: huden under axlarna som inte var hud i första rutan, utom vid skon där givhanden stod, närmast förra läget.
+ * Rutorna läses en gång.
+ */
+export async function filmTracks(path: string, screen: Screen): Promise<{ tracks: Tracks; fps: number; frames: number }> {
+  const film = await probe(path);
+  const frame: Frame = { width: film.width, height: film.height };
+  type Start = { figure: Figure; staticSkin: Uint8Array; firstCard: Uint8Array; card: number[] };
+  let start: Start | null = null;
+  let headX = 0;
+  let hand: number[] | null = null;
+  let card: number[] | null = null;
+  const skins: Uint8Array[] = [];
+  const tracks: Record<string, (number[] | null)[]> = { huvud: [], ansikte: [], flank: [], axel: [], brost: [], kort: [], hand: [] };
+  const push = (name: string, point: number[] | null): void => {
+    tracks[name]!.push(point ? point.map((value) => value * STEP) : null);
+  };
+  await eachFrame(path, frame, (picture) => {
+    const s = sample(picture, screen);
+    const { width, height } = s;
+    if (!start) {
+      const figure = figureOf(s);
+      const at = centreIn(below(s.card, width, figure.shoulders), width, { x0: 0, y0: 0, x1: width, y1: height }, 5) ?? [figure.x + figure.width, figure.shoulders + figure.width];
+      // Hud i första rutan utom givhanden vid skons kort: den vilande handen, ansiktet, halsen.
+      const keep = new Uint8Array(s.skin);
+      const reach = figure.width * 0.7;
+      for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) if (Math.hypot(x - at[0]!, y - at[1]!) < reach) keep[y * width + x] = 0;
+      start = { figure, staticSkin: grownMask(keep, width, height, 6), firstCard: grownMask(s.card, width, height, 4), card: at };
+      headX = figure.x;
+      hand = nearestPart(s.skin, width, height, at, figure.width, 20);
+    }
+    const { figure: f, staticSkin, firstCard } = start;
+    const wide = f.width;
+    // Huvudet: översta förgrunden kring förra rutans mitt, och tyngdpunkten i huvudets övre del.
+    const x0 = Math.max(0, Math.round(headX - wide));
+    const x1 = Math.min(width, Math.round(headX + wide));
+    const count = (y: number): number => {
+      let c = 0;
+      for (let x = x0; x < x1; x++) c += s.fg[y * width + x]!;
+      return c;
+    };
+    let top = 0;
+    while (top < height && count(top) < 3) top++;
+    const headBox = { x0: Math.round(headX - 0.75 * wide), y0: top, x1: Math.round(headX + 0.75 * wide), y1: top + Math.round((f.shoulders - f.top) * 0.6) };
+    const head = centreIn(s.fg, width, headBox, 20);
+    const face = centreIn(s.skin, width, headBox, 20);
+    if (head) headX = head[0]!;
+    push('huvud', head);
+    tracks.ansikte!.push(head && face ? [((face[0]! - head[0]!) / wide) * 100] : null);
+    // Bålen: den vilande sidans flank (vänster i bild) i raderna under axlarna.
+    let fx = 0;
+    let fn = 0;
+    for (let y = f.shoulders + Math.round(0.2 * wide); y < Math.min(height, f.shoulders + Math.round(0.8 * wide)); y++) {
+      for (let x = Math.max(0, Math.round(f.x - 2.5 * wide)); x < f.x; x++) {
+        if (s.fg[y * width + x]) {
+          fx += x;
+          fn++;
+          break;
+        }
+      }
+    }
+    push('flank', fn ? [fx / fn] : null);
+    // Axeln: kavajens övre kant ovanför flanken, medel över några kolumner.
+    let ay = 0;
+    let an = 0;
+    for (let x = Math.round(f.x - 1.05 * wide); x <= Math.round(f.x - 0.75 * wide); x++) {
+      if (x < 0) continue;
+      let y = Math.max(0, f.top);
+      while (y < height && !s.dark[y * width + x]) y++;
+      if (y < height) {
+        ay += y;
+        an++;
+      }
+    }
+    push('axel', an ? [ay / an] : null);
+    push('brost', centreIn(s.light, width, { x0: Math.round(f.x - 0.6 * wide), y0: f.shoulders, x1: Math.round(f.x + 0.6 * wide), y1: f.shoulders + Math.round(1.2 * wide) }, 20));
+    // Kortet: gult eller blått under axlarna som inte var det i första rutan, närmast förra läget.
+    const cards = below(s.card, width, f.shoulders + Math.round(0.25 * wide));
+    for (let i = 0; i < cards.length; i++) if (firstCard[i]) cards[i] = 0;
+    const foundCard = nearestPart(cards, width, height, card ?? start.card, wide * 4, 15);
+    if (foundCard) card = foundCard;
+    push('kort', foundCard);
+    // Huden som kan vara givhanden: under axlarna, inte hud i första rutan, och inte i halsens och bröstets ruta (bålen
+    // som lutar flyttar sin hud). Handen följs när kortet ligger (se nedan).
+    const moving = below(s.skin, width, f.shoulders + Math.round(0.2 * wide));
+    const chest = { x0: Math.round(f.x - 0.6 * wide), x1: Math.round(f.x + 0.6 * wide), y1: f.shoulders + Math.round(1.3 * wide) };
+    for (let i = 0; i < moving.length; i++) {
+      const x = i % width;
+      if (staticSkin[i] || (x >= chest.x0 && x < chest.x1 && i < chest.y1 * width)) moving[i] = 0;
+    }
+    skins.push(grownMask(moving, width, height, 2));
+  });
+  // Handen: medan kortet bärs är det kortet (handen håller det i änden), före det handen i REDO, och när kortet ligger
+  // still följs huden från kortet och tillbaka.
+  const fps = film.fps;
+  const cardPoints = filled({ fps, points: tracks.kort!.some(Boolean) ? tracks.kort! : [[0, 0]] });
+  const cardSpeed = speedOf(smoothed(cardPoints, 1), fps);
+  const cardTop = Math.max(...cardSpeed);
+  const firstSeen = tracks.kort!.findIndex(Boolean);
+  const landed = cardTop > 0 ? cardSpeed.findLastIndex((value) => value > 0.05 * cardTop) + 1 : -1;
+  const wide = start!.figure.width;
+  hand = hand ? [hand[0]!, hand[1]!] : null;
+  skins.forEach((mask, k) => {
+    if (firstSeen < 0 || landed < 0 || k < firstSeen) {
+      tracks.hand!.push(hand ? hand.map((value) => value * STEP) : null);
+      return;
+    }
+    if (k <= landed) {
+      hand = cardPoints[k]!.map((value) => value / STEP);
+      tracks.hand!.push(cardPoints[k]!);
+      return;
+    }
+    const found = hand ? nearestPart(mask, Math.floor(frame.width / STEP), Math.floor(frame.height / STEP), hand, wide, 30) : null;
+    if (found) hand = found;
+    tracks.hand!.push(found ? found.map((value) => value * STEP) : null);
+  });
+  const out: Tracks = {};
+  for (const [name, points] of Object.entries(tracks)) if (points.some(Boolean)) out[name] = { fps, points };
+  return { tracks: out, fps, frames: film.frames };
+}
+
+export const FILM_ROLES: Roles = { hand: 'hand', head: 'huvud', trunk: 'flank', body: ['hand', 'huvud', 'flank', 'brost'] };
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Kommandot
+
+function print(title: string, values: Record<string, Value>): void {
+  console.log(title);
+  for (const [key, { value, what }] of Object.entries(values)) console.log(`  ${key.padEnd(20)} ${String(value).padStart(8)}   ${what}`);
+}
+
+/** Varje del för sig: toppfart, rörelserna med knyck och tvära stopp, och farten ruta för ruta. */
+export function partsReport(tracks: Tracks, smooth: number): string[] {
+  const lines: string[] = [];
+  for (const [name, track] of Object.entries(tracks)) {
+    const speed = speedOf(smoothed(filled(track), smooth), track.fps);
+    const moves = segments(speed, track.fps);
+    const words = moves.map((m) => `${round(m.from / track.fps, 2)}–${round(m.to / track.fps, 2)} s topp ${round(m.peak, 2)} vid ${round(m.at / track.fps, 2)} knyck ${round(snap(speed, track.fps, m), 1)} tvära ${abrupt(speed, m)} toppar ${peaksIn(speed, m)}`);
+    lines.push(`${name}: ${words.join('; ')}`);
+    const top = Math.max(...speed) || 1;
+    lines.push(`  ${speed.map((v) => Math.round((99 * v) / top)).join(' ')}`);
+  }
+  return lines;
+}
+
+async function main(args: string[]): Promise<void> {
+  const [what, ...rest] = args;
+  const flag = (name: string): string | undefined => {
+    const k = rest.indexOf(name);
+    return k >= 0 ? rest[k + 1] : undefined;
+  };
+  const plain = rest.filter((word, k) => !word.startsWith('--') && !rest[k - 1]?.startsWith('--fps'));
+  if (what === 'docka') {
+    const named = plain[0] && !/^(\d+|D)$/.test(plain[0]) ? plain.shift()! : 'cykel-nyp';
+    const parts = readCycleParts(named);
+    const seat: Seat = plain[0] === 'D' ? 'D' : Number(plain[0] ?? 4);
+    const index = Number(plain[1] ?? 0);
+    const move = rest.includes('--giv') ? moveFor(parts.scene, parts.doll, parts.base, seat, { index }) : cycleMove(parts, { seat, index, action: 'deal' });
+    const fps = Number(flag('--fps') ?? 24);
+    const tracks = dollTracks(parts, move, fps);
+    print(`${move.id}, ${round(move.seconds)} s, ${fps} prov/s, meter`, motionValues(tracks, DOLL_ROLES, { still: 0.01, smooth: 0, units: 'm' }));
+    if (rest.includes('--delar')) console.log(partsReport(tracks, 0).join('\n'));
+    return;
+  }
+  if (what === 'film') {
+    const path = plain[0];
+    if (!path) throw new MotionError('Skriv filmen: node src/pipeline/rorelse.ts film <film.mp4>');
+    const screen: Screen = { grey: [[118, 124, 128], [176, 176, 176]], tolerance: 14 };
+    const { tracks, fps, frames } = await filmTracks(path, screen);
+    const missing = Object.entries(tracks).map(([name, track]) => `${name} ${track.points.filter((p) => !p).length}`).join(', ');
+    print(`${path}: ${frames} rutor à ${fps}/s, bildpunkter; saknas: ${missing}`, motionValues(tracks, FILM_ROLES, { still: 0.03, smooth: 1, units: 'bp' }));
+    if (rest.includes('--delar')) console.log(partsReport(tracks, 1).join('\n'));
+    const json = flag('--spar');
+    if (json) (await import('node:fs')).writeFileSync(json, JSON.stringify(tracks));
+    return;
+  }
+  throw new MotionError('Skriv docka [cykel] <plats> [kort] [--fps n] [--giv], eller film <film.mp4>');
+}
+
+if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
+  main(process.argv.slice(2)).catch((error: unknown) => {
+    console.error(error instanceof MotionError ? error.message : error);
+    process.exit(1);
+  });
+}

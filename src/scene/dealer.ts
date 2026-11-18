@@ -15,8 +15,19 @@ export type CardSpot = { seat: number | 'D'; index: number; hand?: number };
  * ligger på kortplatsen (registrets `lands.at`). Från den tiden tas klippets blå märkkort bort och scenens kort ligger
  * där, till följdens slut. Ett senare kort på samma kortplats tar det tidigares plats: så vänds hålkortet.
  * `face` null är ett kort med baksidan upp, hålkortet innan det vänds: spelkärnan har inte sagt vad det är.
+ * `place` är var kortet ligger på filten (x, z på ett olutat bord) när klippet bär det (registrets `place`): där klippet
+ * lägger det, också när scenens kortplatser har flyttats sedan klippet gjordes. Utan det räknas platsen ur scenen.
  */
-export type ClipCard = CardSpot & { face: string | null; at: number };
+export type ClipCard = CardSpot & { face: string | null; at: number; place?: [number, number] };
+
+/**
+ * Ögat en dealerfilm är gjord genom: vyns närbild så som den räknades när filmen gjordes, som en förlaga bär det (läge,
+ * riktning och brännvidd i rutan `frame`). Filmen läggs tillbaka genom samma öga, också när scenen har ändrats sedan.
+ */
+export type FilmEye = { position: [number, number, number]; forward: [number, number, number]; focalPx: number; frame: { width: number; height: number } };
+
+/** Skon så som den stod när en dealerfilm gjordes (content/scene.json, shoe): den är inbakad i filmen. */
+export type FilmShoe = { at: [number, number]; yawDeg: number; length: number };
 
 /**
  * Ett klipp i dealerns film: filen som registrets `file`, och kortet klippet lägger, om det lägger ett.
@@ -33,9 +44,10 @@ export type FilmClip = { file: string; card?: ClipCard } | { file: null; seconds
  * framför sig och projicerade därifrån på den vikta ytan. Klippen spelas efter varandra utan glapp, och varje kort
  * ligger kvar från att det har landat tills följden är slut. Efter sista klippet står filmens sista ruta kvar i `hold`
  * sekunder, och sedan börjar följden om; med `loop: false` står den kvar där. Ett ensamt klipp är en följd med ett
- * klipp; en stillbild kan bara stå ensam.
+ * klipp; en stillbild kan bara stå ensam. `eye` och `shoe` är ögat filmerna är gjorda genom och skon de bär, när
+ * registret säger det (FilmEye, FilmShoe); utan dem räknas de ur scenen och vyn.
  */
-export type FilmNote = { kind: 'film'; view: SeatView; clips: FilmClip[]; hold?: number; loop?: boolean };
+export type FilmNote = { kind: 'film'; view: SeatView; clips: FilmClip[]; hold?: number; loop?: boolean; eye?: FilmEye; shoe?: FilmShoe };
 
 /**
  * Ett ensamt klipp skrivet som förr: filen här, och kortet bredvid i beställningen (`card`, CardNote). Det läses som en

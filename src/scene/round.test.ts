@@ -238,3 +238,25 @@ test('content/runda.json går att läsa, och en runda som inte går att använda
   assert.throws(() => readRound({ ...whole, film: { background: 'x.jpg', fps: 0, hold: 1 } }), /film\.fps/);
   assert.throws(() => readRound(null), /deal\.seed/);
 });
+
+test('ett klipp som bär sitt öga, sin sko och var kortet landar spelas så, också när scenens tal har ändrats', () => {
+  // Som registrets poster för klippen som gjordes före skons flytt (eye, shoe, place).
+  const eye = { position: [0, 0.6, 0.0562], forward: [0.0178, -0.1817, -0.9832], focalPx: 2065.9, frame: { width: 1920, height: 1080 } };
+  const shoe = { at: [0.495, -1.8433], yawDeg: -74.6, length: 0.442 };
+  const made = (file: string, more: Record<string, unknown>) => clip(file, { ...more, eye, shoe });
+  const entries = [
+    made('gammal-4-0.mp4', { seat: 4, index: 0, lands: { at: 1.9 }, place: [-0.019, -1.4468] }),
+    made('gammal-4-1.mp4', { seat: 4, index: 1, lands: { at: 1.8 }, place: [0.0191, -1.46] }),
+  ];
+  const scene = readScene(readJson('scene.json'));
+  const plan = planRound(dealsOf(STEPS), entries, 'paulina', { kind: 'spelaren' }, FALLBACK);
+  assert.deepEqual(plan.clips[0], { file: 'dealers/paulina/clips/gammal-4-0.mp4', card: { seat: 4, index: 0, face: '10♠', at: 1.9, place: [-0.019, -1.4468] } });
+  const film = roundFilm(plan, round, { kind: 'spelaren' }, false);
+  assert.deepEqual([film.eye, film.shoe], [eye, shoe], 'följden läggs genom ögat klippen gjordes i, med skon de bär');
+  // Kortet ligger där klippet lägger det, inte på scenens kortplats; ett kort utan klipp ligger på scenens.
+  assert.deepEqual(spotPlace(scene, plan.clips[0]!.card!), [-0.019, -1.4468]);
+  assert.notDeepEqual(spotPlace(scene, { seat: 4, index: 0 }), [-0.019, -1.4468]);
+  assert.deepEqual(spotPlace(scene, plan.clips[4]!.card!), scene.places.seats.find((entry) => entry.seat === 4)!.cards[2]);
+  // Ett klipp utan öga i posten läggs genom vyns närbild i dag (inget eye i följden).
+  assert.equal(roundFilm(planRound(dealsOf(STEPS), ENTRIES, 'paulina', { kind: 'spelaren' }, FALLBACK), round, { kind: 'spelaren' }).eye, undefined);
+});

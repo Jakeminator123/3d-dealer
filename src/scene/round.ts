@@ -12,7 +12,7 @@
 
 import type { SeatSignalEvent, SeatView as TableView } from '../engine/seats.ts';
 import { captureHeightOf, type Background } from './backdrop.ts';
-import { sameSpot, type CardSpot, type FilmClip, type FilmNote } from './dealer.ts';
+import { sameSpot, type CardSpot, type FilmClip, type FilmEye, type FilmNote, type FilmShoe } from './dealer.ts';
 import type { FeltPoint, SceneDescription } from './description.ts';
 import type { SeatView } from './geometry.ts';
 
@@ -152,8 +152,23 @@ function isCycle(entry: RoundEntry): boolean {
 /** Omdömet ett klipp måste ha för att spelas i en runda. */
 const PLAYED = 'godkänd';
 
-/** Ett cykelklipp i rundan: posten, vad det gör och tiden i klippet då kortet ligger. */
-type Take = { file: string; status: string; seat: number | 'D'; index: number; action: CardAction; at: number; seconds: number | null };
+/**
+ * Ett cykelklipp i rundan: posten, vad det gör och tiden i klippet då kortet ligger, och när posten säger det, ögat det
+ * är gjort genom, skon det bär och var kortet landar (registrets eye, shoe och place).
+ */
+type Take = { file: string; status: string; seat: number | 'D'; index: number; action: CardAction; at: number; seconds: number | null; eye?: FilmEye; shoe?: FilmShoe; place?: [number, number] };
+
+const isPoint = (value: unknown, length: number): boolean => Array.isArray(value) && value.length === length && value.every(isNumber);
+/** Ögat, skon och landningsplatsen ur en post, när de har rätt form. */
+function madeWith(entry: RoundEntry): Pick<Take, 'eye' | 'shoe' | 'place'> {
+  const eye = entry.eye as FilmEye | undefined;
+  const shoe = entry.shoe as FilmShoe | undefined;
+  return {
+    ...(eye && isPoint(eye.position, 3) && isPoint(eye.forward, 3) && isNumber(eye.focalPx) && isNumber(eye.frame?.width) && isNumber(eye.frame?.height) ? { eye } : {}),
+    ...(shoe && isPoint(shoe.at, 2) && isNumber(shoe.yawDeg) && isNumber(shoe.length) ? { shoe } : {}),
+    ...(isPoint(entry.place, 2) ? { place: entry.place as [number, number] } : {}),
+  };
+}
 
 const clipKey = (seat: number | 'D', index: number, action: CardAction): string => `${seat}/${index}/${action}`;
 
@@ -166,7 +181,7 @@ function takeOf(entry: RoundEntry): Take | string {
   if (!((Number.isInteger(seat) && (seat as number) >= 1) || seat === 'D') || !Number.isInteger(index) || (index as number) < 0) return 'seat och index saknas';
   if (!CARD_ACTIONS.includes(action as CardAction)) return `action ${JSON.stringify(action)} är inte deal, hole eller flip`;
   if (!isNumber(lands.at) || lands.at < 0) return 'lands.at saknas: tiden då kortet ligger är inte mätt';
-  return { file: entry.file, status: entry.status, seat: seat as number | 'D', index: index as number, action: action as CardAction, at: lands.at, seconds: isNumber(entry.seconds) ? entry.seconds : null };
+  return { file: entry.file, status: entry.status, seat: seat as number | 'D', index: index as number, action: action as CardAction, at: lands.at, seconds: isNumber(entry.seconds) ? entry.seconds : null, ...madeWith(entry) };
 }
 
 /**
@@ -192,6 +207,9 @@ export type Plan = {
   anchor: string | null;
   /** Varje ankare med godkända klipp för rundan, och hur många av rundans kort de har klipp till, flest först. */
   anchors: { anchor: string | null; clips: number }[];
+  /** Ögat och skon följdens klipp är gjorda med, när deras poster säger det (FilmNote eye och shoe). */
+  eye?: FilmEye;
+  shoe?: FilmShoe;
 };
 
 /**
@@ -251,7 +269,7 @@ export function planRound(deals: Deal[], entries: RoundEntry[], dealer: string, 
     }
     const found = deal.hand === 0 ? best.get(clipKey(deal.seat, deal.index, deal.action)) : undefined;
     if (found) {
-      clips.push({ file: found.take.file, card: { ...spot, face: deal.face, at: found.take.at } });
+      clips.push({ file: found.take.file, card: { ...spot, face: deal.face, at: found.take.at, ...(found.take.place ? { place: found.take.place } : {}) } });
       dealt.push({ ...deal, file: found.take.file, status: found.take.status, at: found.take.at, seconds: found.take.seconds ?? 0 });
       continue;
     }
@@ -260,7 +278,18 @@ export function planRound(deals: Deal[], entries: RoundEntry[], dealer: string, 
     dealt.push({ ...deal, file: null, status: null, at: seconds, seconds });
     missing.push(deal);
   }
-  return { clips, dealt, missing, unusable, anchor, anchors: ranked.map(([one, set]) => ({ anchor: one, clips: set.best.size })) };
+  // Klippen ur ett ankare är gjorda genom samma öga med samma sko: följden läggs genom det första klippets.
+  const made = [...best.values()].map((entry) => entry.take).find((take) => take.eye);
+  return {
+    clips,
+    dealt,
+    missing,
+    unusable,
+    anchor,
+    anchors: ranked.map(([one, set]) => ({ anchor: one, clips: set.best.size })),
+    ...(made?.eye ? { eye: made.eye } : {}),
+    ...(made?.shoe ? { shoe: made.shoe } : {}),
+  };
 }
 
 /** Ankaret som ord: filens namn utan mapp, eller att posten inte säger det. */
@@ -278,7 +307,7 @@ export function dealName(deal: Deal): string {
  */
 export function roundFilm(plan: Plan, round: Round, view: SeatView, loop = true): FilmNote {
   if (plan.clips.length === 0) throw new RoundError('Rundan har inga kort att spela');
-  return { kind: 'film', view, clips: plan.clips, hold: round.film.hold, ...(loop ? {} : { loop: false }) };
+  return { kind: 'film', view, clips: plan.clips, hold: round.film.hold, ...(loop ? {} : { loop: false }), ...(plan.eye ? { eye: plan.eye } : {}), ...(plan.shoe ? { shoe: plan.shoe } : {}) };
 }
 
 /**
@@ -302,8 +331,10 @@ export function readyClip(entries: RoundEntry[], dealer: string, view: SeatView)
  * (hand 2 och framåt) ligger ett kort längre mot spelaren per hand. Båda är räknade ur scenens tal, inte mätta. Null
  * när scenen inte har platsen.
  */
-export function spotPlace(scene: SceneDescription, spot: CardSpot): FeltPoint | null {
-  const row = spot.seat === 'D' ? scene.places.dealer : scene.places.seats.find((entry) => entry.seat === spot.seat)?.cards;
+export function spotPlace(scene: SceneDescription, spot: CardSpot & { place?: FeltPoint }): FeltPoint | null {
+  // Ett klipps kort ligger där klippet lägger det (ClipCard.place), också om scenens kortplatser har flyttats sedan.
+  if (Array.isArray(spot.place) && spot.place.length === 2 && spot.place.every((value) => typeof value === 'number' && Number.isFinite(value))) return [spot.place[0], spot.place[1]];
+  const row =spot.seat === 'D' ? scene.places.dealer : scene.places.seats.find((entry) => entry.seat === spot.seat)?.cards;
   if (!row || row.length === 0 || !Number.isInteger(spot.index) || spot.index < 0) return null;
   let place: FeltPoint;
   if (spot.index < row.length) place = row[spot.index]!;

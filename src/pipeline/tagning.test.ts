@@ -11,8 +11,11 @@ import sharp from 'sharp';
 import { probe } from './matning.ts';
 import { about, createRegister, getEntry } from './registry.ts';
 import { cardWords, clipFile, forbered, matOm, nextTake, packageId, promptFor, readTagning, registrera, taEmot, type PostFile } from './tagning.ts';
+import { readScene } from '../scene/description.ts';
+import { viewEye } from '../scene/geometry.ts';
 
 const root = resolve(import.meta.dirname, '..', '..');
+const scene = readScene(JSON.parse(readFileSync(join(root, 'content', 'scene.json'), 'utf8')));
 const content = readTagning(root);
 const quiet = () => {};
 
@@ -173,7 +176,15 @@ test('ta-emot: ljudet tas bort, måtten prövas, och posten bär allt registret 
   assert.equal((post.source as { taskId: string }).taskId, 'task-1');
   assert.deepEqual([order.model, order.kind, order.credits, order.balanceBefore, order.balanceAfter, order.basis, order.result], ['kling-4', 'film', 85, 1000, 915, 'mätt', post.file]);
   assert.ok(order.inputs!.includes('dealers/paulina/anchors/spelaren-redo.png'), 'indata nämner ankaret');
-  assert.equal(measurements.length, result.judged.length + measurements.filter((entry) => entry.note === 'utan gräns').length);
+  // Varje mått med gräns, de som bara visas, och skons läge som klippet är gjort och mätt med.
+  assert.equal(measurements.length, result.judged.length + measurements.filter((entry) => entry.note === 'utan gräns').length + 1);
+  assert.deepEqual(measurements.find((entry) => entry.what.startsWith('skonsLage:'))?.value, { at: scene.shoe.at, yawDeg: scene.shoe.yawDeg, length: scene.shoe.length });
+  // Posten bär ögat filmen görs genom, skon den bär och var kortet landar: uppspelningen lägger dem efter det (round.ts).
+  const close = viewEye(scene, { kind: 'spelaren', close: true });
+  assert.deepEqual(post.eye, { position: close.position, forward: close.forward, focalPx: close.focalPx, frame: close.frame });
+  assert.deepEqual(post.shoe, { at: scene.shoe.at, yawDeg: scene.shoe.yawDeg, length: scene.shoe.length });
+  assert.deepEqual(post.place, scene.places.seats.find((entry) => entry.seat === 4)!.cards[1]);
+  assert.equal(post.action, 'deal');
   assert.deepEqual(uploads, [{ file: 'output/tagningar/paulina_spelaren_cykel-nyp_4-1_t1/sista.png', url: 'https://d2jqrm6oza8nb6.cloudfront.net/datasets/abc.png', assetId: 'a1', at: '2026-11-18 12:00' }]);
   received = posted;
   // Krediter som inte är skillnaden mellan saldona är antagna.
@@ -195,7 +206,9 @@ test('registreringen: klippet som post att granska, beställningen och måtten, 
   const known = about(register, received!.post.file);
   assert.deepEqual(known.orders.map((row) => row.task_id), ['task-1']);
   assert.equal(known.measurements.length, received!.measurements.length);
-  assert.ok(known.measurements.every((row) => row.basis === 'mätt'));
+  // Måtten ur klippet är mätta; skons läge har scenens märkning (content/scene.json, shoe).
+  const wrongBasis = known.measurements.filter((row) => row.basis !== (String(row.what).startsWith('skonsLage:') ? scene.shoe.basis : 'mätt'));
+  assert.deepEqual(wrongBasis.map((row) => `${row.what}: ${row.basis}`), []);
   assert.equal(about(register, received!.uploads[0]!.file).uploads[0]!.url, 'https://d2jqrm6oza8nb6.cloudfront.net/datasets/abc.png');
   // En gång till: posten, beställningen och uppladdningen förs inte in igen, och måtten ersätter de förra.
   const again = await registrera(register, received!, clip, uploads);
@@ -216,7 +229,7 @@ test('mät-om: måtten tas om och ersätter de förra i post.json och registret;
   const result = await matOm(id, { root: project, registry: register, proof: false, say: quiet });
   const after = JSON.parse(readFileSync(join(dir, 'post.json'), 'utf8')) as PostFile;
   assert.deepEqual([after.post, after.order, after.uploads], [before.post, before.order, before.uploads]);
-  assert.equal(after.measurements.length, result.judged.length + after.measurements.filter((entry) => entry.note === 'utan gräns').length);
+  assert.equal(after.measurements.length, result.judged.length + after.measurements.filter((entry) => entry.note === 'utan gräns').length + 1);
   assert.ok(result.judged.some((entry) => entry.key === 'kortetsOverlapp') && !result.judged.some((entry) => entry.key === 'kortetsHorn'), 'dagens mått');
   assert.match(result.registered.join('\n'), /i stället för de \d+ förra/);
   assert.equal(getEntry(register, before.post.file)!.status, entryBefore.status);
