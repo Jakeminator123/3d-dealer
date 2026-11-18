@@ -2,15 +2,19 @@
   "schemaVersion": 2,
   "about": "Rundan: den giv som spelkärnan delar när ingen spelar, hur länge ett kort utan klipp går självt, och hur rundan sparas som film. Läses av servern (/api/runda, src/game/game.ts), som delar rundan med spelkärnan, och av src/scene/round.ts, som väljer dealerns klipp för den i Labbet, Casinot och src/pipeline/runda.ts. Ingenting här avgör spelet: kort, ordning, pengar och utfall är spelkärnans.",
   "deal": {
-    "seed": "runda-3",
+    "seed": "sju-8",
     "bets": [
       { "seat": 1, "main": 10 },
+      { "seat": 2, "main": 10 },
+      { "seat": 3, "main": 10 },
       { "seat": 4, "main": 10 },
+      { "seat": 5, "main": 10 },
+      { "seat": 6, "main": 10 },
       { "seat": 7, "main": 10 }
     ],
     "hitBelow": 15,
     "basis": "antaget",
-    "source": "Valt av agenten 2026-11-18: tre spelare (plats 1, 4 och 7, så att given går över hela bordet), insats 10, och spelare som tar Hit så länge handen är under 15, annars Stand, och aldrig försäkring. seed är fröet till skon (spelkärnans seeded-läge, src/engine/shoe-source.ts): samma frö ger samma runda. Fröet runda-3 är det första av runda-1 … runda-120 (output/work/runda-fro/sok.ts) där rundan visar dealerns öppna kort och hålkort, minst två Hit, vändningen och minst ett kort till dealern, utan försäkring eller blackjack, och där utfallen skiljer sig: plats 1 vinner, plats 4 förlorar och plats 7 får lika."
+    "source": "Valt av agenten 2026-11-18, natt: alla sju platserna (Jakobs mål: dealern delar till alla positioner, minst två kort per plats), insats 10, och spelare som tar Hit så länge handen är under 15, annars Stand, och aldrig försäkring. seed är fröet till skon (spelkärnans seeded-läge, src/engine/shoe-source.ts): samma frö ger samma runda. Fröet sju-8 är det första av sju-1 … sju-400 (output/work/runda-fro/sok-sju.ts) där varje kort har en kortplats som serien filmas för (spelarna högst tre kort, dealern högst fyra), utan försäkring, blackjack eller delning: tre Hit (plats 7, 5 och 4), hålkortet vänds, dealern drar två kort till 17, och utfallen skiljer sig. Förut tre spelare med fröet runda-3."
   },
   "fallback": {
     "seconds": 1.2,
