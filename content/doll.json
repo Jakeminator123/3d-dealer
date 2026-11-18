@@ -1,0 +1,87 @@
+{
+  "schemaVersion": 1,
+  "about": "Dockan: en vit provdocka som gör dealerns rörelser i scenen, så att scenen kan spara en förlaga. Hon är lika för alla dealers och alla platser. Meter i scenens mått (content/scene.json): x åt höger i bild, y uppåt från filten, z mot kameran. Vänster och höger är dockans egna; hennes vänstra hand delar och är till höger i bild. Här står dockans mått och standarden för var kort hämtas; rörelserna står i content/moves/, och hur allt räknas står i src/scene/dollPose.ts. Varje grupp bär basis (mätt eller antaget) och en källa. Det som är mätt i bild är fört ut i meter genom scenens kamera, som är antagen. Gamla Dealer är C:/Users/jakem/dev/super-feature-sg/dealer vid commit e6c07124c16a9b8d00ab3435895f94e982516ce9.",
+  "sitting": {
+    "behindEdge": 0.18,
+    "hipBelowFelt": 0.2,
+    "neckLift": 0.03,
+    "basis": "antaget",
+    "source": "Gamla Dealers standard för var dealern sitter. behindEdge: axlarnas och ansiktets plan ligger 0,18 m bakom dealerns bordskant (dealer3d/src/world.ts, ASSUMED.shouldersBehindEdge: \"she sits a little behind the table edge, shoulders and face 0.18 m behind it\"). hipBelowFelt: höften ligger 0,2 m under filtens höjd, i samma plan (dealer3d/src/body.ts, BODY.hipBelowFelt). neckLift: nackens fäste ligger 0,03 m över axlarnas mitt (body.ts, standing). Bålen är 0,095 m djup från sin mitt (shape.torso.depth), så dess framsida står 0,085 m bakom bordskanten."
+  },
+  "body": {
+    "centreX": -0.0152,
+    "shoulderHeight": 0.3489,
+    "shoulderHalfWidth": 0.159,
+    "head": { "x": -0.008, "height": 0.5419, "radius": 0.1269 },
+    "eyeHeight": 0.5329,
+    "basis": "mätt",
+    "source": "Gamla Dealers docka har Paows mått, avlästa för ögat i ankaret paow-nyp-ung-1, inom 10 bildpunkter (dealer3d/src/world.ts, MEASURED: kavajens axelpunkter på rad 405 i kolumn 655 och 1075, pupillerna på rad 211 i kolumn 836 och 909, hakan på rad 337, hjässan på rad 58). Punkterna är förda ut i meter genom scenens kamera på planet sitting.behindEdge bakom dealerns bordskant (dealer3d/src/body.ts, standing; räknat om 2026-11-18). centreX är axlarnas mitt, shoulderHeight axelledernas höjd över filten och shoulderHalfWidth halva avståndet mellan axellederna, som ligger 0,82 av vägen från mitten ut till kavajens axelpunkter (BODY.jointInFromShoulderPoint). head är mitten mellan hjässa och haka och halva avståndet mellan dem, håret inräknat. eyeHeight är pupillernas höjd över filten. Avstånden i meter är inte säkrare än kameran och planets djup, som båda är antagna. Samma pupillrad förd ut på ett plan som står på själva bordskanten ger 0,584 m: det är de 0,58 m som content/scene.json anger för ögonen i ankaret VILA. Dockan har alltså ögonen på samma rad i filmkamerans bild som ankaret, men sitter 0,18 m längre bak och därmed 0,05 m lägre i meter."
+  },
+  "arm": {
+    "upper": 0.29,
+    "fore": 0.26,
+    "reach": 0.535,
+    "mostLean": 0.6,
+    "mostTwist": 0.6,
+    "basis": "antaget",
+    "source": "Gamla Dealer, dealer3d/src/body.ts, BODY: överarmen 0,29 m och underarmen 0,26 m. När handleden ligger längre från axeln än reach böjer hon sig från höften mot handen och för fram den givande axeln, som mest mostLean och mostTwist radianer (solveBody)."
+  },
+  "gaze": {
+    "down": 0.25,
+    "ahead": 1.2,
+    "share": 0.75,
+    "seconds": 0.65,
+    "basis": "antaget",
+    "source": "Gamla Dealer, dealer3d/src/stage.ts: hon ser på kortet från skon tills det ligger, genom hela vändningen (Jakob 2026-11-18: \"Hon ska följa korten oftast, och alltid när det vänds över\"). När kortet ligger lyfter hon blicken på seconds sekunder andelen share av vägen mot en punkt ahead meter framför huvudet och down meter under det. I VILA ser hon på den punkten."
+  },
+  "shape": {
+    "torso": { "width": 0.47, "height": 0.56, "depth": 0.095, "centre": 0.52 },
+    "yoke": 0.052,
+    "neck": [0.04, 0.036],
+    "head": { "scale": 0.92, "skull": [0.74, 1, 0.86], "nose": { "radius": 0.16, "at": [0, -0.12, 0.84] }, "neckAt": 0.6 },
+    "upperArm": [0.047, 0.04],
+    "forearm": [0.038, 0.027],
+    "shoulder": 0.055,
+    "elbow": 0.04,
+    "wrist": 0.027,
+    "basis": "antaget",
+    "source": "Hur gamla Dealers docka ritas (dealer3d/src/stage.ts). Bålen är ett ägg från höften till axlarna: bredden är andelen width av avståndet mellan axellederna, höjden andelen height av avståndet från höften till axlarnas mitt, djupet depth meter, och mitten ligger andelen centre av vägen från höften till axlarna. yoke är oket mellan axlarna, och neck, upperArm och forearm är radien i lemmens början och slut, i meter. Huvudet är ett klot med radien body.head.radius gånger scale, tillplattat med skull (bredd, höjd, djup); näsan sitter på at i huvudets egna mått och visar vart hon ser; halsen går upp till neckAt av huvudets radie under dess mitt. shoulder, elbow och wrist är ledernas radier. Ändrat mot förlagan: underarmens slut och handleden är 0,027 (förlagan 0,030 och 0,031), så att handleden står i proportion till en hand i naturlig storlek."
+  },
+  "hand": {
+    "rest": [
+      [0, 0.0362, 0],
+      [0.0188, 0.0317, 0.0309], [0.0311, 0.0257, 0.0558], [0.0321, 0.026, 0.0894], [0.0323, 0.0277, 0.1136],
+      [0.0074, 0.0599, 0.0903], [0.0125, 0.0453, 0.1192], [0.0218, 0.0245, 0.1244], [0.0266, 0.0065, 0.1334],
+      [-0.0129, 0.0596, 0.0846], [-0.0119, 0.0482, 0.1173], [-0.0083, 0.0339, 0.1358], [0, 0.0157, 0.1436],
+      [-0.0268, 0.0542, 0.0796], [-0.0231, 0.041, 0.106], [-0.0201, 0.0303, 0.1253], [-0.0117, 0.0163, 0.1334],
+      [-0.0398, 0.0427, 0.0621], [-0.0388, 0.0306, 0.0829], [-0.0362, 0.0228, 0.0966], [-0.0326, 0.0129, 0.1093]
+    ],
+    "radius": { "wrist": 0.0115, "knuckle": 0.01, "joint": 0.0075, "tip": 0.0065 },
+    "basis": "antaget",
+    "source": "Dockans hand, lika för båda händerna (den vänstra är spegelbilden). rest är höger hand vilande på filten: 21 punkter i MediaPipes ordning (0 handled, 1–4 tumme, 5–8 pekfinger, 9–12 långfinger, 13–16 ringfinger, 17–20 lillfinger), x tvärs mot tummens sida, y upp från filten, z mot fingertopparna, origo på filten under handleden. Ur punkterna räknas handflatans form och fingerbenens längder; radius är ledernas radier. Antaget: storleken, en kvinnas hand på 17,5 cm från handleden till långfingrets yttersta spets (16,85 cm längs benen och spetsens radie), och radierna. Då blir bredden över knogarna 7,8 cm från utsida till utsida (5,8 cm mellan pekfingrets och lillfingrets knogleder och två knogradier). Mätt: proportionerna och ställningen. Benens inbördes längder är medianerna över de 120 rutorna av den givande handen i content/moves/giv-nyp-plats-4.json (handflata 0→9 126 mm, långfinger 49 + 34 + 31 mm, knogar 82 mm, tillsammans 240 mm längs benen), alla skalade med 0,7016. Ställningen är den vilande handens i samma rörelse (medianen över rutorna), lagd med dockans ben och sänkt 5 mm så att lägsta leden vilar på filten: hon vilar på fingertopparna med knogarna 4–6 cm över filten. Förlagans händer är större än en hand: den givande 24 cm längs benen (22–27 cm i de olika rutorna) och 8,2 cm mellan knoglederna, den vilande 19 cm och 6,3 cm. Räknat 2026-11-18 med ett arbetsskript som inte ligger i repot."
+  },
+  "rest": {
+    "wristFromCentre": 0.1442,
+    "fingertipsBeforeEdge": 0.1,
+    "toeInDeg": 37.1,
+    "basis": "mätt",
+    "source": "VILA: var händerna ligger. Mätt på den vilande handen i content/moves/giv-nyp-plats-4.json (medianen över rutorna), med dockans hand lagd i dess ställe: handleden 0,144 m från kroppens mitt i sidled, långfingrets spets 0,100 m framför dealerns bordskant och handen vriden 37,1 grader inåt mot kroppens mitt. Då ligger högerhanden i VILA där den ligger genom hela rörelsen, och vänsterhanden är dess spegelbild. Paows vilande hand i gamla standarden (data/dealer-standard.json, hands.leftInPicture, förd ut genom kameran) ligger 0,152 m från mitten, 0,105 m framför kanten och 32 grader inåt."
+  },
+  "pickUp": {
+    "foot": 0.406,
+    "lift": 0.012,
+    "leanDeg": 58,
+    "nextBehind": 0.0006,
+    "basis": "antaget",
+    "source": "Hämtstället: standarden för var kort hämtas, lika för alla dealers och platser. Kortet står på skons mittlinje i den öppna mynningen och lutar bakåt in mot skon. foot är hur långt framför skons mitt kortets nedre kant står, som andel av skons längd; lift är nedre kantens höjd över filten i meter; leanDeg är kortets lutning från filten. Hur läget räknas ur scenens sko står vid pickUpCard i src/scene/dollPose.ts. lift och leanDeg är gamla Dealers antaganden om skon (src/table-lens.ts, SHOE.windowLift och SHOE.plateLean, shoeCard). foot är valt så att stället ligger där rörelsens lästa kort står i scenens sko: det kortets nedre kant står 0,1795 m framför skons mitt (0,406 av längden 0,442), 0,0415 m innanför nosens spets, och kortets mitt 0,009 m vid sidan av mittlinjen; standarden ställer det på mittlinjen. I scenens modell (models/shoe.glb, mätt som tal 2026-11-18) slutar kortbädden där, 0,165–0,172 m framför mitten, och nosens klack börjar på 0,183 m. Kortet i gamla filmens glugg (SHOE_WINDOW_CARD, bildpunkt 1291,5 807,5) ligger på samma mittlinje, 0,13–0,14 m framför skons mitt på 4–5 cm höjd. Modellens egen bädd lutar bara 14 grader: ett kort som står 58 grader sticker upp 1,5 cm över mynningens sidor. nextBehind är hur långt innanför det delade kortet nästa kort står, i meter (dealer3d/src/stage.ts)."
+  },
+  "shoeEnvelope": {
+    "halfWidth": 0.155,
+    "backHeight": 0.333,
+    "boxEnd": 0.238,
+    "boxHeight": 0.206,
+    "noseHeight": 0.068,
+    "basis": "mätt",
+    "source": "Skons hölje, för att se om en hand går genom skon (throughShoe i src/scene/dollPose.ts). Andelar av skons längd (scene.shoe.length): halva bredden, takets höjd längst bak, var den slutna lådan slutar räknat från skons mitt mot mynningen, takets höjd där, och höjden vid nosens spets. Mätt i models/shoe.glb som tal 2026-11-18 (högsta punkt per centimeter längs skon, med modellen skalad till 0,442 m): 0,137 m bred, 0,147 m hög längst bak, taket sluttar rakt till 0,091 m vid 0,105 m framför mitten, och mynningens sidor faller därifrån till 0,049 m vid 0,18 m och 0,03 m vid nosen. Höljet är fyllt också där mynningen är öppen. Talen hör hemma hos skon i content/scene.json och kan flyttas dit."
+  }
+}

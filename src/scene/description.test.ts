@@ -51,4 +51,23 @@ test('en beskrivning med hål i tas inte emot', () => {
   assert.throws(() => readScene({ ...whole, background: undefined }), /background\.liftDeg/);
   assert.throws(() => readScene({ ...whole, player: { ...whole.player, fovDeg: 0 } }), /player\.pitchDeg och player\.fovDeg/);
   assert.throws(() => readScene({ ...whole, table: { ...whole.table, tilt: undefined } }), /table\.tilt\.deg/);
+  // Rummet, helfiguren och förlagan: golvets höjd räknas ur bordets låda, och ytorna ur sina rutor.
+  assert.throws(() => readScene({ ...whole, table: { ...whole.table, model: { ...(whole.table!.model as object), box: { min: [0, 0], max: [1, 1, 1] } } } }), /table\.model\.box/);
+  assert.throws(() => readScene({ ...whole, room: { ...whole.room, radius: 0 } }), /room\.captureHeight och room\.radius/);
+  assert.throws(() => readScene({ ...whole, room: undefined }), /room: basis och source/);
+  assert.throws(() => readScene({ ...whole, figure: { ...whole.figure, frame: { width: 1920 } } }), /figure\.frame/);
+  assert.throws(() => readScene({ ...whole, figure: { ...whole.figure, handRow: '568' } }), /figure\.height, figure\.handRow/);
+  assert.throws(() => readScene({ ...whole, forlaga: { ...whole.forlaga, fps: 0 } }), /forlaga\.frame och forlaga\.fps/);
+});
+
+test('rummet, helfiguren och förlagan bär de tal som är avgjorda', () => {
+  const scene = readScene(readJson('scene.json'));
+  assert.deepEqual(scene.figure.frame, { width: 1920, height: 1080 });
+  assert.deepEqual(scene.forlaga, { ...scene.forlaga, frame: { width: 1920, height: 1080 }, fps: 30 });
+  assert.equal(scene.background.liftDeg, 0);
+  assert.ok(scene.room.captureHeight > 1 && scene.room.captureHeight < 2.5 && scene.room.radius > 3);
+  assert.ok(scene.room.shadowStrength > 0 && scene.room.shadowStrength < 1);
+  // Lådan är hela modellen: filten och dealerns kant ligger inom den.
+  const { box, feltY, dealerEdgeZ } = scene.table.model;
+  assert.ok(box.min[1] <= 0 && feltY < box.max[1] && dealerEdgeZ > box.min[2] && dealerEdgeZ < box.max[2]);
 });

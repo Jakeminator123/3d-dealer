@@ -12,11 +12,12 @@
   ],
   "groups": {
     "identity": "assets/dealers/<dealer>/identity: bilder som bär dealerns likhet. Spelas aldrig.",
-    "anchors": "assets/dealers/<dealer>/anchors: stillbilder som klipp börjar och slutar på (VILA, REDO).",
+    "anchors": "assets/dealers/<dealer>/anchors: stillbilder som klipp börjar och slutar på (VILA, REDO, LAGT n). Ett ankare med use: \"dealerfilm\" är gjort på grön skärm i närbilden av en vy (view) och läggs på den vikta ytan i scenen genom den.",
+    "clips": "assets/dealers/<dealer>/clips: tagningar av klipp mellan två ankare, dealern på grön skärm utan ljud, gjorda i närbilden av en vy (use: \"dealerfilm\", view). De läggs på den vikta ytan i scenen genom den vyn.",
     "backgrounds": "assets/scene/backgrounds: bakgrunder att välja mellan.",
     "materials": "assets/scene/materials: ytor till bordet.",
     "models": "assets/models: 3D-modeller som är lätta nog för scenen.",
-    "reference": "assets/reference: bilder och filmer som visar ett utseende eller ett prov. Används inte i scenen."
+    "reference": "assets/reference: bilder och filmer som visar ett utseende, en rörelse eller ett prov. De spelas aldrig i spelet. En helfigur (use: \"helfigur\") får visas i scenen som förlaga: underlag för de filmer som görs sedan."
   },
   "sources": {
     "dealer": {
@@ -33,6 +34,11 @@
     },
     "jakob": {
       "what": "Lämnad av Jakob direkt."
+    },
+    "local-studio": {
+      "what": "Jakobs projekt local-studio (blackjack-studio), lokalt C:/Users/jakem/dev/super-feature-sg/local-studio. Därifrån kommer dealern Liv, en annan figur än Paulina.",
+      "importedAt": "2026-11-18",
+      "note": "Bara de filer som en post pekar ut är kopierade. Ingenting här läser från den mappen efter importen."
     }
   },
   "assets": [
@@ -386,7 +392,649 @@
       "statusBy": "Agent 2026-11-18: helfiguren sitter rätt i rutan, men händerna vilar på låren, cirka 68 bildpunkter längre in och längre ned än i Livs VILA (mätt av den som gjorde bilden). Duger som stå-in i scenen, inte som första bild till ett klipp med Livs film som referens.",
       "statusAt": "2026-11-18 06:27",
       "reply": "Första helfiguren av Paulina, tre försök för 60 krediter. Hon sitter rätt och har rätt kläder, men händerna ligger på låren i stället för ute vid bordshöjd som Livs. Ansiktet är något slätare än i identitetsbilden. Jag beställer inte fler nu: som förlaga i scenen räcker Livs klipp, och Paulinas riktiga ankare görs ur scenen.",
-      "replyAt": "2026-11-18 06:27"
+      "replyAt": "2026-11-18 06:27",
+      "use": "helfigur"
+    },
+    {
+      "file": "dealers/paulina/anchors/vila-helfigur-bord.png",
+      "group": "anchors",
+      "dealer": "paulina",
+      "title": "VILA i helfigur, händerna vid bordshöjd",
+      "status": "godkänd",
+      "note": "Gjord 2026-11-18, efter Jakobs ord 06:30 om att Paulina ska hålla händerna ovanför som Liv gör. Paulina sittande i helfigur på grönt, framifrån, utan bord, sko och kort, i samma ruta som dealern Livs VILA i local-studio (1920 × 1080), med underarmarna framåt och händerna svävande i bordshöjd med handflatorna nedåt, som på en osynlig bordskant. Händerna ligger på Livs ställe i bilden (mätt, se source.measured: vänster i bild 0 bildpunkter ifrån, höger 4). I vila-helfigur.png vilar händerna på låren. Ett försök. Inte dömd: gjord av en agent och väntar på en oberoende granskare.",
+      "width": 1920,
+      "height": 1080,
+      "bytes": 501945,
+      "pose": "vila",
+      "licence": "Ingen tredjepartslicens: genererad på Jakobs Runway-konto",
+      "use": "helfigur",
+      "source": {
+        "from": "runway",
+        "taskId": "d1fd4d6d-4c71-44cd-a890-030756deee23",
+        "model": "gpt-image-2.6-sunburst",
+        "imageSize": "2K",
+        "ratio": "16:9",
+        "credits": 10,
+        "creditsNote": "Mätt: saldot var 5 005 före beställningen och 4 995 efter (whoami 2026-11-18). Kontot delas med andra sessioner.",
+        "attempts": [
+          {
+            "attempt": 1,
+            "taskId": "d1fd4d6d-4c71-44cd-a890-030756deee23",
+            "credits": 10,
+            "outcome": "Vald. Sittande, lik, tatuerad på hals och händer, händerna svävar med handflatorna nedåt på Livs plats (0 och 4 bildpunkter ifrån), ren bakgrund utan spökbilder."
+          }
+        ],
+        "attemptsFile": "output/work/helfigur2/forsok.json (texterna ordagrant)",
+        "references": [
+          {
+            "tag": "base",
+            "what": "output/work/helfigur2/base-vila.png, byggd av output/work/helfigur2/base.mjs: Livs VILA (se poseFrom) skalad till 1920 × 1080 och orörd som ställning, med huvud, hals och axlar ur dealers/paulina/anchors/vila-helfigur.png ovanför rad 318. Av Liv är bara ställning, ruta, kamera, ljus och grönt hämtat.",
+            "sha256": "4c5246e80a3cd38a80781a3417545ad7e72f431a21cb7b2a00bd7cb7f634fa1f"
+          },
+          {
+            "tag": "face",
+            "what": "dealers/paulina/identity/ansikte-kavaj.png, förminskad till 2048 × 2048 (output/work/helfigur/ref-ansikte.png)"
+          },
+          {
+            "tag": "outfit",
+            "what": "dealers/paulina/identity/helkropp-staende.png, förminskad till 1529 × 2048 (output/work/helfigur/ref-helkropp.png)"
+          },
+          {
+            "tag": "seated",
+            "what": "dealers/paulina/identity/sittande-vid-bord.png, förminskad till 2048 × 1529 (output/work/helfigur/ref-sittande.png)"
+          }
+        ],
+        "prompt": "Edit @base into one clean, finished studio photograph for chroma key. @base is a rough collage: the head, hair, face, tattooed neck, necklace and shoulders at the top already belong to the right woman; everything below the shoulders still shows another person's clothes (a lilac shirt, a navy waistcoat with buttons, navy trousers, black flat shoes) and bare hands. The body pose in @base is correct and final.\n\nKeep exactly as in @base: the 16:9 framing and crop, the straight-on eye-level camera with a long lens, the soft even frontal light, the flat uniform vivid green background everywhere (RGB 2, 182, 48; no floor line, no shadow, no gradient), and the size and position of the figure: top of the hair at 4% from the top edge, soles of the shoes at 96%, centred horizontally. Every body part stays at the same place and the same size: head, shoulders, elbows, hands, knees, feet.\n\nThe pose, stated in words so that it is not changed: she is SITTING upright on an invisible seat, facing the camera squarely. Her thighs are horizontal and point straight toward the camera, so they look short (foreshortened); her knees are bent ninety degrees, at about 60% of the frame height; her lower legs are vertical; her feet are flat on the invisible floor, slightly apart. She is not standing. Her upper arms hang down beside her torso with the elbows slightly away from the body. Her forearms point straight forward toward the camera, horizontal, so they look very short. Both hands hover in the air, palms down, flat and relaxed, fingers together and pointing toward the camera, as if resting on the edge of an invisible table in front of her at table height (just below elbow height, at about 49% of the frame height). The hands are to the left and right of her waist, outside her hips and above the thighs, about hip-width apart, exactly where they are in @base. The hands do NOT rest on the thighs or in her lap, do not touch the body or each other, and do not hang down.\n\nChange only this:\n1. Clothes, as in @outfit and @seated: one fitted black single-button blazer, buttoned, continuing from the shoulders and lapels of @base down over the torso to the hips, with long black sleeves that follow the arms as they are and end at the wrists; a cream V-neck top visible only in the neckline; slim black trousers; black leather ankle boots where the flat shoes are. No waistcoat, no shirt, no shirt cuffs, no row of buttons.\n2. Hands: her own hands as in @seated: the same skin tone as her face, a rose-in-mandala tattoo covering the back of each hand and small symbol tattoos on the backs of the fingers, fine grey-black linework. No rings, no bracelets, no watch.\n3. Blend the collage seam at the chest so that the photograph is seamless.\n\nShe is the woman in @face (the same woman as the head in @base): the same face, the platinum-blonde chin-length bob, the dense black-and-grey ornamental tattoos covering the front of the neck and upper chest, the thin necklace with a small white flower pendant, a calm closed-mouth expression, eyes into the camera.\n\n@face, @outfit and @seated are reference pictures only: nothing from them appears in the picture; no white table, no white background, no enlarged hands, no overlay, no double exposure. No table, no chair or stool, no card shoe, no cards, no chips, no props, no text. One single seamless photograph of one seated person on plain uniform green, sharp from head to toe, true-to-life proportions.",
+        "poseFrom": {
+          "what": "Dealern Livs utgångsbild för VILA i local-studio (rollen keystone, \"Liv · VILA · bred helkropp\"). En annan figur: bara ställning och ruta är hämtade, ingenting av utseendet.",
+          "path": "C:/Users/jakem/dev/super-feature-sg/local-studio/blackjack-studio/data/creator/b4289e0c-90d8-4667-8817-8a68cd40cc71/assets/f9f7fbe2-ac53-4526-8ce5-f4b277103283.png",
+          "width": 1672,
+          "height": 941,
+          "sha256": "9676aa1a21c8bee666309ca271613cf85c8c50cea48e8fd826d38b69724b5090"
+        },
+        "generated": {
+          "width": 2560,
+          "height": 1440,
+          "sha256": "a5afabf4736f58793acc98dfbf5213ec47c064f5ebc4fcfbe8ae998ccd8b7bd1"
+        },
+        "localSteps": [
+          "Bakgrunden (output/work/helfigur2/finish.mjs): figuren (det största sammanhängande området som inte är grönt, vidgat 10 bildpunkter) är behållen. Allt annat är satt till Livs gröna, RGB 2, 182, 48, och det gröna i figurens kant är räknat om från försökets gröna (2, 181, 45). Utanför figuren fanns fyra bildpunkter som inte var gröna; inga spökbilder av referenserna.",
+          "Storleken: 2560 × 1440 förminskad till 1920 × 1080 med samma skala åt båda håll (0,75, lanczos3). Figuren är varken flyttad eller skalad om för att passa Liv."
+        ],
+        "measured": {
+          "how": "output/work/helfigur/measure.mjs, bilderna i 1920 × 1080. Ram: allt som inte är grönt. Händer: sammanhängande hudfärg i ett rutnät om 4 bildpunkter, vänster i bild först. handsOffset är Paulinas kant minus Livs, i bildpunkter.",
+          "green": {
+            "paulina": [
+              2,
+              182,
+              48
+            ],
+            "liv": [
+              2,
+              182,
+              48
+            ]
+          },
+          "figure": {
+            "paulina": {
+              "x0": 757,
+              "y0": 44,
+              "x1": 1161,
+              "y1": 1045
+            },
+            "liv": {
+              "x0": 760,
+              "y0": 45,
+              "x1": 1152,
+              "y1": 1042
+            }
+          },
+          "hands": {
+            "paulina": [
+              {
+                "x0": 792,
+                "y0": 496,
+                "x1": 868,
+                "y1": 568
+              },
+              {
+                "x0": 1052,
+                "y0": 496,
+                "x1": 1128,
+                "y1": 568
+              }
+            ],
+            "liv": [
+              {
+                "x0": 792,
+                "y0": 496,
+                "x1": 868,
+                "y1": 568
+              },
+              {
+                "x0": 1056,
+                "y0": 492,
+                "x1": 1128,
+                "y1": 568
+              }
+            ]
+          },
+          "handsOffset": [
+            {
+              "x0": 0,
+              "y0": 0,
+              "x1": 0,
+              "y1": 0
+            },
+            {
+              "x0": -4,
+              "y0": 4,
+              "x1": 0,
+              "y1": 0
+            }
+          ]
+        },
+        "sha256": "6ed61f239dc96b150a4b2ea8423d90b3b499536188c07d48dee09f13d22e153a"
+      },
+      "statusBy": "Oberoende granskare 2026-11-18: rätt person mot identitetsbilderna (ansikte, bob, halstatuering med hänge, kavaj och blus, ros och knogtecken på båda händerna, fem fingrar, handflatorna nedåt), sittande med hela figuren i rutan (y 44–1045) och händerna x 790–868 och 1053–1129, y 496–567, högst 4 bildpunkter från Livs. Det gröna är jämnt 2, 182, 48 utan skugga, golvlinje, bord, sko eller kort; kvar finns bara en tunn mörkare rand närmast under skosulorna.",
+      "statusAt": "2026-11-18 07:12"
+    },
+    {
+      "file": "dealers/paulina/anchors/redo-helfigur-bord.png",
+      "group": "anchors",
+      "dealer": "paulina",
+      "title": "REDO i helfigur, handen sträckt mot skon",
+      "status": "godkänd",
+      "note": "Gjord 2026-11-18. Samma figur, ruta och storlek som vila-helfigur-bord.png, i dealern Livs REDO-ställning: hennes vänstra hand (höger i bild) är sträckt åt sidan mot där skon står, handflatan nedåt; den andra handen svävar kvar vid bordshöjd. Allt utanför ett område kring den flyttade armen är bildpunkt för bildpunkt samma som i vila-helfigur-bord.png (se source.localSteps och source.measured.differsFromVila). Den sträckta handen ligger 24–28 bildpunkter längre ut än Livs och i samma höjd (mätt). Ett försök. Inte dömd: gjord av en agent och väntar på en oberoende granskare.",
+      "width": 1920,
+      "height": 1080,
+      "bytes": 463859,
+      "pose": "redo",
+      "licence": "Ingen tredjepartslicens: genererad på Jakobs Runway-konto",
+      "use": "helfigur",
+      "source": {
+        "from": "runway",
+        "taskId": "84275dd4-f8f3-4827-b698-af28451c85d4",
+        "model": "gpt-image-2.6-sunburst",
+        "imageSize": "2K",
+        "ratio": "16:9",
+        "credits": 10,
+        "creditsNote": "Antaget lika med VILA-bilden (samma modell och storlek): saldot lästes inte mellan den här beställningen och filmen. Mätt är att saldot var 4 995 före REDO-bilden och 4 901 efter filmen, 94 för de två tillsammans. Kontot delas med andra sessioner.",
+        "attempts": [
+          {
+            "attempt": 1,
+            "taskId": "84275dd4-f8f3-4827-b698-af28451c85d4",
+            "credits": 10,
+            "outcome": "Vald. Armen sträckt åt sidan med tatuerad hand, handflatan nedåt, resten nära VILA (kanter inom 1–2 bildpunkter utom låret bakom den gamla handen). Handen ligger 24–28 bildpunkter längre ut än Livs, i samma höjd."
+          }
+        ],
+        "attemptsFile": "output/work/helfigur2/forsok.json (texterna ordagrant)",
+        "references": [
+          {
+            "tag": "base",
+            "what": "output/work/helfigur2/base-redo.png, byggd av output/work/helfigur2/base-redo.mjs: den färdiga VILA-rutan (dealers/paulina/anchors/vila-helfigur-bord.png) med en lapp ur Livs REDO (se poseFrom), x från 1040 och y 300–590, där armen är sträckt åt sidan. Av Liv är bara armens ställning hämtad.",
+            "sha256": "c52ee8fc592ae3ca77e585e14660b8c58834fce420eaf952c91087ca111a28a3"
+          },
+          {
+            "tag": "vila",
+            "what": "VILA-försöket före efterarbete, task d1fd4d6d-4c71-44cd-a890-030756deee23"
+          },
+          {
+            "tag": "seated",
+            "what": "dealers/paulina/identity/sittande-vid-bord.png, förminskad till 2048 × 1529 (output/work/helfigur/ref-sittande.png)"
+          }
+        ],
+        "prompt": "Edit @base into one clean, finished studio photograph for chroma key. @base is the finished photograph @vila with one rough patch pasted in on the right side of the picture. The patch shows her left arm (the arm on the right side of the picture) in a new pose, but with another person's clothes and hand: a lilac shirt sleeve, a strip of navy waistcoat and navy trousers along the edge of the patch, and a bare hand without tattoos.\n\nThe pose of that arm in the patch is correct and final: the upper arm hangs down from the shoulder and slightly outward; the elbow is bent; the forearm reaches out sideways, away from the body, toward the right edge of the picture, nearly horizontal; the hand hovers in the air at table height, palm down, flat and relaxed, fingers together and pointing sideways to the right, as if reaching toward something standing on an invisible table beside her. The hand stays exactly where it is in @base: far out to the right of her body, at about 46% of the frame height, touching nothing.\n\nChange only the patch:\n1. The sleeve: the long black sleeve of her fitted black blazer, the same fabric as the rest of the blazer in @base, following the arm exactly as it is in the patch and ending at the wrist. No lilac shirt, no shirt cuff.\n2. The hand: her own hand, like her other hand in @base and as in @seated: the same skin tone, a rose-in-mandala tattoo covering the back of the hand and small symbol tattoos on the backs of the fingers, fine grey-black linework. No rings, no bracelet, no watch.\n3. Where the patch shows navy waistcoat or navy trousers: continue her black blazer (its side, its hem, its flap pocket) and her black trousers, as on the other side of her body in @base, so that the torso is symmetric and the photograph is seamless.\n\nEverything outside the patch stays exactly as in @base, unchanged: the 16:9 framing and crop, the camera, the soft even frontal light, the flat uniform green background everywhere (no floor line, no shadow, no gradient), her head, hair, face, expression, neck tattoos, necklace, blazer, cream top, her right arm and right hand (on the left side of the picture, still hovering palm-down in the air beside her hip, not on the thigh), her legs, trousers and boots, and the size and position of the figure. She is still SITTING upright on an invisible seat, facing the camera squarely, eyes into the camera; only this one arm has moved.\n\n@vila and @seated are reference pictures only: nothing from them appears in the picture, no white table, no overlay, no double exposure, no second person. No table, no chair or stool, no card shoe, no cards, no chips, no props, no text. One single seamless photograph of one seated person on plain uniform green, sharp from head to toe, true-to-life proportions.",
+        "poseFrom": {
+          "what": "Dealern Livs utgångsbild för REDO i local-studio. En annan figur: bara armens ställning är hämtad, ingenting av utseendet.",
+          "path": "C:/Users/jakem/dev/super-feature-sg/local-studio/blackjack-studio/data/creator/b4289e0c-90d8-4667-8817-8a68cd40cc71/assets/bba2104b-8574-4058-81c7-6724a1edc171.png",
+          "width": 1672,
+          "height": 941,
+          "sha256": "5a51f75a0e6f5212d242e3308ac3ffd452f0ab42215e935a6efd8e883deb57e4"
+        },
+        "generated": {
+          "width": 2560,
+          "height": 1440,
+          "sha256": "c5cec49c8f4e873cbf17c76d823222831bfb23da56da32d272cc6fe2677bcbab"
+        },
+        "localSteps": [
+          "Bakgrunden (output/work/helfigur2/finish.mjs): som för VILA-bilden; försökets gröna var (2, 178, 48), och utanför figuren fanns tre bildpunkter som inte var gröna.",
+          "Storleken: 2560 × 1440 förminskad till 1920 × 1080 med samma skala åt båda håll (0,75, lanczos3).",
+          "Sammanläggning (output/work/helfigur2/compose-redo.mjs): inom en månghörning kring den flyttade armen är bildpunkterna tagna ur REDO-försöket (155 977 hela och 10 344 i en mjuk kant om cirka 6 bildpunkter); överallt annars ur dealers/paulina/anchors/vila-helfigur-bord.png. Månghörningen går längs ärmhålets söm, tre bildpunkter utanför bålens kant genom det gröna mellan bål och arm, runt platsen där handen låg i VILA och ned till rad 686, där lårets kant åter står lika i de två bilderna (mellan rad 570 och 650 skilde den 3–10 bildpunkter, eftersom höften bakom handen aldrig syntes i VILA). Kontrollerat: 0 avvikande bildpunkter utanför området."
+        ],
+        "composePolygon": [
+          [
+            1088,
+            236
+          ],
+          [
+            1086,
+            262
+          ],
+          [
+            1081,
+            300
+          ],
+          [
+            1075,
+            340
+          ],
+          [
+            1066,
+            375
+          ],
+          [
+            1062,
+            392
+          ],
+          [
+            1062,
+            400
+          ],
+          [
+            1061,
+            410
+          ],
+          [
+            1058,
+            420
+          ],
+          [
+            1057,
+            430
+          ],
+          [
+            1055,
+            440
+          ],
+          [
+            1055,
+            450
+          ],
+          [
+            1057,
+            460
+          ],
+          [
+            1060,
+            470
+          ],
+          [
+            1064,
+            480
+          ],
+          [
+            1068,
+            490
+          ],
+          [
+            1072,
+            500
+          ],
+          [
+            1072,
+            506
+          ],
+          [
+            1048,
+            514
+          ],
+          [
+            1046,
+            620
+          ],
+          [
+            1056,
+            686
+          ],
+          [
+            1420,
+            686
+          ],
+          [
+            1420,
+            236
+          ]
+        ],
+        "measured": {
+          "how": "output/work/helfigur/measure.mjs, bilderna i 1920 × 1080. Ram: allt som inte är grönt. Händer: sammanhängande hudfärg i ett rutnät om 4 bildpunkter, vänster i bild först. handsOffset är Paulinas kant minus Livs, i bildpunkter.",
+          "green": {
+            "paulina": [
+              2,
+              182,
+              48
+            ],
+            "liv": [
+              2,
+              184,
+              56
+            ]
+          },
+          "figure": {
+            "paulina": {
+              "x0": 757,
+              "y0": 44,
+              "x1": 1322,
+              "y1": 1045
+            },
+            "liv": {
+              "x0": 760,
+              "y0": 45,
+              "x1": 1297,
+              "y1": 1042
+            }
+          },
+          "hands": {
+            "paulina": [
+              {
+                "x0": 792,
+                "y0": 496,
+                "x1": 868,
+                "y1": 568
+              },
+              {
+                "x0": 1204,
+                "y0": 468,
+                "x1": 1324,
+                "y1": 520
+              }
+            ],
+            "liv": [
+              {
+                "x0": 792,
+                "y0": 496,
+                "x1": 868,
+                "y1": 568
+              },
+              {
+                "x0": 1180,
+                "y0": 468,
+                "x1": 1296,
+                "y1": 524
+              }
+            ]
+          },
+          "handsOffset": [
+            {
+              "x0": 0,
+              "y0": 0,
+              "x1": 0,
+              "y1": 0
+            },
+            {
+              "x0": 24,
+              "y0": 0,
+              "x1": 28,
+              "y1": -4
+            }
+          ],
+          "differsFromVila": {
+            "what": "Bildpunkter som skiljer sig från dealers/paulina/anchors/vila-helfigur-bord.png, och deras ram",
+            "pixels": 33712,
+            "box": {
+              "x0": 1044,
+              "y0": 261,
+              "x1": 1325,
+              "y1": 688
+            }
+          }
+        },
+        "sha256": "cce38a9a5664fef9edac59de9f54259d6198dda7097e93b32a4e543b2dc7c29d"
+      },
+      "statusBy": "Oberoende granskare 2026-11-18: utanför den flyttade armen är bilden bildpunkt för bildpunkt VILA-bilden (skillnaden ligger inom x 1044–1325, y 261–688), ingen skarv syns vid höft eller axel i tredubbel storlek, och den sträckta handen ligger x 1202–1322, y 470–522: 21–26 bildpunkter längre ut än Livs och i samma höjd, på gränsen för det godtagbara. Handens teckning är tunna linjer i stället för den skuggade rosen i VILA-bilden och identitetsbilden, och bara tre fingrar och tummen syns ur den vinkeln, som hos Liv.",
+      "statusAt": "2026-11-18 07:12"
+    },
+    {
+      "file": "reference/films/paulina-helfigur-vila-redo.mp4",
+      "group": "reference",
+      "dealer": "paulina",
+      "title": "Paulina i helfigur: VILA → REDO",
+      "status": "godkänd",
+      "note": "Gjord 2026-11-18 med Kling 4, efter Jakobs ord om en bättre modell. Paulina sittande i helfigur på grönt går från VILA till REDO: första bild vila-helfigur-bord.png, sista bild redo-helfigur-bord.png och Livs klipp ”Vila → redo” som rörelsereferens, alla tre i samma beställning. 4 s, 1920 × 1080, 24 rutor per sekund (Livs filmer har 30). Ljudet, som alltid följer med ur Kling 4, är borttaget. Mätt i fem rutor (source.measured): figurens ram står still, den vilande handen ligger kvar på sin plats, den andra går från VILA-läget till REDO-läget och är framme senast vid ruta 72; det gröna är (0, 176, 47) i avkodade rutor mot (2, 182, 48) i stillbilderna. Sett av den som gjorde filmen, inte dömt: i rutorna mitt i rörelsen (ungefär 40–48) syns inte tatueringen på den rörliga handen. En tagning. Väntar på en oberoende granskare.",
+      "width": 1920,
+      "height": 1080,
+      "seconds": 4.04,
+      "fps": 24,
+      "bytes": 2329981,
+      "pose": "vila → redo",
+      "licence": "Ingen tredjepartslicens: genererad på Jakobs Runway-konto",
+      "use": "helfigur",
+      "source": {
+        "from": "runway",
+        "taskId": "d306be7a-9c7a-4d0d-9b7c-ed841f82ec3d",
+        "model": "kling-4",
+        "resolution": "1080p",
+        "ratio": "16:9",
+        "duration": 4,
+        "credits": 84,
+        "creditsNote": "Härlett, inte mätt för sig: saldot var 4 995 efter VILA-bilden och 4 901 efter REDO-bilden och filmen (whoami 2026-11-18); med REDO-bilden antagen till 10 blir filmen 84. Verktygets beskrivning anger 14,1 krediter per sekund vid 1080p med referensfilm, räknat på filmens längd plus den längre av referensens och filmens längd, vilket skulle ge cirka 113. Kontot delas med andra sessioner.",
+        "attemptsFile": "output/work/helfigur2/forsok.json (texten ordagrant)",
+        "references": [
+          {
+            "role": "startFrame",
+            "what": "dealers/paulina/anchors/vila-helfigur-bord.png",
+            "sha256": "6ed61f239dc96b150a4b2ea8423d90b3b499536188c07d48dee09f13d22e153a"
+          },
+          {
+            "role": "endFrame",
+            "what": "dealers/paulina/anchors/redo-helfigur-bord.png",
+            "sha256": "cce38a9a5664fef9edac59de9f54259d6198dda7097e93b32a4e543b2dc7c29d"
+          },
+          {
+            "role": "referenceVideos[0]",
+            "what": "reference/films/liv-vila-redo.mp4: dealern Livs klipp ”Vila → redo” ur local-studio, durationSeconds 4. Bara rörelsen är hämtad, ingenting av utseendet.",
+            "path": "C:/Users/jakem/dev/super-feature-sg/local-studio/blackjack-studio/data/creator/b4289e0c-90d8-4667-8817-8a68cd40cc71/assets/8e15d558-5344-498c-ba19-25cb42afdbda.mp4",
+            "sha256": "7d3da52cad58b3dfcc14f4ae2b8f200c3c6d03e3fa255ca57cca5e1ff3fdac3b"
+          }
+        ],
+        "prompt": "The woman in image 1 performs the movement from video 1. Image 1 is the first frame of the clip and image 2 is the last frame.\n\nShe sits still and upright on an invisible seat, facing the camera. For the first second nothing moves. Then she calmly moves only her left arm (the arm on the right side of the picture), exactly as the woman in video 1 does: the hand lifts slightly from where it hovers beside her hip and glides out sideways to the right, palm down, fingers together, until the arm and hand are exactly as in image 2, with the hand hovering in the air far out to the right of her body. The hand arrives about one and a half seconds before the end and then holds completely still until the last frame. The movement has the same timing, the same path and the same calm, smooth pace as in video 1.\n\nHer other hand stays where it is, hovering palm-down in the air beside her hip; it does not move and does not drop onto her thigh. Her head, face, hair, shoulders, torso, legs and feet stay still. She keeps looking into the camera with the same calm closed-mouth expression; only minimal natural breathing and at most one blink. She does not speak.\n\nTake only the movement from video 1. Nothing else from video 1 appears: not that woman's face, hair, waistcoat, shirt, trousers or shoes. The woman keeps her own appearance from image 1 in every frame: the platinum-blonde bob, the tattoos on her neck and on the backs of both hands, the black blazer with the cream top, the black trousers and the black ankle boots.\n\nThe camera is locked off: a completely static tripod shot with no zoom, no pan, no tilt, no push-in and no shake; the framing and the size and position of the woman are identical from the first frame to the last. The background is the same flat, uniform, evenly lit green everywhere for the whole clip: no shadows, no gradient, no floor line, no flicker, no change of colour. There is no table, no card shoe, no cards, no chips, no chair or stool and no other object anywhere in the picture, and no text; nothing appears and nothing disappears. No music, no speech.",
+        "generated": {
+          "what": "Filen som Runway lämnade, med ljudspår",
+          "bytes": 2413030,
+          "audio": "aac",
+          "sha256": "da48fbae343ed645438ef9dc803bac60c66066446b7894475fd63fcdbdd7703e"
+        },
+        "localSteps": [
+          "Ljudet borttaget utan omkodning av bilden: ffmpeg -i film-1-ra.mp4 -an -c:v copy -movflags +faststart film-1.mp4"
+        ],
+        "frames": 97,
+        "codec": "h264",
+        "pixFmt": "yuv420p",
+        "measured": {
+          "how": "output/work/helfigur/measure.mjs på rutorna 0, 24, 48, 72 och 96 (ffmpeg, output/work/helfigur2/rutor). Ram: allt som inte är grönt. Händer: sammanhängande hudfärg i ett rutnät om 4 bildpunkter, vänster i bild först.",
+          "frames": [
+            {
+              "frame": 0,
+              "green": [
+                0,
+                176,
+                48
+              ],
+              "figure": {
+                "x0": 757,
+                "y0": 44,
+                "x1": 1161,
+                "y1": 1045
+              },
+              "hands": [
+                {
+                  "x0": 792,
+                  "y0": 496,
+                  "x1": 868,
+                  "y1": 568
+                },
+                {
+                  "x0": 1052,
+                  "y0": 496,
+                  "x1": 1128,
+                  "y1": 568
+                }
+              ]
+            },
+            {
+              "frame": 24,
+              "green": [
+                0,
+                176,
+                47
+              ],
+              "figure": {
+                "x0": 757,
+                "y0": 44,
+                "x1": 1161,
+                "y1": 1045
+              },
+              "hands": [
+                {
+                  "x0": 792,
+                  "y0": 496,
+                  "x1": 868,
+                  "y1": 568
+                },
+                {
+                  "x0": 1052,
+                  "y0": 496,
+                  "x1": 1128,
+                  "y1": 568
+                }
+              ]
+            },
+            {
+              "frame": 48,
+              "green": [
+                0,
+                176,
+                47
+              ],
+              "figure": {
+                "x0": 757,
+                "y0": 44,
+                "x1": 1303,
+                "y1": 1045
+              },
+              "hands": [
+                {
+                  "x0": 792,
+                  "y0": 496,
+                  "x1": 868,
+                  "y1": 568
+                },
+                {
+                  "x0": 1192,
+                  "y0": 436,
+                  "x1": 1304,
+                  "y1": 484
+                }
+              ]
+            },
+            {
+              "frame": 72,
+              "green": [
+                0,
+                176,
+                47
+              ],
+              "figure": {
+                "x0": 757,
+                "y0": 44,
+                "x1": 1323,
+                "y1": 1045
+              },
+              "hands": [
+                {
+                  "x0": 792,
+                  "y0": 496,
+                  "x1": 868,
+                  "y1": 568
+                },
+                {
+                  "x0": 1200,
+                  "y0": 468,
+                  "x1": 1324,
+                  "y1": 524
+                }
+              ]
+            },
+            {
+              "frame": 96,
+              "green": [
+                0,
+                176,
+                47
+              ],
+              "figure": {
+                "x0": 757,
+                "y0": 44,
+                "x1": 1323,
+                "y1": 1045
+              },
+              "hands": [
+                {
+                  "x0": 792,
+                  "y0": 496,
+                  "x1": 868,
+                  "y1": 568
+                },
+                {
+                  "x0": 1200,
+                  "y0": 468,
+                  "x1": 1324,
+                  "y1": 524
+                }
+              ]
+            }
+          ],
+          "stills": {
+            "vila": {
+              "figure": {
+                "x0": 757,
+                "y0": 44,
+                "x1": 1161,
+                "y1": 1045
+              },
+              "hands": [
+                {
+                  "x0": 792,
+                  "y0": 496,
+                  "x1": 868,
+                  "y1": 568
+                },
+                {
+                  "x0": 1052,
+                  "y0": 496,
+                  "x1": 1128,
+                  "y1": 568
+                }
+              ]
+            },
+            "redo": {
+              "figure": {
+                "x0": 757,
+                "y0": 44,
+                "x1": 1322,
+                "y1": 1045
+              },
+              "hands": [
+                {
+                  "x0": 792,
+                  "y0": 496,
+                  "x1": 868,
+                  "y1": 568
+                },
+                {
+                  "x0": 1204,
+                  "y0": 468,
+                  "x1": 1324,
+                  "y1": 520
+                }
+              ]
+            }
+          }
+        },
+        "sha256": "f11a62009b8ba7ef00aa887eb5e6086c8ad2a5e556a55308b04b679a91a0abf7"
+      },
+      "statusBy": "Oberoende granskare 2026-11-18: godkänd som förlaga för ställning och rörelse, inte som källa för handens utseende: ruta 0 och 96 har händerna på stillbildernas platser, ramen står still i alla 97 rutor, ansikte, hals och kläder är desamma, och handens väg följer Livs (start vid 1,2 s, högst y 428 mot Livs 430, framme vid 2,4 s). Den rörliga handen är helt otecknad i rutorna 37–48 och svagt tecknad till 52 (längre än de 40–48 som uppgavs), rörelseoskarp i 37–42, och filmen har 24 rutor/s mot scenens 30.",
+      "statusAt": "2026-11-18 07:12"
     },
     {
       "file": "dealers/paulina/anchors/redo-nyp.png",
@@ -1016,7 +1664,7 @@
       "file": "scene/materials/runway_felt_2-diffuse.webp",
       "group": "materials",
       "title": "Filt 2, färg",
-      "status": "att granska",
+      "status": "godkänd",
       "width": 2142,
       "height": 918,
       "bytes": 447712,
@@ -1025,7 +1673,9 @@
         "from": "dealer",
         "path": "assets/scene/materials/runway_felt_2-diffuse.webp",
         "sha256": "76eaf82fcc980fbcc3ecbef4b3b551ea86b94e02fa3c3d8017568c4b277e6e5c"
-      }
+      },
+      "statusBy": "Jakob i Labbet 2026-11-18",
+      "statusAt": "2026-11-18 08:32"
     },
     {
       "file": "scene/materials/runway_felt_3-diffuse.webp",
@@ -1061,7 +1711,7 @@
       "file": "scene/materials/runway_leather_2-diffuse.webp",
       "group": "materials",
       "title": "Läder 2, färg",
-      "status": "att granska",
+      "status": "godkänd",
       "width": 1024,
       "height": 1024,
       "bytes": 496196,
@@ -1070,7 +1720,9 @@
         "from": "dealer",
         "path": "assets/scene/materials/runway_leather_2-diffuse.webp",
         "sha256": "efbf489c203901f1429ef2d4c4a1324b49afd79cf14e09055986224b18abe6b1"
-      }
+      },
+      "statusBy": "Jakob i Labbet 2026-11-18",
+      "statusAt": "2026-11-18 08:32"
     },
     {
       "file": "scene/materials/brown_leather-nor_gl.webp",
@@ -1091,7 +1743,7 @@
       "file": "scene/materials/brown_leather-rough.webp",
       "group": "materials",
       "title": "Läder, strävhet",
-      "status": "att granska",
+      "status": "godkänd",
       "width": 512,
       "height": 512,
       "bytes": 134886,
@@ -1100,13 +1752,15 @@
         "from": "dealer",
         "path": "assets/scene/materials/brown_leather-rough.webp",
         "sha256": "00612ec28b54cf8da43dc60085be0511a65112825e8ca863afaadefce556d7e4"
-      }
+      },
+      "statusBy": "Jakob i Labbet 2026-11-18",
+      "statusAt": "2026-11-18 08:32"
     },
     {
       "file": "scene/materials/denim_fabric-nor_gl.webp",
       "group": "materials",
       "title": "Tyg, normalkarta",
-      "status": "att granska",
+      "status": "godkänd",
       "width": 512,
       "height": 512,
       "bytes": 29240,
@@ -1115,13 +1769,15 @@
         "from": "dealer",
         "path": "assets/scene/materials/denim_fabric-nor_gl.webp",
         "sha256": "47d6e98f08a4311f7e7332b159d0ec3aa4b472d3f94b781c664a971655e77119"
-      }
+      },
+      "statusBy": "Jakob i Labbet 2026-11-18",
+      "statusAt": "2026-11-18 08:32"
     },
     {
       "file": "scene/materials/denim_fabric-rough.webp",
       "group": "materials",
       "title": "Tyg, strävhet",
-      "status": "att granska",
+      "status": "godkänd",
       "width": 512,
       "height": 512,
       "bytes": 62308,
@@ -1130,7 +1786,9 @@
         "from": "dealer",
         "path": "assets/scene/materials/denim_fabric-rough.webp",
         "sha256": "a9a9483ca0672ef18329e7d7de6acd7b6742201808cd91e4e1c36829fd27d97d"
-      }
+      },
+      "statusBy": "Jakob i Labbet 2026-11-18",
+      "statusAt": "2026-11-18 08:32"
     },
     {
       "file": "scene/materials/wood_table-diffuse.webp",
@@ -1572,6 +2230,307 @@
       "statusBy": "Jakob i Labbet 2026-11-18",
       "comment": "Också bra, liknar film 5 mycket.",
       "commentAt": "2026-11-18 04:28"
+    },
+    {
+      "file": "reference/films/liv-vila-redo.mp4",
+      "group": "reference",
+      "title": "Liv i helfigur: Vila → redo",
+      "status": "godkänd",
+      "note": "Dealern Liv ur local-studio, en annan figur än Paulina: bara rörelse, ruta och ställning används, aldrig utseendet. Klippet ”Vila → redo”. Sittande helfigur på grön skärm, framifrån, utan bord. Visas i scenen upprätt bakom 3D-bordet, som underlag för förlagor.",
+      "width": 1920,
+      "height": 1080,
+      "seconds": 4,
+      "fps": 30,
+      "bytes": 10083623,
+      "use": "helfigur",
+      "licence": "Inte utredd här: gjord i Jakobs projekt local-studio, där dess ursprung står. Används bara som förlaga och publiceras inte.",
+      "source": {
+        "from": "local-studio",
+        "path": "C:/Users/jakem/dev/super-feature-sg/local-studio/blackjack-studio/data/creator/b4289e0c-90d8-4667-8817-8a68cd40cc71/assets/8e15d558-5344-498c-ba19-25cb42afdbda.mp4",
+        "sha256": "7d3da52cad58b3dfcc14f4ae2b8f200c3c6d03e3fa255ca57cca5e1ff3fdac3b",
+        "frames": 120
+      },
+      "statusBy": "Agent 2026-11-18: rörelsereferens ur local-studio, visas bara som förlaga",
+      "statusAt": "2026-11-18 06:46"
+    },
+    {
+      "file": "reference/films/liv-redo-vila.mp4",
+      "group": "reference",
+      "title": "Liv i helfigur: Redo → vila",
+      "status": "godkänd",
+      "note": "Dealern Liv ur local-studio, en annan figur än Paulina: bara rörelse, ruta och ställning används, aldrig utseendet. Klippet ”Redo → vila”. Sittande helfigur på grön skärm, framifrån, utan bord. Visas i scenen upprätt bakom 3D-bordet, som underlag för förlagor.",
+      "width": 1920,
+      "height": 1080,
+      "seconds": 4,
+      "fps": 30,
+      "bytes": 9949289,
+      "use": "helfigur",
+      "licence": "Inte utredd här: gjord i Jakobs projekt local-studio, där dess ursprung står. Används bara som förlaga och publiceras inte.",
+      "source": {
+        "from": "local-studio",
+        "path": "C:/Users/jakem/dev/super-feature-sg/local-studio/blackjack-studio/data/creator/b4289e0c-90d8-4667-8817-8a68cd40cc71/assets/8e0f2c33-ca94-4c49-b5e5-77326390834c.mp4",
+        "sha256": "c41f763ac6cc230184da95290d62bf48d259e64dfef08b73a76e800982701778",
+        "frames": 120
+      },
+      "statusBy": "Agent 2026-11-18: rörelsereferens ur local-studio, visas bara som förlaga",
+      "statusAt": "2026-11-18 06:46"
+    },
+    {
+      "file": "reference/films/liv-vila-andas.mp4",
+      "group": "reference",
+      "title": "Liv i helfigur: Andas lugnt",
+      "status": "godkänd",
+      "note": "Dealern Liv ur local-studio, en annan figur än Paulina: bara rörelse, ruta och ställning används, aldrig utseendet. Klippet ”Andas lugnt”: hon sitter i VILA och andas. Filmen är 1918 bildpunkter bred och sträcks till rutans 1920 när den visas. Sittande helfigur på grön skärm, framifrån, utan bord. Visas i scenen upprätt bakom 3D-bordet, som underlag för förlagor.",
+      "width": 1918,
+      "height": 1080,
+      "seconds": 8,
+      "fps": 30,
+      "bytes": 19119220,
+      "use": "helfigur",
+      "licence": "Inte utredd här: gjord i Jakobs projekt local-studio, där dess ursprung står. Används bara som förlaga och publiceras inte.",
+      "source": {
+        "from": "local-studio",
+        "path": "C:/Users/jakem/dev/super-feature-sg/local-studio/blackjack-studio/data/creator/b4289e0c-90d8-4667-8817-8a68cd40cc71/assets/30be2ef5-0858-4d30-8e12-233aefa567c5.mp4",
+        "sha256": "721582033dbb1f099753cd29ec37b3544746790ec0178bf01368b370e8c7a522",
+        "frames": 240
+      },
+      "statusBy": "Agent 2026-11-18: rörelsereferens ur local-studio, visas bara som förlaga",
+      "statusAt": "2026-11-18 06:46"
+    },
+    {
+      "file": "reference/films/liv-plats4-vila-redo.mp4",
+      "group": "reference",
+      "title": "Liv i helfigur: Plats 4 · VILA → REDO",
+      "status": "godkänd",
+      "note": "Dealern Liv ur local-studio, en annan figur än Paulina: bara rörelse, ruta och ställning används, aldrig utseendet. Klippet ”Plats 4 · VILA → REDO”. Källan är kodad i yuv444p, som webbläsare ofta inte spelar; filen här är omkodad till yuv420p. Sittande helfigur på grön skärm, framifrån, utan bord. Visas i scenen upprätt bakom 3D-bordet, som underlag för förlagor.",
+      "width": 1920,
+      "height": 1080,
+      "seconds": 7.8,
+      "fps": 30,
+      "bytes": 3929065,
+      "use": "helfigur",
+      "licence": "Inte utredd här: gjord i Jakobs projekt local-studio, där dess ursprung står. Används bara som förlaga och publiceras inte.",
+      "source": {
+        "from": "local-studio",
+        "path": "C:/Users/jakem/dev/super-feature-sg/local-studio/blackjack-studio/data/creator/b4289e0c-90d8-4667-8817-8a68cd40cc71/assets/354efdbe-15dd-4bec-9c2d-a4a3a3494453.mp4",
+        "sha256": "f9070dcf8552a50a59b58fd2692571b8cedc2d214a0bbbed367205a14f02e9e6",
+        "original": {
+          "sha256": "143131b8506554f86a15dab3705972f5acc607bb64cac80b60982b0a0efc19b8",
+          "bytes": 2692744,
+          "pixFmt": "yuv444p"
+        },
+        "command": "ffmpeg -i 354efdbe-15dd-4bec-9c2d-a4a3a3494453.mp4 -c:v libx264 -preset slow -crf 14 -pix_fmt yuv420p -an -movflags +faststart liv-plats4-vila-redo.mp4",
+        "commandNote": "Omkodad 2026-11-18, eftersom webbläsare ofta inte spelar yuv444p. Samma rutor och samma takt; färgens upplösning är halverad.",
+        "frames": 234
+      },
+      "statusBy": "Agent 2026-11-18: rörelsereferens ur local-studio, visas bara som förlaga",
+      "statusAt": "2026-11-18 06:46"
+    },
+    {
+      "file": "reference/liv-vila.png",
+      "group": "reference",
+      "title": "Liv i helfigur: VILA",
+      "status": "godkänd",
+      "note": "Dealern Liv ur local-studio, en annan figur än Paulina: bara rörelse, ruta och ställning används, aldrig utseendet. Utgångsbilden för VILA. Bilden är 1672 × 941, samma sidförhållande som rutan, och sträcks till rutan när den visas. Sittande helfigur på grön skärm, framifrån, utan bord. Visas i scenen upprätt bakom 3D-bordet, som underlag för förlagor.",
+      "width": 1672,
+      "height": 941,
+      "bytes": 1326077,
+      "use": "helfigur",
+      "licence": "Inte utredd här: gjord i Jakobs projekt local-studio, där dess ursprung står. Används bara som förlaga och publiceras inte.",
+      "source": {
+        "from": "local-studio",
+        "path": "C:/Users/jakem/dev/super-feature-sg/local-studio/blackjack-studio/data/creator/b4289e0c-90d8-4667-8817-8a68cd40cc71/assets/f9f7fbe2-ac53-4526-8ce5-f4b277103283.png",
+        "sha256": "9676aa1a21c8bee666309ca271613cf85c8c50cea48e8fd826d38b69724b5090"
+      },
+      "statusBy": "Agent 2026-11-18: rörelsereferens ur local-studio, visas bara som förlaga",
+      "statusAt": "2026-11-18 06:46"
+    },
+    {
+      "file": "reference/liv-redo.png",
+      "group": "reference",
+      "title": "Liv i helfigur: REDO",
+      "status": "godkänd",
+      "note": "Dealern Liv ur local-studio, en annan figur än Paulina: bara rörelse, ruta och ställning används, aldrig utseendet. Utgångsbilden för REDO. Bilden är 1672 × 941, samma sidförhållande som rutan, och sträcks till rutan när den visas. Sittande helfigur på grön skärm, framifrån, utan bord. Visas i scenen upprätt bakom 3D-bordet, som underlag för förlagor.",
+      "width": 1672,
+      "height": 941,
+      "bytes": 1357452,
+      "use": "helfigur",
+      "licence": "Inte utredd här: gjord i Jakobs projekt local-studio, där dess ursprung står. Används bara som förlaga och publiceras inte.",
+      "source": {
+        "from": "local-studio",
+        "path": "C:/Users/jakem/dev/super-feature-sg/local-studio/blackjack-studio/data/creator/b4289e0c-90d8-4667-8817-8a68cd40cc71/assets/bba2104b-8574-4058-81c7-6724a1edc171.png",
+        "sha256": "5a51f75a0e6f5212d242e3308ac3ffd452f0ab42215e935a6efd8e883deb57e4"
+      },
+      "statusBy": "Agent 2026-11-18: rörelsereferens ur local-studio, visas bara som förlaga",
+      "statusAt": "2026-11-18 06:46"
+    },
+    {
+      "file": "dealers/paulina/anchors/spelaren-redo.png",
+      "group": "anchors",
+      "dealer": "paulina",
+      "title": "REDO ur Spelaren, på grönt",
+      "status": "att granska",
+      "note": "Gjord 2026-11-18. Paulina på enfärgad grön skärm i närbilden av vyn Spelaren (samma öga som vyn, inzoomat på dealern), i dockans ställning REDO: vänster hand nyper det gula märkkortets övre kortsida i skons mynning, höger hand vilar på filten, blicken på kortet. Skon och kortet står där scenens sko står sedd ur närbilden (kortet inom 4 bildpunkter). Händerna är krympta lokalt till dockans storlek (0,82), eftersom bildmodellerna ritade dem 1,2–1,3 gånger för stora. Inte dömd: gjord av en agent och väntar på en oberoende granskare.",
+      "width": 1920,
+      "height": 1080,
+      "bytes": 748767,
+      "pose": "redo",
+      "grip": "nyp",
+      "licence": "Ingen tredjepartslicens: genererad på Jakobs Runway-konto",
+      "use": "dealerfilm",
+      "view": {
+        "kind": "spelaren"
+      },
+      "source": {
+        "from": "runway",
+        "taskId": "0741b713-43e3-43ac-b64a-5056493203d7",
+        "model": "gpt-image-2.6-sunburst",
+        "imageSize": "2K",
+        "ratio": "16:9",
+        "credits": 28,
+        "creditsNote": "Mätt med whoami och verktygets svar 2026-11-18: ställningen med Nano Banana Pro kostade 20 (4 744 → 4 724) och retuschen 8 (4 724 → 4 716). Tre tidigare försök med GPT Image 2.6 Sunburst (30 krediter) och ett med Ideogram 4.5 Precise Edit (25) valdes inte; de står i output/work/giv-4/LOGG.md.",
+        "steps": [
+          {
+            "step": "underlag",
+            "what": "Dockans REDO (content/moves/giv-nyp-plats-4.json, tid 0) ur Spelarens närbild i ateljén: grön skärm, ljusare grönt bord med rutnät om 10 cm, scenens sko, hudfärgade händer. output/forlagor/docka-giv-nyp-plats-4_spelaren-nara_atelje_bild_redo.png, sparad med src/pipeline/shoot.ts."
+          },
+          {
+            "step": "ställning",
+            "model": "nano-banana-pro",
+            "taskId": "4a564060-e702-4b31-b3e0-551095b0e54a",
+            "what": "Dockan bytt mot Paulina med identitetsbilderna ansikte-kavaj, helkropp-staende och hander-ovansida som referens. Håller underlagets geometri (sko, bordskant, rutnät och kort inom 4 bildpunkter); ansiktet blev slätare och håret askblont."
+          },
+          {
+            "step": "likhet",
+            "model": "gpt-image-2.6-sunburst",
+            "taskId": "0741b713-43e3-43ac-b64a-5056493203d7",
+            "what": "Retusch av förra bilden med ansikte-kavaj som referens: bara huvudet ändrat i ord, geometrin kvar (kortet på samma bildpunkter), händerna 8 % större."
+          },
+          {
+            "step": "händer",
+            "what": "output/work/giv-4/krymp-hand.ts: vilande handen skalad 0,82 kring ärmen, givhanden 0,82 kring kortet; det som blev över fyllt med närmaste bildpunkt."
+          },
+          {
+            "step": "skärm",
+            "what": "output/work/giv-4/platta-gront.ts: bakgrund, bord och rutnät satta till RGB (2, 182, 48)."
+          }
+        ],
+        "measured": "Mätt med output/work/giv-4/mat-ankare.ts i den färdiga bilden: vilande handens hud 124 × 88 bildpunkter (dockans 120 × 88), gult kort 1264,720–1328,800 (dockans 1264,716–1332,796), skon 1228,608–1692,840 (underlagets 1240,652–1692,840: bildmodellens sko är högre baktill).",
+        "sha256": "384333d8814d849c749582c04d2278ee5247fa4c1a22dd315c4964be77220f7e"
+      }
+    },
+    {
+      "file": "dealers/paulina/anchors/spelaren-lagt-4.png",
+      "group": "anchors",
+      "dealer": "paulina",
+      "title": "LAGT 4 ur Spelaren, på grönt",
+      "status": "att granska",
+      "note": "Gjord 2026-11-18. Samma uppställning som spelaren-redo.png, i dockans slutställning: kortet ligger på första kortplatsen för plats 4 med den blå sidan upp, vänster hand vilar med fingertopparna vid kortet, höger hand ligger kvar, blicken ned på kortet. Märkkortet är målat enfärgat blått på dockans kortplats (bildmodellen gav det vit kant och lade det 20 bildpunkter åt höger); fingertopparna ligger därför vid kortets högra kant och inte mitt på dess kortsida. Skon är flyttad 14 bildpunkter åt vänster till samma plats som i REDO. Händerna krympta som i REDO. Inte dömd: gjord av en agent och väntar på en oberoende granskare.",
+      "width": 1920,
+      "height": 1080,
+      "bytes": 822167,
+      "pose": "lagt 4",
+      "grip": "nyp",
+      "licence": "Ingen tredjepartslicens: genererad på Jakobs Runway-konto",
+      "use": "dealerfilm",
+      "view": {
+        "kind": "spelaren"
+      },
+      "source": {
+        "from": "runway",
+        "taskId": "547b3025-105c-40f8-b856-13691bb109fa",
+        "model": "gpt-image-2.6-sunburst",
+        "imageSize": "2K",
+        "ratio": "16:9",
+        "credits": 29,
+        "creditsNote": "Verktygets svar 2026-11-18: ställningen med Nano Banana Pro 20 (4 716 → 4 696), retuschen 9 (4 671 → 4 662).",
+        "steps": [
+          {
+            "step": "underlag",
+            "what": "Dockans slutställning (tid 3,9667 s) ur Spelarens närbild i ateljén, output/forlagor/docka-giv-nyp-plats-4_spelaren-nara_atelje_bild_lagt.png."
+          },
+          {
+            "step": "ställning",
+            "model": "nano-banana-pro",
+            "taskId": "b26dc9ec-83f9-43d5-a18e-dbc493b7f796",
+            "what": "Dockan bytt mot Paulina. Geometrin höll; håret blev orange av orden warm golden-blonde."
+          },
+          {
+            "step": "likhet",
+            "model": "gpt-image-2.6-sunburst",
+            "taskId": "547b3025-105c-40f8-b856-13691bb109fa",
+            "what": "Retusch av huvudet med ansikte-kavaj och REDO-bilden som referens."
+          },
+          {
+            "step": "händer",
+            "what": "krymp-hand.ts: vilande handen 0,82 kring ärmen, givhanden 0,82 kring kortet (med tatueringen följd upp till ärmen)."
+          },
+          {
+            "step": "kort",
+            "what": "output/work/giv-4/mala-kort.ts: märkkortet målat enfärgat blått i dockans fyra korthörn (860,968 – 940,967 – 941,1022 – 857,1022), resten av modellens kort borttaget."
+          },
+          {
+            "step": "skärm och sko",
+            "what": "platta-gront.ts, och flytta-ruta.mjs: rutan med skon flyttad 14 bildpunkter åt vänster."
+          }
+        ],
+        "measured": "Mätt med mat-ankare.ts: blått kort 856,968–940,1024 (dockans 856,964–940,1020), vilande handens hud 112 × 84 (dockans 124 × 80), givhandens 132 × 152 med handleden (dockans 124 × 116), skon 1224,608–1692,840.",
+        "sha256": "be148f85af548bebf9db5e0194f0cfc57b9957f96e62be2e4f85cae07e0bbbaa"
+      }
+    },
+    {
+      "file": "dealers/paulina/clips/giv-4-nyp_spelaren_t1.mp4",
+      "group": "clips",
+      "dealer": "paulina",
+      "title": "Giv till plats 4 (nyp) ur Spelaren, tagning 1",
+      "status": "att granska",
+      "note": "Gjord 2026-11-18 med Kling 4. Paulina på grön skärm i närbilden av vyn Spelaren ger ett kort till plats 4: REDO → LAGT 4. Första bild spelaren-redo.png, sista bild spelaren-lagt-4.png, och dockans giv ur samma närbild som rörelsereferens. Ljudet, som alltid följer med ur Kling 4, är borttaget. Sett av den som beställde, inte dömt: hon drar det gula kortet ur skons mynning, vänder det till blått och lägger det på kortplatsen; huvud och blick följer kortet och axeln rör sig; skon står still och skärmen är jämnt grön. Mitt i rörelsen syns inte handens tatuering. Väntar på en oberoende granskare.",
+      "width": 1920,
+      "height": 1080,
+      "seconds": 4.04,
+      "fps": 24,
+      "bytes": 3946357,
+      "pose": "redo → lagt 4",
+      "grip": "nyp",
+      "seat": 4,
+      "take": 1,
+      "licence": "Ingen tredjepartslicens: genererad på Jakobs Runway-konto",
+      "use": "dealerfilm",
+      "view": {
+        "kind": "spelaren"
+      },
+      "lands": {
+        "seat": 4,
+        "index": 0,
+        "at": 3
+      },
+      "source": {
+        "from": "runway",
+        "taskId": "988659b5-77ee-42d7-8b31-5bf4c7fd9121",
+        "model": "kling-4",
+        "resolution": "1080p",
+        "ratio": "16:9",
+        "duration": 4,
+        "credits": 85,
+        "creditsNote": "Enligt underagenten som beställde: 85 krediter drogs (whoami före och efter, 2026-11-18). Kontot delas med andra sessioner.",
+        "references": [
+          {
+            "role": "startFrame",
+            "what": "dealers/paulina/anchors/spelaren-redo.png"
+          },
+          {
+            "role": "endFrame",
+            "what": "dealers/paulina/anchors/spelaren-lagt-4.png"
+          },
+          {
+            "role": "referenceVideos[0]",
+            "what": "output/forlagor/docka-giv-nyp-plats-4_spelaren-nara_atelje.mp4: dockans giv (content/moves/giv-nyp-plats-4.json) ur Spelarens närbild i grå ateljé, 3,97 s i 30 rutor/s, sparad med src/pipeline/shoot.ts"
+          }
+        ],
+        "prompt": "Locked camera, one continuous shot. The woman in image 1 performs the movement of the white mannequin in video 1, with the same timing. Image 1 is the first frame of the clip and image 2 is the last frame. Her left hand at the card shoe draws the yellow card up out of the opening, holding it by its short end between thumb and fingers, and carries it low over the table to its place in front of her, where the last frame shows it. On the way her wrist rolls once and hand and card turn over together about the card's long side, like turning a key: the broad yellow side narrows to a thin edge, then the broad blue side opens upward. With the same hold she lays the card flat at its place, blue side up, and her fingertips come to rest on it, as in the last frame. She is alive and attentive: her eyes follow the card the whole way, her head turns with it from the shoe to the middle of the table, and her shoulder and upper body lean slightly with the reach, naturally, as a professional dealer moves. She blinks once. Her other hand rests on the table and does not move. Only one card moves: a small card, about half as long as her hand, which keeps the same size all the way. It is blank, solid yellow on one side and solid blue on the other. The next card in the shoe is the same blank yellow. Her hands stay small and slender, the same size as in the first frame, with the same tattoos. The black card shoe does not move. The background stays the same flat green everywhere: no table is visible, there are no shadows on the green, and nothing else appears. No sound.",
+        "promptNote": "Texten utgår från gamla Dealers bästa för nyp till plats 4 (text C, tagning C2 och C3), med tillägg om blick, huvud och överkropp efter Jakobs ord 2026-11-18.",
+        "sha256": "c629d19b73d60f222c8afd929ce78796a33a359a9de6052556b7734ecd2775d5"
+      }
     }
   ],
   "leftOut": [
@@ -1614,6 +2573,22 @@
     {
       "what": "dealers/paulina/identity/original-vid.png, dealers/paulina/identity/original-nara.png, dealers/paulina/identity/ansikte-linne.png, dealers/paulina/anchors/redo-slap.png",
       "why": "Jakob gav dem utgår i Labbet 2026-11-18 och sa ja till att ta bort dem. Källor i gamla Dealer: assets/proofs/paow-profilbild-och-keystone/9-jakobs-bild-vid.png (sha256 a2dd9e57d37a); assets/proofs/paow-profilbild-och-keystone/8-jakobs-bild-nara.png (sha256 2575b685e18d); assets/proofs/paow-profilbild-och-keystone/1-profilbild-4k-forslag-a.png (sha256 b7304ae17bb7); assets/anchors/paow-ankare-2-2-t1/anchor.png (sha256 451fbaafa65a)"
+    },
+    {
+      "what": "dealers/paulina/anchors/vila-spelaren.png",
+      "why": "Struken 2026-11-18 av agenten (Claude Code) efter Jakobs ord samma morgon: gjord av 2D-agenten efter modellbytet med rum, bord och sko inbakade i bilden. Jakob valde dealern på grönt med 3D-scenen runt, och kallade materialet skit. Bilden själv höll: kamera, bord och rum låg kvar som i förlagan. Filen ligger i output/work/struket/dealers/paulina/anchors/vila-spelaren.png (sha256 be02b7286119)."
+    },
+    {
+      "what": "dealers/paulina/anchors/redo-spelaren.png",
+      "why": "Struken 2026-11-18 av agenten (Claude Code) efter Jakobs ord samma morgon: gjord av 2D-agenten efter modellbytet med rum, bord och sko inbakade i bilden. Jakob valde dealern på grönt med 3D-scenen runt, och kallade materialet skit. Handen ligger dessutom på skons lock i stället för på kortet i mynningen. Filen ligger i output/work/struket/dealers/paulina/anchors/redo-spelaren.png (sha256 3fd4d9eb3208)."
+    },
+    {
+      "what": "dealers/paulina/anchors/vila-plats7.png",
+      "why": "Struken 2026-11-18 av agenten (Claude Code) efter Jakobs ord samma morgon: gjord av 2D-agenten efter modellbytet med rum, bord och sko inbakade i bilden. Jakob valde dealern på grönt med 3D-scenen runt, och kallade materialet skit. Bildmodellen vände henne dessutom mot kameran, gjorde henne större än förlagan och ritade om bordet. Filen ligger i output/work/struket/dealers/paulina/anchors/vila-plats7.png (sha256 2ced0c8d2267)."
+    },
+    {
+      "what": "reference/films/paulina-spelaren-vila-redo.mp4",
+      "why": "Struken 2026-11-18 av agenten (Claude Code) efter Jakobs ord samma morgon: gjord av 2D-agenten efter modellbytet med rum, bord och sko inbakade i bilden. Jakob valde dealern på grönt med 3D-scenen runt, och kallade materialet skit. Filmen slutar på det felaktiga REDO-ankaret och bara armen rör sig (Jakob: helt fel). Kling 4, 85 krediter. Filen ligger i output/work/struket/reference/films/paulina-spelaren-vila-redo.mp4 (sha256 ecd5ea42f005)."
     }
   ]
 }

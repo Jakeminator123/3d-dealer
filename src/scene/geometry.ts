@@ -140,6 +140,57 @@ export function tilted(scene: SceneDescription, point: Vec3): Vec3 {
 /** En kortplats som punkt i scenen: på filten, där bordets lutning lägger den. */
 export const placeOnTable = (scene: SceneDescription, place: FeltPoint): Vec3 => tilted(scene, [place[0], 0, place[1]]);
 
+/** Bordsmodellens låda i scenen: dess åtta hörn, där modellen står och bordets lutning ställer dem. */
+function tableBox(scene: SceneDescription): Vec3[] {
+  const { min, max } = scene.table.model.box;
+  const at = tablePosition(scene);
+  const corners: Vec3[] = [];
+  for (const x of [min[0], max[0]]) for (const y of [min[1], max[1]]) for (const z of [min[2], max[2]]) corners.push(tilted(scene, add(at, [x, y, z])));
+  return corners;
+}
+
+/**
+ * Golvets höjd: det lutade bordets lägsta punkt. Bordsmodellens undersida står på golvet när bordet är olutat; lutat
+ * sjunker sidan mot spelaren, och golvet läggs där, så att bordet aldrig går ned i det.
+ */
+export const floorY = (scene: SceneDescription): number => Math.min(...tableBox(scene).map((corner) => corner[1]));
+
+/** Bordets fotavtryck på golvet, sett rakt uppifrån: den minsta och den största punkten i x och z. */
+export function tableFootprint(scene: SceneDescription): { min: FeltPoint; max: FeltPoint } {
+  const corners = tableBox(scene);
+  const xs = corners.map((corner) => corner[0]);
+  const zs = corners.map((corner) => corner[2]);
+  return { min: [Math.min(...xs), Math.min(...zs)], max: [Math.max(...xs), Math.max(...zs)] };
+}
+
+/**
+ * Punkten på golvet som en 360-bild antas vara tagen över: rakt under spelarens öga. Då ser spelaren rummet som bilden
+ * är tagen, så när som på skillnaden i höjd, och från de andra platserna förskjuts rummet som ett rum gör.
+ */
+export function roomFoot(scene: SceneDescription): Vec3 {
+  const eye = playerEye(scene);
+  return [eye.position[0], floorY(scene), eye.position[2]];
+}
+
+/**
+ * Helfigurens yta: en upprätt fyrhörning bakom dealerns bordskant, mitt för bordet. Hörnen går medurs i bild med början
+ * uppe till vänster och täcker hela helfigurens ruta. Raden för händernas underkant står strax över filtens höjd.
+ * Ytan lutar inte med bordet: dealern sitter på golvet bakom det.
+ */
+export function figureCorners(scene: SceneDescription): Vec3[] {
+  const { width, height } = scene.figure.frame;
+  const [left, top] = onFigure(scene, { x: -0.5, y: -0.5 });
+  const [right, bottom, z] = onFigure(scene, { x: width - 0.5, y: height - 0.5 });
+  return [[left, top, z], [right, top, z], [right, bottom, z], [left, bottom, z]];
+}
+
+/** Var det som helfigurens bild har i en bildpunkt står i scenen. Rutans överkant är rad 0, en halv bildpunkt ovanför översta punktens mitt. */
+export function onFigure(scene: SceneDescription, pixel: Pixel): Vec3 {
+  const { frame, height, handRow, handLift, behindEdge } = scene.figure;
+  const metre = height / frame.height;
+  return [(pixel.x + 0.5 - frame.width / 2) * metre, handLift + (handRow - (pixel.y + 0.5)) * metre, scene.dealerEdge.z - behindEdge];
+}
+
 /**
  * Vecket: dealerfilmens två ytor, så som filmkameran ser dem. Ovanför bordskantens rad står bilden upprätt på kanten;
  * nedanför ligger den på filten. Hörnen går medurs i bild med början uppe till vänster, och täcker tillsammans hela rutan.
@@ -273,6 +324,106 @@ export function seatEye(scene: SceneDescription, seat: number, base: Eye = playe
   const topRow = see(base, top)?.y;
   if (!card || topRow === undefined) throw new Error('Ögat ser inte sitt eget kort och dealerbildens överkant');
   return aimed(position, base.frame, tilted(scene, own), card, top, topRow, Math.atan2(turned.forward[0], -turned.forward[2]));
+}
+
+/**
+ * Dealerns arbetsyta: punkterna en dealerfilm ska rymma. Kroppen är en låda vid och bakom bordskanten, från filten upp
+ * till luften över hjässan och i sidled så långt armarna och skon når. På filten är det varje kortplats, dealerns och
+ * spelarnas, med handens räckvidd förbi kortet åt sidorna och mot spelaren, där bordets lutning lägger dem.
+ */
+export function workArea(scene: SceneDescription): Vec3[] {
+  const { x, top, behind, past } = scene.film.reach;
+  const edge = scene.dealerEdge.z;
+  const body = x.flatMap((side): Vec3[] => [
+    [side, top, edge - behind],
+    [side, top, edge],
+    [side, 0, edge - behind],
+    [side, 0, edge],
+  ]);
+  const places = [...scene.places.dealer, ...scene.places.seats.flatMap((seat) => seat.cards)];
+  const felt = places.flatMap((place): Vec3[] => [
+    tilted(scene, [place[0] - past, 0, place[1] + past]),
+    tilted(scene, [place[0] + past, 0, place[1] + past]),
+  ]);
+  return [...body, ...felt];
+}
+
+/**
+ * Närbilden av ett öga: samma plats, riktat mot dealern och inzoomat så att hennes arbetsyta (`workArea`) fyller
+ * dealerfilmens ruta med `film.margin` luft mot kanten. En dealerfilm görs i närbilden och läggs tillbaka på den vikta
+ * ytan genom den. Ögat står kvar, så det närbilden visar är ett utsnitt av det `from` ser: ingenting förskjuts.
+ */
+export function closeEye(scene: SceneDescription, from: Eye): Eye {
+  const { frame, margin } = scene.film;
+  const points = workArea(scene);
+  const centre = mul(points.reduce(add), 1 / points.length);
+  let forward = unit(sub(centre, from.position));
+  let wide = 1;
+  let tall = 1;
+  // Ögat vrids tills arbetsytan ligger mitt i rutan: lika långt till dess yttersta punkter åt båda håll, i sidled och i höjd.
+  for (let step = 0; step < 40; step++) {
+    const eye = axes({ ...from, forward });
+    const seen = points.map((point) => {
+      const offset = sub(point, from.position);
+      const depth = dot(offset, eye.forward);
+      if (depth <= 1e-9) throw new Error('Ögat ser inte hela dealerns arbetsyta');
+      return [dot(offset, eye.right) / depth, dot(offset, eye.up) / depth];
+    });
+    const us = seen.map((point) => point[0]!);
+    const vs = seen.map((point) => point[1]!);
+    wide = Math.max(...us) - Math.min(...us);
+    tall = Math.max(...vs) - Math.min(...vs);
+    forward = unit(add(eye.forward, add(mul(eye.right, (Math.max(...us) + Math.min(...us)) / 2), mul(eye.up, (Math.max(...vs) + Math.min(...vs)) / 2))));
+  }
+  const room = 1 - 2 * margin;
+  return { position: from.position, forward, focalPx: Math.min((frame.width * room) / wide, (frame.height * room) / tall), frame };
+}
+
+/**
+ * Varifrån scenen betraktas. Spelaren är spelarens öga på kamerans plats, och en plats är samma sorts öga flyttat dit.
+ * Med `close` är det vyns närbild: samma öga inzoomat på dealern, rutan en dealerfilm görs i.
+ * Filmkameran är den kamera de gamla vikta dealerbilderna är gjorda genom: därifrån ska en sådan dealer se ut som i sin bild.
+ */
+export type SeatView = { kind: 'spelaren'; close?: boolean } | { kind: 'plats'; seat: number; close?: boolean };
+export type View = SeatView | { kind: 'filmkameran' };
+
+/** Ögat som en vy står i. */
+export function viewEye(scene: SceneDescription, view: View): Eye {
+  if (view.kind === 'filmkameran') return sceneEye(scene);
+  const eye = view.kind === 'spelaren' ? playerEye(scene) : seatEye(scene, view.seat);
+  return view.close ? closeEye(scene, eye) : eye;
+}
+
+/** Vyns namn i ett ord, för filnamn och beskrivningar: `spelaren`, `plats-7`, `filmkameran`, och närbilden med `-nara` efter. */
+export function viewName(view: View): string {
+  if (view.kind === 'filmkameran') return view.kind;
+  return `${view.kind === 'plats' ? `plats-${view.seat}` : view.kind}${view.close ? '-nara' : ''}`;
+}
+
+/**
+ * Den vikta ytan som två rektanglar i scenen, för en dealerfilm ur vilket öga som helst: den upprätta står på dealerns
+ * bordskant och den liggande ligger på filten framför kanten, `film.lift` över den. De är större än något öga visar:
+ * bilden läggs på dem genom ögat som såg den, och utanför dess ruta ritas ingenting. Hörnen går medurs sedda framifrån
+ * respektive uppifrån, med början längst bort till vänster. Den liggande anges som på ett olutat bord och lutar med det.
+ */
+export function foldSurfaces(scene: SceneDescription): { upright: Vec3[]; felt: Vec3[] } {
+  const z = scene.dealerEdge.z;
+  const lift = scene.film.lift;
+  // Tre meter åt varje håll rymmer bordet, dealern och det en kamera vid en spelarplats kan se av dem.
+  const far = 3;
+  return {
+    upright: [[-far, far, z], [far, far, z], [far, 0, z], [-far, 0, z]],
+    felt: [[-far, lift, z], [far, lift, z], [far, lift, z + far], [-far, lift, z + far]],
+  };
+}
+
+/**
+ * Samma öga med en annan ruta: hela den gamla rutan ryms i den nya, inpassad på höjden eller bredden (som `viewFovDeg`).
+ * Brännvidden räknas om till den nya rutans bildpunkter. Så ritas en förlaga ur en vy.
+ */
+export function framed(eye: Eye, frame: Frame): Eye {
+  const half = radians(viewFovDeg(eye, frame.width / frame.height)) / 2;
+  return { ...eye, focalPx: frame.height / 2 / Math.tan(half), frame };
 }
 
 /**

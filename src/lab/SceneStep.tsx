@@ -1,11 +1,12 @@
 // Steget Scen: bord, sko och dealer i en vald bakgrund. Här ser Jakob bakgrunderna där de ska användas,
-// vrider runt i miljön och sätter sitt omdöme på dem.
+// vrider runt i miljön och sätter sitt omdöme på dem. Härifrån sparas också förlagor: scenen som bild eller klipp ur en vy.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { buildScene, type Background, type SceneHandle, type View } from '../scene/build.ts';
+import { buildScene, type Background, type CardNote, type Dealer, type SceneHandle, type View } from '../scene/build.ts';
 import { readScene, type SceneDescription } from '../scene/description.ts';
 import { seatsOf } from '../scene/geometry.ts';
-import { backdropItems, backdropKind, PLAIN, sameLook, standIn, startLook, type Look } from './backdrops.ts';
+import { backdropItems, backdropKind, dealerChoices, PLAIN, sameLook, startLook, type Look } from './backdrops.ts';
+import { saveForlaga, type Saved } from './forlaga.ts';
 import { fetchRegistry, mediaUrl, saveComment, saveStatus, thumbUrl, type Asset, type Item, type Registry } from './registry.ts';
 import { routeTo } from './route.ts';
 import { Verdict, type Judge } from './Verdict.tsx';
@@ -15,6 +16,10 @@ import './scene.css';
 const STEP = 'scen';
 // Första dealern. Tills dealerns egen fil finns i content/ står hennes id här.
 const DEALER = 'paulina';
+// Helfiguren som visas från början, som registrets file. Finns den inte visas den första som finns.
+const FIGURE = 'reference/films/liv-vila-andas.mp4';
+// Kortet scenen lägger där ett klipp har lagt sitt märkkort. Tills spelkärnan säger vilket kort det är står ett ess här.
+const SHOWN_CARD = 'A♠';
 // Skon visas från början: framifrån, i spelarens vy, står den där dealern har den vid sin vänstra hand.
 // Att den hänger utanför bordskanten syns först från sidan, och då går den att dölja.
 const SHOE_HIDDEN = false;
@@ -77,6 +82,14 @@ function Workbench({ registry, scene, route, problem, onProblem, onJudge, onSay 
   const [shoeHidden, setShoeHidden] = useState(SHOE_HIDDEN);
   // Reglagens värden per bakgrund. De lever så länge sidan är öppen och sparas inte.
   const [looks, setLooks] = useState<Record<string, Look>>({});
+  // Dealern som visas, som registrets file. Tom innan något är valt: då gäller den förvalda.
+  const [dealerFile, setDealerFile] = useState('');
+  const [paused, setPaused] = useState(false);
+  // Scenen som visas, så att en förlaga kan sparas ur den.
+  const [handle, setHandle] = useState<SceneHandle | null>(null);
+  // En förlaga som sparas just nu: hur många rutor som är inne. Och den som sparades senast.
+  const [saving, setSaving] = useState<{ still: boolean; done: number; of: number } | null>(null);
+  const [saved, setSaved] = useState<Saved | null>(null);
 
   const choose = (next: View) => {
     setView(next);
@@ -88,20 +101,55 @@ function Workbench({ registry, scene, route, problem, onProblem, onJudge, onSay 
   // Adressen är scen/<nummer>, med samma nummer som bakgrunden har i Granska. Utan nummer visas den första.
   const items = backdropItems(registry);
   const chosen = items.find((item) => item.number === Number(route[0])) ?? items[0];
-  const dealer = standIn(registry, DEALER);
+  const dealers = dealerChoices(registry, DEALER);
+  // Från början visas dealerns egen film om hon har någon, annars den förvalda helfiguren.
+  const choice =
+    dealers.find((entry) => entry.dealer.file === dealerFile) ??
+    dealers.find((entry) => entry.dealer.kind === 'film') ??
+    dealers.find((entry) => entry.dealer.file === FIGURE) ??
+    dealers[0] ??
+    null;
+  const dealer = choice?.dealer ?? null;
+  const card: CardNote | null = choice?.lands ? { seat: choice.lands.seat, index: choice.lands.index, face: SHOWN_CARD, from: choice.lands.at } : null;
 
   // Ett fel som gällde förra bakgrunden ska inte stå kvar över nästa.
   const file = chosen?.asset.file;
   useEffect(() => onProblem(null), [file, onProblem]);
 
-  const start = chosen ? startLook(chosen.asset, scene.background.liftDeg) : null;
+  const { captureHeight, radius } = scene.room;
+  const start = chosen ? startLook(chosen.asset, { lift: scene.background.liftDeg, height: captureHeight, radius }) : null;
   const look = chosen && start ? (looks[chosen.asset.file] ?? start) : null;
   const change = (part: Partial<Look>) => {
     if (chosen && look) setLooks((all) => ({ ...all, [chosen.asset.file]: { ...look, ...part } }));
   };
 
+  const round = chosen ? backdropKind(chosen.asset) === '360' : false;
   const background: Background | null =
     chosen && look && chosen.asset.present ? { url: mediaUrl(chosen.asset.file), kind: backdropKind(chosen.asset), ...look } : null;
+
+  // Förlagan sparas ur den valda fasta vyn, också när musen har vridit bort från den, i förlagans egen ruta.
+  const save = async (still: boolean) => {
+    if (!handle || saving) return;
+    setSaving({ still, done: 0, of: 0 });
+    setSaved(null);
+    onProblem(null);
+    try {
+      const order = {
+        view,
+        dealer,
+        background: chosen && look && background ? { file: chosen.asset.file, kind: background.kind, ...look } : null,
+        studio: null,
+        shoe: !shoeHidden,
+        frame: scene.forlaga.frame,
+        fps: scene.forlaga.fps,
+      };
+      setSaved(await saveForlaga(handle, order, still, (done, of) => setSaving({ still, done, of })));
+    } catch (error) {
+      onProblem((error as Error).message);
+    } finally {
+      setSaving(null);
+    }
+  };
 
   return (
     <div className="scenestep">
@@ -128,18 +176,68 @@ function Workbench({ registry, scene, route, problem, onProblem, onJudge, onSay 
         <div className="sceneview">
           <Stage
             scene={scene}
-            dealer={dealer?.file ?? null}
+            dealer={dealer}
+            card={card}
+            paused={paused}
             background={background}
             view={view}
             shoe={!shoeHidden}
             onMoved={onMoved}
             onProblem={onProblem}
+            onHandle={setHandle}
           />
         </div>
 
-        <section className="scenecontrols" aria-label="Reglage">
+        {/* Medan en förlaga sparas står reglagen stilla: varje ruta ska ritas ur samma scen. */}
+        <section className="scenecontrols" aria-label="Reglage" inert={saving !== null}>
           {problem && <p className="warning">{problem}</p>}
           {chosen && !chosen.asset.present && <p className="warning">Bakgrundens fil saknas i assets/.</p>}
+
+          <div className="control">
+            <span className="controlname">Dealer</span>
+            <select
+              className="pick"
+              aria-label="Dealer"
+              value={dealer?.file ?? ''}
+              onChange={(event) => {
+                setDealerFile(event.currentTarget.value);
+                setPaused(false);
+              }}
+            >
+              {dealers.length === 0 && <option value="">Ingen dealer i registret</option>}
+              {dealers.map((entry) => (
+                <option key={entry.dealer.file} value={entry.dealer.file}>
+                  {entry.label}
+                </option>
+              ))}
+            </select>
+            {choice?.film && (
+              <button type="button" className="reset" aria-pressed={paused} onClick={() => setPaused(!paused)}>
+                {paused ? 'Spela' : 'Pausa'}
+              </button>
+            )}
+            <button type="button" className="reset" disabled={!handle} title={`Scenen ur ${viewName} som en bild, ${frameText(scene)}`} onClick={() => save(true)}>
+              Spara bild
+            </button>
+            <button
+              type="button"
+              className="reset"
+              disabled={!handle || !choice?.film}
+              title={`Hela dealerns film ur ${viewName}, ruta för ruta, ${frameText(scene)}`}
+              onClick={() => save(false)}
+            >
+              Spara klipp
+            </button>
+            <span className="controlhint" role="status">
+              {saving
+                ? saving.of > 0
+                  ? `Sparar ruta ${saving.done} av ${saving.of} …`
+                  : 'Börjar spara …'
+                : saved
+                  ? `Sparad: ${saved.file}${saved.seconds > 0 ? ` (${saved.frames} rutor, ${comma(saved.seconds)} s)` : ''}`
+                  : `Förlagan sparas ur ${viewName}${moved ? ', inte ur den fria vyn' : ''}.`}
+            </span>
+          </div>
 
           <div className="control">
             <span className="controlname">Vy</span>
@@ -191,6 +289,12 @@ function Workbench({ registry, scene, route, problem, onProblem, onJudge, onSay 
             <div className="control">
               <span className="controlname">Bakgrund</span>
               <Slider label="Vrid" unit="°" min={-180} max={180} step={1} value={look.turn} onChange={(turn) => change({ turn })} />
+              {round && (
+                <>
+                  <Slider label="Höjd" unit=" m" min={0.5} max={4} step={0.05} value={look.height} onChange={(height) => change({ height })} />
+                  <Slider label="Radie" unit=" m" min={3} max={40} step={0.5} value={look.radius} onChange={(radius) => change({ radius })} />
+                </>
+              )}
               <Slider label="Lyft" unit="°" min={0} max={45} step={1} value={look.lift} onChange={(lift) => change({ lift })} />
               <Slider label="Oskärpa" min={0} max={30} step={0.5} value={look.blur} onChange={(blur) => change({ blur })} />
               <Slider label="Ljusstyrka" min={0.05} max={2} step={0.01} value={look.exposure} onChange={(exposure) => change({ exposure })} />
@@ -206,8 +310,9 @@ function Workbench({ registry, scene, route, problem, onProblem, onJudge, onSay 
 
           <ul className="scenenotes">
             <li>
-              Reglagen sparas inte än. De startar på bakgrundens värden ur gamla projektet, när posten har sådana, och lyftet på
-              scenens värde ({comma(scene.background.liftDeg)}°). De gäller så länge sidan är öppen.
+              Reglagen sparas inte än. De startar på bakgrundens värden ur gamla projektet, när posten har sådana, och rummets höjd,
+              radie och lyft på scenens värden ({comma(captureHeight)} m, {comma(radius)} m och {comma(scene.background.liftDeg)}°).
+              De gäller så länge sidan är öppen, och följer med i förlagans beskrivning.
             </li>
             <li>
               Spelaren är vyn man spelar i: ögat {comma(scene.player.height)} m över filten, i dealerns ögonhöjd,{' '}
@@ -217,26 +322,30 @@ function Workbench({ registry, scene, route, problem, onProblem, onJudge, onSay 
               med det.
             </li>
             <li>
-              {dealer
-                ? `Dealern är en stå-in ur gamla rutan: ankaret ”${dealer.title}”, projicerat från filmkameran och vikt vid bordskanten. Filmkameran är kameran de gamla ankarna är gjorda genom (${comma(Math.round(scene.camera.pitchDeg))}° nedåt): därifrån ser dealern ut som i ankarbilden, så när som på händerna, som bordets lutning flyttar några bildpunkter. Skon i den bilden är övermålad där scenens sko står.`
-                : `Ingen dealer visas: registret har inget ankare i vila för ${DEALER}.`}
+              {!choice
+                ? 'Ingen dealer visas: registret har varken en helfigur eller ett ankare i vila.'
+                : choice.dealer.kind === 'film'
+                  ? `Dealern är en dealerfilm: ”${choice.label}”, en ${choice.film ? 'film' : 'stillbild'} av dealern på grön skärm, gjord i närbilden av ${choice.dealer.view.kind === 'plats' ? `Plats ${choice.dealer.view.seat}` : 'Spelaren'}: samma öga som vyn, inzoomat på dealern. Bilden läggs tillbaka genom det ögat och viks vid bordskanten, så att kroppen står upprätt och händerna ligger på filten. Sedd ur den vyn är den bilden som den är; ur andra vyer är kroppen platt.${choice.lands ? ` När klippet har lagt sitt märkkort (${comma(choice.lands.at)} s in) tas det blå bort och scenens kort ligger på kortplatsen för plats ${choice.lands.seat}; valören är en stå-in.` : ''}`
+                : choice.dealer.kind === 'helfigur'
+                  ? `Dealern är en helfigur: ”${choice.label}”, en ${choice.film ? 'film' : 'stillbild'} av en sittande person på grön skärm, utan bord, ställd upprätt ${comma(scene.figure.behindEdge * 100)} cm bakom bordskanten. Rutan är ${comma(scene.figure.height)} m hög, händernas underkant står ${comma(scene.figure.handLift * 1000)} mm över filtens höjd, och bordet döljer underkroppen. Helfiguren är en förlaga: Spara bild och Spara klipp lägger scenen ur vald vy i output/forlagor/, ${frameText(scene)}, med en beskrivning bredvid.`
+                  : `Dealern är ett gammalt ankare: ”${choice.label}”, projicerat från filmkameran och vikt vid bordskanten. Filmkameran är kameran de gamla ankarna är gjorda genom (${comma(Math.round(scene.camera.pitchDeg))}° nedåt): därifrån ser dealern ut som i ankarbilden, så när som på händerna, som bordets lutning flyttar några bildpunkter. Skon i den bilden är övermålad där scenens sko står.`}
             </li>
             <li>
-              {chosen && backdropKind(chosen.asset) === 'platt'
-                ? 'Platt bild: den visas som en kuliss rakt bakom dealern, så stor som spelarens ruta. Utanför den är det svart.'
-                : `360-bilden ligger oändligt långt bort: den vrids med vyn men förskjuts inte när ögat flyttas. Spelarens öga står i dealerns ögonhöjd, så olyft ligger horisonten bakom hennes huvud.${
-                    look && look.lift > 0
-                      ? ` Bilden är lyft ${comma(look.lift)}°: då syns mer av väggarna och mindre av golvet. Lyftet gäller i alla vyer; lodräta linjer står kvar lodräta, men horisonten buktar svagt nedåt mot rutans kanter.`
-                      : ''
-                  }`}{' '}
-              Bord och sko har ett neutralt ljus; bakgrunden lyser inte på dem än. Skon står där den stod i ankarbilden; från sidan
-              syns att den hänger utanför bordskanten.
+              {!round
+                ? 'Platt bild: den visas som en kuliss rakt bakom dealern, så stor som spelarens ruta. Utanför den är det svart, och den har inget golv.'
+                : `360-bilden visas som ett rum med golv. Golvet ligger där bordet står, och bilden antas vara tagen ${
+                    look ? comma(look.height) : comma(captureHeight)
+                  } m över golvet, rakt över eller under spelarens öga, med väggarna ${look ? comma(look.radius) : comma(radius)} m bort. Rummet förskjuts därför som ett rum gör när vyn flyttas. Höjd gör rummet större eller mindre mot bordet; Radie flyttar väggarna.${
+                    look && look.lift > 0 ? ` Bilden är dessutom lyft ${comma(look.lift)}°; med golv i rummet behövs det inte.` : ''
+                  } Under bordet ligger en mjuk skugga på golvet.`}{' '}
+              Bord och sko har ett neutralt ljus; bakgrunden lyser inte på dem än. Skon står där den stod i de gamla ankarna; från
+              sidan syns att den hänger utanför bordskanten.
             </li>
           </ul>
         </section>
       </main>
 
-      <aside className="backdrops" aria-label="Bakgrunder">
+      <aside className="backdrops" aria-label="Bakgrunder" inert={saving !== null}>
         <h2>
           Bakgrunder <span>{items.length}</span>
         </h2>
@@ -250,47 +359,68 @@ function Workbench({ registry, scene, route, problem, onProblem, onJudge, onSay 
 
 type StageProps = {
   scene: SceneDescription;
-  dealer: string | null;
+  /** Dealern. Scenen byggs om när den byts mot en annan, inte när samma dealer kommer som ett nytt värde. */
+  dealer: Dealer | null;
+  /** Scenens kort där klippet lägger sitt, när klippet säger var och när. */
+  card: CardNote | null;
+  /** Om dealerns film står stilla. */
+  paused: boolean;
   background: Background | null;
   view: View;
   shoe: boolean;
   onMoved: () => void;
   onProblem: (text: string) => void;
+  /** Får scenen när den är byggd, och null när den stängs. */
+  onHandle: (handle: SceneHandle | null) => void;
 };
 
 /** 3D-ytan. Den har kamerans sidförhållande och fyller så mycket av platsen som ryms. */
-function Stage({ scene, dealer, background, view, shoe, onMoved, onProblem }: StageProps) {
+function Stage({ scene, dealer, card, paused, background, view, shoe, onMoved, onProblem, onHandle }: StageProps) {
   const holder = useRef<HTMLDivElement>(null);
   const [handle, setHandle] = useState<SceneHandle | null>(null);
+  // Dealern som text: lika för två värden som säger samma sak.
+  const dealerKey = JSON.stringify(dealer);
 
   useEffect(() => {
     const element = holder.current!;
-    const built = buildScene(element, scene, { urlOf: mediaUrl, dealer, onProblem, onMoved });
+    const built = buildScene(element, scene, { urlOf: mediaUrl, dealer: JSON.parse(dealerKey) as Dealer | null, onProblem, onMoved });
     const fit = () => built.resize(element.clientWidth, element.clientHeight);
     const watcher = new ResizeObserver(fit);
     watcher.observe(element);
     fit();
     setHandle(built);
+    onHandle(built);
     return () => {
       watcher.disconnect();
       built.dispose();
       setHandle(null);
+      onHandle(null);
     };
-  }, [scene, dealer, onProblem, onMoved]);
+  }, [scene, dealerKey, onProblem, onMoved, onHandle]);
 
   // Bakgrunden lämnas över fält för fält, så att scenen bara får ett nytt besked när något faktiskt har ändrats.
-  const { url, kind, turn, blur, exposure, mirror, lift } = background ?? { url: null, kind: '360' as const, ...PLAIN };
+  const { url, kind, turn, blur, exposure, mirror, lift, height: roomHeight, radius } = background ?? { url: null, kind: '360' as const, ...PLAIN, lift: 0, height: 0, radius: 0 };
   useEffect(() => {
-    handle?.setBackground(url === null ? null : { url, kind, turn, blur, exposure, mirror, lift });
-  }, [handle, url, kind, turn, blur, exposure, mirror, lift]);
+    handle?.setBackground(url === null ? null : { url, kind, turn, blur, exposure, mirror, lift, height: roomHeight, radius });
+  }, [handle, url, kind, turn, blur, exposure, mirror, lift, roomHeight, radius]);
 
   useEffect(() => {
     handle?.setView(view);
   }, [handle, view]);
 
   useEffect(() => {
+    if (paused) handle?.clip?.pause();
+    else handle?.clip?.play();
+  }, [handle, paused]);
+
+  useEffect(() => {
     handle?.setShoe(shoe);
   }, [handle, shoe]);
+
+  const cardKey = JSON.stringify(card);
+  useEffect(() => {
+    handle?.setCard(JSON.parse(cardKey) as CardNote | null);
+  }, [handle, cardKey]);
 
   const { width, height } = scene.camera.frame;
   return (
@@ -326,6 +456,10 @@ function Slider({ label, unit = '', min, max, step, value, onChange }: SliderPro
     </label>
   );
 }
+
+/** Förlagans ruta och takt i ord. */
+const frameText = (scene: SceneDescription): string =>
+  `${scene.forlaga.frame.width} × ${scene.forlaga.frame.height} bildpunkter i ${comma(scene.forlaga.fps)} rutor per sekund`;
 
 const KIND_LABELS = { '360': '360-bild', platt: 'Platt bild' };
 

@@ -1,4 +1,4 @@
-// Scenens beskrivning så som den står i content/scene.json: kamera, bord, sko, kort och kortplatser.
+// Scenens beskrivning så som den står i content/scene.json: kamera, bord, sko, rum, helfigur, förlaga, kort och kortplatser.
 // Verkliga meter: x åt höger i bild, y uppåt, z mot kameran, filten på y = 0. Origo ligger på filtens plan rakt under kameran.
 // Här står bara formen. Talen står i content/scene.json, och det som går att räkna ur dem räknas i geometry.ts.
 
@@ -27,17 +27,41 @@ export type SceneDescription = {
   /** Dealerns bordskant: linjen på filten där dealerfilmen viks. */
   dealerEdge: Marked & { z: number };
   /**
-   * Bordet. `model` säger var filten och dealerns kant ligger i modellens egna mått, så att modellen kan ställas rätt.
+   * Bordet. `model` säger var filten och dealerns kant ligger i modellens egna mått, så att modellen kan ställas rätt,
+   * och `box` är modellens yttersta mått: ur dess undersida räknas golvets höjd.
    * `tilt` är hur många grader bordet lutar mot spelaren kring dealerns bordskant. Allt som ligger på bordet lutar med det:
    * modellen, filmens liggande del, kortplatserna och skon. Deras lägen står som på ett olutat bord.
    */
-  table: { file: string; model: Marked & { feltY: number; dealerEdgeZ: number }; tilt: Marked & { deg: number } };
+  table: {
+    file: string;
+    model: Marked & { feltY: number; dealerEdgeZ: number; box: { min: Vec3; max: Vec3 } };
+    tilt: Marked & { deg: number };
+  };
   /** Skon: var modellens mitt står på filten, hur den är vriden kring lodlinjen (0 = mynningen mot kameran) och hur lång den är. */
   shoe: Marked & { file: string; at: FeltPoint; yawDeg: number; length: number };
-  /** Rummet bakom scenen: hur många grader en 360-bild lyfts från början, så att dess horisont kommer in i kamerans ruta. */
+  /** Rummet bakom scenen: hur många grader en 360-bild lyfts från början. Med golv i rummet är det 0. */
   background: Marked & { liftDeg: number };
-  /** Dealerfilmens yta: hur högt över filten den liggande delen ritas. */
-  film: Marked & { lift: number };
+  /**
+   * Rummet som en 360-bild visas som: hur högt över golvet bilden antas vara tagen och hur långt bort väggarna ligger,
+   * båda i meter och startvärden för reglagen. Skuggan under bordet: hur långt utanför bordets fotavtryck den tonar ut,
+   * i meter, och hur stor andel av ljuset den som mest tar bort.
+   */
+  room: Marked & { captureHeight: number; radius: number; shadowReach: number; shadowStrength: number };
+  /**
+   * Helfiguren: dealern som film eller stillbild på en upprätt yta bakom bordet. `frame` är rutan bilderna är gjorda i och
+   * `height` rutans höjd i meter. Raden `handRow`, händernas underkant, står `handLift` meter över filtens höjd, och ytan
+   * står `behindEdge` meter bakom dealerns bordskant.
+   */
+  figure: Marked & { frame: Frame; height: number; handRow: number; handLift: number; behindEdge: number };
+  /** Förlagan: rutan och takten som scenen sparas i, som underlag för filmer. */
+  forlaga: Marked & { frame: Frame; fps: number };
+  /**
+   * Dealerfilmen. `lift` är hur högt över filten den liggande delen ritas. Resten beskriver närbilden, den ruta en
+   * dealerfilm görs i ur en vy: `frame` är rutan, och `reach` är arbetsytan som ska rymmas i den, i meter: i sidled vid
+   * bordskanten (`x`), uppåt över filten vid dealern (`top`), bakom dealerns bordskant (`behind`) och förbi varje
+   * kortplats på filten (`past`). `margin` är luften mot rutans kant, som andel av rutan.
+   */
+  film: Marked & { lift: number; frame: Frame; reach: { x: [number, number]; top: number; behind: number; past: number }; margin: number };
   card: Marked & { width: number; height: number; thickness: number; corner: number };
   /** Kortplatser: kortets mitt på filten, för dealern och för varje spelarplats, i den ordning korten läggs. */
   places: Marked & { dealer: FeltPoint[]; seats: { seat: number; cards: FeltPoint[] }[] };
@@ -60,7 +84,9 @@ export function readScene(value: unknown): SceneDescription {
   const marked = (group: Partial<Marked> | undefined, what: string) =>
     need((group?.basis === 'mätt' || group?.basis === 'antaget') && typeof group?.source === 'string' && group.source !== '', `${what}: basis och source`);
 
-  const { camera, player, dealerEdge, table, shoe, background, film, card, places } = scene ?? {};
+  const isFrame = (frame: Partial<Frame> | undefined): boolean => isNumber(frame?.width) && frame.width > 0 && isNumber(frame?.height) && frame.height > 0;
+
+  const { camera, player, dealerEdge, table, shoe, background, room, figure, forlaga, film, card, places } = scene ?? {};
   need(isNumber(camera?.frame?.width) && isNumber(camera?.frame?.height), 'camera.frame');
   need(isNumber(camera?.focalPx) && camera.focalPx > 0, 'camera.focalPx');
   need(isPoint(camera?.position, 3), 'camera.position');
@@ -74,6 +100,7 @@ export function readScene(value: unknown): SceneDescription {
   marked(dealerEdge, 'dealerEdge');
   need(typeof table?.file === 'string', 'table.file');
   need(isNumber(table?.model?.feltY) && isNumber(table?.model?.dealerEdgeZ), 'table.model');
+  need(isPoint(table?.model?.box?.min, 3) && isPoint(table?.model?.box?.max, 3), 'table.model.box');
   marked(table?.model, 'table.model');
   need(isNumber(table?.tilt?.deg), 'table.tilt.deg');
   marked(table?.tilt, 'table.tilt');
@@ -82,7 +109,21 @@ export function readScene(value: unknown): SceneDescription {
   marked(shoe, 'shoe');
   need(isNumber(background?.liftDeg), 'background.liftDeg');
   marked(background, 'background');
+  need(isNumber(room?.captureHeight) && room.captureHeight > 0 && isNumber(room?.radius) && room.radius > 0, 'room.captureHeight och room.radius');
+  need(isNumber(room?.shadowReach) && room.shadowReach > 0 && isNumber(room?.shadowStrength), 'room.shadowReach och room.shadowStrength');
+  marked(room, 'room');
+  need(isFrame(figure?.frame), 'figure.frame');
+  need(isNumber(figure?.height) && figure.height > 0 && [figure?.handRow, figure?.handLift, figure?.behindEdge].every(isNumber), 'figure.height, figure.handRow, figure.handLift och figure.behindEdge');
+  marked(figure, 'figure');
+  need(isFrame(forlaga?.frame) && isNumber(forlaga?.fps) && forlaga.fps > 0, 'forlaga.frame och forlaga.fps');
+  marked(forlaga, 'forlaga');
   need(isNumber(film?.lift), 'film.lift');
+  need(isFrame(film?.frame), 'film.frame');
+  need(
+    isPoint(film?.reach?.x, 2) && film!.reach.x[0] < film!.reach.x[1] && [film?.reach?.top, film?.reach?.behind, film?.reach?.past].every((value) => isNumber(value) && value > 0),
+    'film.reach',
+  );
+  need(isNumber(film?.margin) && film.margin >= 0 && film.margin < 0.5, 'film.margin');
   marked(film, 'film');
   need([card?.width, card?.height, card?.thickness, card?.corner].every(isNumber), 'card');
   marked(card, 'card');

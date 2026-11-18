@@ -151,6 +151,29 @@
   accent-color: var(--accent);
 }
 
+/* Valet av dealer */
+
+.pick {
+  max-width: 320px;
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--raised);
+  color: inherit;
+  font: inherit;
+}
+
+.reset[aria-pressed='true'] {
+  background: var(--raised);
+}
+
+/* Medan en förlaga sparas står reglagen stilla */
+
+.scenecontrols[inert],
+.backdrops[inert] {
+  opacity: 0.6;
+}
+
 .reset {
   padding: 4px 11px;
   border: 1px solid var(--line);

@@ -15,7 +15,7 @@ npm run dev
 
 ## Läget
 
-Labbets första steg, Granska, finns: där visas allt i bildregistret och där sätter Jakob sina omdömen. Scenen, spelet och produktionskedjan är inte byggda än. Se [docs/status.md](docs/status.md).
+Labbet har två steg: Granska, där allt i bildregistret visas och döms, och Scen, där bord, sko, rum och dealer ses ur spelarnas vyer. Produktionskedjan är körd en gång: Paulina ger ett kort till plats 4. Spelet är inte byggt än. Se [docs/status.md](docs/status.md).
 
 ## Karta
 

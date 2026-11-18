@@ -1,0 +1,26 @@
+# Det här läser en agent aldrig som text och det indexeras inte. Skalkommandon (ffmpeg, node) når det ändå.
+# Bilder i assets/ och output/ står inte här: de ska gå att se på. De hålls utanför indexet i .cursorindexingignore.
+
+# Beroenden och byggen
+node_modules/
+dist/
+package-lock.json
+
+# Råmaterial och pågående jobb
+glb/
+runtime/
+output/cache/
+
+# Filmer, modeller och arkiv: binärer som blir tusentals rader skräp när de öppnas som text
+*.mp4
+*.webm
+*.mov
+*.glb
+*.gltf
+*.zip
+*.hdr
+*.exr
+*.psd
+
+# Lokala hemligheter
+.env*

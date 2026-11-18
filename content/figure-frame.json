@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "about": "Helfigurens mall: var dealern Liv sitter och håller händerna i sina två grundställningar, och det gröna bakom henne. En ny dealers helfigur görs i samma ruta och mäts mot talen här. Koden är src/pipeline/helfigur.ts och receptet står i docs/production.md. Alla lägen är bildpunkter i rutan figure.frame i scene.json, med origo uppe till vänster. En figurs ruta har kanterna medräknade. En hands ruta är mätt i ett rutnät om 4 bildpunkter, och där är x1 och y1 första bildpunkten efter handen.",
+  "reference": {
+    "dealer": "liv",
+    "vila": "reference/liv-vila.png",
+    "redo": "reference/liv-redo.png",
+    "clips": { "vila-redo": "reference/films/liv-vila-redo.mp4" },
+    "basis": "antaget",
+    "source": "Valt 2026-11-18: Liv är local-studios dealer i helfigur, sittande utan bord med händerna i bordshöjd, och scenens helfigur står efter hennes mått (scene.json, figure). Filerna är registrets (content/assets.json), där ursprung och sha256 står. Bilderna är 1672 × 941 och skalas till rutan innan de mäts eller används."
+  },
+  "green": {
+    "rgb": [2, 182, 48],
+    "basis": "mätt",
+    "source": "Medianen i Livs VILA skalad till rutan, lika i hörnen och i hela bakgrunden (src/pipeline/helfigur.ts mat, 2026-11-18). Livs REDO har ett annat grönt, (2, 184, 56). Underlag och färdiga rutor räknas om till VILA:s gröna, så att en dealers alla bilder har samma skärm."
+  },
+  "poses": {
+    "vila": {
+      "figure": { "x0": 760, "y0": 45, "x1": 1152, "y1": 1042 },
+      "headCentre": 960.3,
+      "hands": [
+        { "x0": 792, "y0": 496, "x1": 868, "y1": 568 },
+        { "x0": 1056, "y0": 492, "x1": 1128, "y1": 568 }
+      ],
+      "basis": "mätt",
+      "source": "Mätt 2026-11-18 i reference/liv-vila.png skalad till rutan (src/pipeline/helfigur.ts mat). figure är allt som inte är skärm. headCentre är mitten av huvudets bredd, x. hands är de två hudområdena i handbandet, vänster i bild först. Händernas underkant, 568, är samma mätning som figure.handRow i scene.json."
+    },
+    "redo": {
+      "figure": { "x0": 760, "y0": 45, "x1": 1297, "y1": 1042 },
+      "hands": [
+        { "x0": 792, "y0": 496, "x1": 868, "y1": 568 },
+        { "x0": 1180, "y0": 468, "x1": 1296, "y1": 524 }
+      ],
+      "basis": "mätt",
+      "source": "Mätt 2026-11-18 i reference/liv-redo.png skalad till rutan, på samma sätt som vila. Handen till höger i bild (dealerns vänstra) är sträckt åt sidan mot skon; den andra ligger kvar som i vila."
+    }
+  },
+  "handBand": {
+    "y0": 400,
+    "y1": 700,
+    "basis": "antaget",
+    "source": "Valt 2026-11-18: en hand är ett hudområde som ligger helt mellan raderna. Ansikte och hals ligger över bandet i båda ställningarna, och nedanför finns ingen bar hud."
+  },
+  "handLimit": {
+    "px": 25,
+    "basis": "antaget",
+    "source": "Satt 2026-11-18 i beställningen av receptet: en hand ska ligga inom 25 bildpunkter från Livs. Avståndet mäts mellan handrutornas mittpunkter. Paulinas REDO samma dag låg 26 ifrån (kanterna 24 och 28 längre ut) och ser rätt ut i bild, så gränsen är ett riktmärke för när en bild ska göras om, inte ett mätt krav från scenen."
+  },
+  "redoPatch": {
+    "x0": 1040,
+    "y0": 300,
+    "y1": 590,
+    "edge": 6,
+    "basis": "antaget",
+    "source": "Vald i bild 2026-11-18 för Paulina: lappen ur mallens REDO som läggs på den färdiga VILA-rutan som underlag för REDO. Den går från x0 till rutans högra kant och mellan raderna y0 och y1, med en mjuk kant om edge bildpunkter åt var sida. Lappen bär hela den sträckta armen och täcker platsen där handen låg i VILA."
+  },
+  "redoRegion": {
+    "x0": 1040,
+    "y0": 236,
+    "x1": 1919,
+    "y1": 686,
+    "basis": "antaget",
+    "source": "Vald 2026-11-18: området där den färdiga REDO-rutan får skilja sig från VILA. Utanför det tas varje bildpunkt ur VILA. Det är lappen vidgad uppåt till axeln och nedåt till låret, de rader där Paulinas REDO skilde sig från hennes VILA (x 1044–1325, y 261–688)."
+  }
+}

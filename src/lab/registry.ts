@@ -42,6 +42,7 @@ export type Section = { key: string; label: string; items: Item[] };
 const GROUP_LABELS: Record<string, string> = {
   identity: 'Identitet',
   anchors: 'Ankare',
+  clips: 'Klipp',
   backgrounds: 'Bakgrunder',
   materials: 'Material',
   models: 'Modeller',

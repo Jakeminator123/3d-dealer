@@ -193,6 +193,59 @@ test('Jakobs ord om en fil sparas med tid och kommer tillbaka i registret', asyn
   assert.equal(foreign.status, 403);
 });
 
+test('en förlaga tas emot ruta för ruta från Labbets egen sida och hamnar under output/forlagor', async () => {
+  const order = {
+    still: true,
+    frames: 1,
+    fps: 30,
+    frame: { width: 48, height: 27 },
+    view: { kind: 'plats', seat: 7 },
+    eye: { position: [0.5, 0.6, 0.4], forward: [-0.1, -0.3, -0.9], focalPx: 33 },
+    dealer: { kind: 'helfigur', file: 'reference/film.mp4', time: 0.5 },
+    background: { file: 'scene/bild.png', kind: '360', turn: 0, lift: 0, blur: 6, exposure: 0.5, mirror: false, height: 1.6, radius: 8 },
+    shoe: true,
+  };
+  const json = { 'Content-Type': 'application/json' };
+  const png = { 'Content-Type': 'image/png' };
+  const start = (body: unknown, headers: Record<string, string> = json) =>
+    fetch(`${base}/api/forlaga/start`, { method: 'POST', headers, body: JSON.stringify(body) });
+  const frame = (name: string, index: number | string, body: Buffer, headers: Record<string, string> = png) =>
+    fetch(`${base}/api/forlaga/${name}/${index}`, { method: 'POST', headers, body: new Uint8Array(body) });
+  const picture = await sharp({ create: { width: 48, height: 27, channels: 3, background: '#224466' } })
+    .png()
+    .toBuffer();
+
+  const started = await start(order);
+  assert.equal(started.status, 200);
+  const { name } = await started.json();
+  assert.equal(name, 'film_plats-7_bild_bild');
+
+  const sent = await frame(name, 0, picture);
+  assert.equal(sent.status, 200);
+  assert.deepEqual(await sent.json(), {
+    saved: { name, file: `output/forlagor/${name}.png`, json: `output/forlagor/${name}.json`, frames: 1, seconds: 0 },
+  });
+  assert.ok(readFileSync(join(root, 'output', 'forlagor', `${name}.png`)).equals(picture));
+  const record = JSON.parse(readFileSync(join(root, 'output', 'forlagor', `${name}.json`), 'utf8'));
+  assert.equal(record.savedAt, '2026-11-18 05:30');
+  assert.deepEqual(record.view, order.view);
+
+  // Fel i förfrågan svaras med ett skäl; inget skrivs utanför output/forlagor.
+  assert.equal((await start({ ...order, frames: 0 })).status, 400);
+  assert.equal(typeof (await (await start(null)).json()).error, 'string');
+  assert.equal((await frame('inte-borjad', 0, picture)).status, 400);
+  assert.equal((await frame('..%2F..%2Fcontent', 0, picture)).status, 400);
+  assert.equal((await frame(name, 'x', picture)).status, 404);
+  assert.equal((await fetch(`${base}/api/forlaga/start`)).status, 404, 'bara POST');
+  assert.deepEqual(readdirSync(join(root, 'output', 'forlagor')).sort(), [`${name}.json`, `${name}.png`]);
+
+  // En annan webbsida får varken börja en förlaga eller lämna rutor.
+  assert.equal((await start(order, { ...json, Origin: 'https://ond.example' })).status, 403);
+  assert.equal((await start(order, { 'Content-Type': 'text/plain' })).status, 403);
+  assert.equal((await frame(name, 0, picture, { ...png, Origin: 'https://ond.example' })).status, 403);
+  assert.equal((await frame(name, 0, picture, { 'Content-Type': 'multipart/form-data' })).status, 403);
+});
+
 test('ett ogiltigt omdöme avvisas med ett skäl', async () => {
   for (const body of [{ file: 'scene/bild.png', status: 'kanske' }, { file: 'finns/inte.png', status: 'utgår' }, { file: 1 }, null]) {
     const response = await post(body);

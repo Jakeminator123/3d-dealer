@@ -1,0 +1,9 @@
+# Text lagras och checkas ut med LF, på alla datorer.
+* text=auto eol=lf
+
+# Media som ändå hamnar i Git behandlas aldrig som text.
+*.png binary
+*.jpg binary
+*.webp binary
+*.mp4 binary
+*.glb binary

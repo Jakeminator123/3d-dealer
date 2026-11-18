@@ -1,0 +1,10 @@
+# Indexeras inte, men går att läsa när det behövs.
+
+# Media och arbetsmaterial: bilder ses en i taget, aldrig genom sökning
+assets/
+output/
+
+# Stora bakgrundstexter: läs med Grep eller offset/limit, inte i sin helhet
+information/filmhandbok-gamla-dealer.md
+information/Dealer_omstart_rekommendation_och_startprompt_2026-11-18.md
+information/konversation-*.txt

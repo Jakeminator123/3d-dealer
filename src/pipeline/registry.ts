@@ -1,4 +1,4 @@
-// Bildregistret, content/assets.json: läsa det, jämföra det med assets/ och skriva ett omdöme.
+// Bildregistret, content/assets.json: läsa det, jämföra det med assets/, skriva ett omdöme och lägga till eller stryka en post.
 // Ordlistan över statusar står i registret självt. Här finns inga statusnamn.
 
 import { existsSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
@@ -74,6 +74,31 @@ function entryOf(registry: Registry, file: string): RegistryEntry {
   const entry = registry.assets.find((candidate) => candidate.file === file);
   if (!entry) throw new RegistryError(`Ingen post i registret för ${file}`);
   return entry;
+}
+
+/**
+ * Lägger en ny post sist i registret. En fil som redan har en post tas inte emot, om inte `replace` säger att posten
+ * ska bytas: då står den nya där den gamla stod.
+ */
+export function addEntry(root: string, entry: RegistryEntry, replace = false): RegistryEntry {
+  const registry = readRegistry(root);
+  if (!Object.hasOwn(registry.statuses, entry.status)) throw new RegistryError(`Okänd status: ${entry.status}`);
+  const at = registry.assets.findIndex((candidate) => candidate.file === entry.file);
+  if (at >= 0 && !replace) throw new RegistryError(`${entry.file} har redan en post i registret`);
+  if (at >= 0) registry.assets[at] = entry;
+  else registry.assets.push(entry);
+  writeRegistry(root, registry);
+  return entry;
+}
+
+/** Stryker en post och antecknar sist under `leftOut` vad som ströks och varför. */
+export function dropEntry(root: string, file: string, why: string): void {
+  const registry = readRegistry(root);
+  entryOf(registry, file);
+  registry.assets = registry.assets.filter((candidate) => candidate.file !== file);
+  const leftOut = Array.isArray(registry.leftOut) ? (registry.leftOut as { what: string; why: string }[]) : [];
+  registry.leftOut = [...leftOut, { what: file, why }];
+  writeRegistry(root, registry);
 }
 
 /**

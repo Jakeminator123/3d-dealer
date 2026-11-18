@@ -12,11 +12,11 @@
   },
   "player": {
     "height": 0.6,
-    "distance": 2.4,
-    "pitchDeg": 16,
-    "fovDeg": 45,
+    "distance": 1.9,
+    "pitchDeg": 15,
+    "fovDeg": 48,
     "basis": "antaget",
-    "source": "Valt 2026-11-18 efter prov i bild (output/scen-matning/vy.ts och arken i webbläsaren). Höjden är dealerns ögonhöjd i ankaret VILA (0,58 m över filten): då ses hon rakt framifrån och rummets horisont ligger bakom hennes huvud utan lyft. Avstånd, lutning och bildvinkel är valda så att hela bordet ryms: hjässan 9 % ned i rutan, bordskanten mot dealern 46 % ned och vallens ytterkant 98 % ned. Förkastat: filmkamerans avstånd 1,84 m, där vallen syns först med 73 graders bildvinkel och dealern blir 30 % av rutans höjd; utgångsläget 1,84 m, 14 grader och 50 grader, där vallen mot spelaren hamnar under rutan; och gamla kontraktets kamera (0,493 m över filten, 1,521 m från kanten, 2,5 grader, 67 grader), som i verkliga meter lägger dealern lågt och litet under en ruta som mest är tak, eftersom gamla scenen ritade bordet i dubbel skala."
+    "source": "Valt 2026-11-18 efter prov i bild, och flyttat närmare samma dag. Höjden är dealerns ögonhöjd (0,58 m över filten i ankaret VILA): då ses hon rakt framifrån och rummets horisont ligger bakom hennes huvud utan lyft. Avståndet var först 2,40 m med 16 grader och 45 graders bildvinkel, valt så att hela bordet med vallen mot spelaren rymdes. Jakob om en film ur den vyn: \"känns som om det skulle vara en reling eller en kant som är mycket högre. Möjligtvis är bordet för långt bort, eller hon är för långt bort från bordet. De måste skjutas samman.\" Prövat med dockan vid bordet (output/work/giv-4/vy-varianter-2.jpg): 1,7 till 2,0 m, 14 till 18 grader och 45 till 50 graders bildvinkel. Valt 1,90 m, 15 grader och 48 grader: dealern blir större, filten fyller rutans nedre halva och vallen syns bara vid sidorna. Vallen mot spelaren ligger under rutan; den som vill se den zoomar ut. Förkastat tidigare: filmkamerans höjd och lutning, där bara golv syns bakom dealern, och gamla kontraktets kamera (0,493 m över filten, 2,5 grader, 67 grader), som i verkliga meter lägger dealern lågt och litet eftersom gamla scenen ritade bordet i dubbel skala."
   },
   "dealerEdge": {
     "z": -1.8438,
@@ -28,8 +28,9 @@
     "model": {
       "feltY": 0.969,
       "dealerEdgeZ": -0.692,
+      "box": { "min": [-1.05, 0, -0.7964], "max": [1.05, 1.0383, 0.7964] },
       "basis": "mätt",
-      "source": "Mätt i GLB-filen 2026-11-18 (output/scen-matning/glb.ts och bordskant.ts) och i en rendering ur scenens kamera. Filten ligger på 0,9689 till 0,9697 över bordets mitt och sjunker till 0,964 intill vallen. Kanten mot dealern är rundad: vid x = 0 börjar skivan på z -0,718, 16 mm under filten, och trälisten innanför ligger 1 till 3 mm under filten fram till z -0,63. Scenens kamera ser kantens överkant vid z -0,704, 4 mm under filtens höjd; förd längs siktlinjen upp till filtens plan är det z -0,698 vid x = 0 och z -0,692 vid x ± 0,25, där kanten buktar 6 mm mot spelarna. Det senare värdet står här: då ritas kanten på veckets rad eller strax ovanför den under hela dealerns kropp, och ingen glipa syns mellan kropp och bord. Ut mot sidorna ligger kanten längre bak (z -0,738 vid x ± 0,6). Modellens skala (längd 2,100 m) sattes av gamla projektets verktyg och är antagen."
+      "source": "Mätt i GLB-filen 2026-11-18 (output/scen-matning/glb.ts och bordskant.ts) och i en rendering ur scenens kamera. Lådan (box) är modellens yttersta mått: undersidan är en bottenplatta på y = 0 (1,81 m2), och ur den räknas golvets höjd. Filten ligger på 0,9689 till 0,9697 över bordets mitt och sjunker till 0,964 intill vallen. Kanten mot dealern är rundad: vid x = 0 börjar skivan på z -0,718, 16 mm under filten, och trälisten innanför ligger 1 till 3 mm under filten fram till z -0,63. Scenens kamera ser kantens överkant vid z -0,704, 4 mm under filtens höjd; förd längs siktlinjen upp till filtens plan är det z -0,698 vid x = 0 och z -0,692 vid x ± 0,25, där kanten buktar 6 mm mot spelarna. Det senare värdet står här: då ritas kanten på veckets rad eller strax ovanför den under hela dealerns kropp, och ingen glipa syns mellan kropp och bord. Ut mot sidorna ligger kanten längre bak (z -0,738 vid x ± 0,6). Modellens skala (längd 2,100 m) sattes av gamla projektets verktyg och är antagen."
     },
     "tilt": {
       "deg": 5,
@@ -46,14 +47,40 @@
     "source": "Passad 2026-11-18 mot skon som är inbakad i ankaret dealers/paulina/anchors/vila.png (output/scen-matning/sko-pass.ts): läge, vridning och längd valda så att modellens kontur, sedd genom kameran, täcker den inbakade skon så väl som möjligt (95,8 % gemensam yta; skons nos når som mest 14,7 bildpunkter utanför konturen). Modellen skalas till längden; i GLB-filen är den 0,450 lång, 0,140 bred och 0,150 hög."
   },
   "background": {
-    "liftDeg": 5,
+    "liftDeg": 0,
     "basis": "antaget",
-    "source": "Valt 2026-11-18 för spelarens vy, så att rummets väggar och fönster syns bakom dealern i stället för golvet (Jakob: \"ser man fortfarande golvet\"). Spelarens öga står i dealerns ögonhöjd, så olyft ligger en 360-bilds horisont bakom hennes ögon. 5 grader lägger den i höjd med hennes axlar, och då syns mindre av golvet mellan väggen och bordet. Från filmkameran, som ser 25 grader nedåt, behövdes 20 grader för samma sak. Startvärde för reglaget Lyft; gäller 360-bilder, inte platta bilder."
+    "source": "Satt till 0 den 2026-11-18: rummet har golv (se room), så bilden behöver inte lyftas för att väggarna ska synas. Jakob samma dag: \"Istället för att vara kvar på golvnivå och vinkla bakgrunden för att se djupare inåt, har vi bara lyfts uppåt. Jag tror att det här är fel.\" Värdet var 5 grader så länge 360-bilden låg oändligt långt bort. Startvärde för reglaget Lyft, som finns kvar; gäller 360-bilder, inte platta bilder."
+  },
+  "room": {
+    "captureHeight": 1.6,
+    "radius": 8,
+    "shadowReach": 0.35,
+    "shadowStrength": 0.55,
+    "basis": "antaget",
+    "source": "Valt 2026-11-18. En 360-bild visas som ett rum med golv: bilden antas vara tagen captureHeight meter över golvet, rakt över eller under spelarens öga, och rummets väggar ligger radius meter från den punkten. 1,6 m är en vanlig stativhöjd för 360-bilder; ingen av bilderna bär uppgift om sin höjd, och 8 m är valt som ett rum där väggarna står klart bakom dealern. Båda är startvärden för reglagen Höjd och Radie, per bakgrund. Golvets egen höjd är inte antagen: den räknas ur bordsmodellen (geometry.ts, floorY). Skuggan under bordet är en mörk fläck på golvet, stor som bordets fotavtryck, som tonar ut shadowReach meter utanför det och som mest tar bort andelen shadowStrength av ljuset; båda valda i bild."
+  },
+  "figure": {
+    "frame": { "width": 1920, "height": 1080 },
+    "height": 1.65,
+    "handRow": 568,
+    "handLift": 0.005,
+    "behindEdge": 0.06,
+    "basis": "antaget",
+    "source": "Helfiguren: en film eller stillbild av en sittande dealer på grön skärm, utan bord, ställd upprätt bakom bordet. Talen är local-studios placering av dealern Liv (planeHeight 1,65 m för hela rutans höjd, fingertipSourceY 0,523, händerna 6 mm över filten), förda hit 2026-11-18. frame är rutan bilderna är gjorda i. handRow är raden för händernas underkant i Livs VILA, mätt i bilden skalad till rutan (output/work/helfigur/measure.mjs: 568 av 1080); den raden ställs handLift meter över filtens höjd. behindEdge är hur långt bakom dealerns bordskant ytan står: bordsskivan börjar 26 mm bakom filtens kant (table.model), så 60 mm ställer ytan strax bakom skivan. Passningen mot det här bordet är sedd i bild, inte mätt."
+  },
+  "forlaga": {
+    "frame": { "width": 1920, "height": 1080 },
+    "fps": 30,
+    "basis": "antaget",
+    "source": "Valt 2026-11-18: en förlaga sparas i helfigurens ruta och takt (Livs filmer är 1920 × 1080 med 30 rutor per sekund), så att en ruta i förlagan svarar mot en ruta i filmen. Vyns hela ruta ryms i förlagans: den passas in på höjden, och förlagan visar mer åt sidorna."
   },
   "film": {
     "lift": 0.0015,
+    "frame": { "width": 1920, "height": 1080 },
+    "reach": { "x": [-0.72, 0.8], "top": 0.71, "behind": 0.3, "past": 0.08 },
+    "margin": 0.03,
     "basis": "antaget",
-    "source": "Gamla scenens veck (src/scene3d-film.ts, place): den liggande delen av dealerfilmen ritas 1,5 mm över filten, så att den inte flimrar mot bordets yta."
+    "source": "lift är gamla scenens veck (src/scene3d-film.ts, place): den liggande delen av dealerfilmen ritas 1,5 mm över filten, så att den inte flimrar mot bordets yta. Resten är valt 2026-11-18 för närbilden, den ruta en dealerfilm görs i ur en vy: samma öga som vyn, riktat mot dealern och inzoomat så att hennes arbetsyta fyller rutan (geometry.ts, workArea). frame är filmmodellens ruta (1080p). reach är arbetsytan i meter. x är hur långt åt sidorna armarna och skon når vid bordskanten: från handen utanför yttersta kortplatsen på plats 1 (-0,53 - 0,05 - 0,14) till skons bakre ände (0,71 + luft). top är höjden över filten för luften över hjässan: dockans huvud når 0,67 m över filten, och dealerns ögon står 0,58 m över den i ankaret VILA. behind är hur långt bakom bordskanten kroppen räknas. past är hur långt förbi en kortplats handen når, åt sidorna och mot spelaren: kortet är 0,09 långt och fingrarna ligger på det. Först räknades filten som en låda en halv meter fram över hela bredden; då styrde lådans hörn rutan och dealerns huvud blev 180 bildpunkter högt. Med kortplatserna själva blir det cirka 250. margin är luften mot rutans kant, som andel av rutan. Inget av det är mätt mot en gjord film."
   },
   "card": {
     "width": 0.063,

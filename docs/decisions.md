@@ -2,6 +2,31 @@
 
 Nyast överst. Ett beslut som ersätts stryks inte: skriv det nya överst och peka på det gamla.
 
+## 2026-11-18, dealern på grönt ur scenens kamera, och dockan som standard
+
+Citat är Jakobs ord samma morgon (07:19–08:35), när han lämnade över till agenten för natten.
+
+| Beslut | Skäl |
+| --- | --- |
+| Dealerns filmer görs på grön skärm ur scenens kamera och nycklas in i scenen. Bord, sko, kort och rum är scenens 3D och bakas inte in i filmen. Ersätter nattens försök med rum, bord och sko inbakade i bilden. | Jakobs val bland tre: "Dealern på grönt". Då går rum, bord och sko att byta, och händerna hamnar över scenens kort. Filmen med allt inbakat kallade han "skit". |
+| Provfilmen är en hel giv: kortet ur skons mynning till plats 4, med blick, huvud och överkropp som följer med. Ett klipp där bara handen går till skon räcker inte som prov. | Jakobs val, och om filmen VILA → REDO: "hon rör bara handen, helt fel". |
+| Samma giv ska gå att se ur flera vinklar: en film per vy, alla gjorda efter samma rörelse i scenens mått. Att byta vy ändrar aldrig var kortet läggs. | "dealern ska filmas så man kan se henne som 3D från olika vinklar utan att hon för den delen dealar till olika positioner" |
+| Dockan är standarden för rörelsen, lika för alla dealers. Hon bär Pamelas avlästa nyp-giv ur gamla Dealer. Kortet hämtas där det står i scenens sko och läggs på platsens första kortplats, båda ur `content/scene.json`, och samma rörelse ställs om till plats 1–7. Förlagan är dockan sedd genom vyns kamera; helfiguren är det inte längre. Preciserar 06:06 ("helfiguren är förlagan"). | "Det måste finnas en standard. Vi kan gärna utgå från Pamela, men då är det viktigt att allt följer en och samma grund." Helfiguren är en platt bild: från sidan syns den som en kuliss, och i local-studios skala står hon 10–15 % för stor mot bordet (hjässan 0,81 m över filten mot dockans 0,67). |
+| En dealerfilm görs i vyns närbild: samma öga som vyn, riktat mot dealern och inzoomat på hennes arbetsyta (`film.reach`). Filmen läggs tillbaka på den vikta ytan genom samma öga. | Dealern blir cirka 260 bildpunkter i huvudhöjd i 1920 × 1080, som i gamla projektets filmer, och ingenting förskjuts eftersom ögat står kvar. Agentens val. |
+| Spelaren står närmare: 1,90 m från dealerns bordskant, 15° nedåt, 48° bildvinkel, fortfarande i dealerns ögonhöjd. Ersätter 2,40 m, 16° och 45° under "teknikval i etapp 1". | "känns som om det skulle vara en reling eller en kant som är mycket högre. Möjligtvis är bordet för långt bort, eller hon är för långt bort från bordet. De måste skjutas samman." Prövat i bild med dockan vid bordet. |
+| Dockans händer är 17,5 cm långa, och ankarnas händer hålls vid dockans storlek. | "Hennes händer är för stora på allt jag ser." Mätt: gamla dockans givhand var 24 cm, och bildmodellerna ritar händerna 1,2–1,3 gånger dockans. |
+| Ett ankare görs i två steg: en bildmodell som håller underlagets geometri sätter dealern i dockans ställning, och en som träffar likheten rättar huvudet. I natt: Nano Banana Pro, sedan GPT Image 2.6 Sunburst. Preciserar 06:30 ("för bilder prövas andra modeller före Nano Banana"). | Mätt i fyra försök: Sunburst ensam flyttade bord och sko 30 bildpunkter och gjorde händerna för stora; Nano Banana Pro höll sko, bordskant och kort inom 4 bildpunkter men gav fel hår och ett slätare ansikte. |
+| Agenten har alla privilegier och ändrar efter eget omdöme. Gamla Dealer och Scoutgaming får läsas som referens. Natten får kosta 2 000 krediter, högst 250 per beställning. | "ALLA privilegier har du och du får ändra vad du vill efter ditt omdöme." "Referensrepos finns som sagt såsom dealer eller scoutgaming." Budgeten valde han i fråga. |
+
+## 2026-11-18, scenen med golv och helfigur
+
+| Beslut | Skäl |
+| --- | --- |
+| Rummet har golv: en 360-bild skärs mot en sfär kring upptagningspunkten, och under golvet mot golvplanet (samma idé som local-studios `GroundedSkybox`, i skuggprogrammet). Lyftet står på 0. | Jakob: lyftet är fel väg. Bakgrunden såg inzoomad ut när den låg oändligt långt bort. Sett i skärmbilder (`output/scen-matning/golv-*.png`). |
+| Helfiguren visas på en upprätt yta bakom bordet (nyckel gemensam med den vikta filmytan). Gamla ankaret på den vikta ytan finns kvar som vyn Filmkameran. | Vägvalet 06:06: helfiguren är förlagan. Livs och Paulinas helfigurer står i registret med `use: "helfigur"`. |
+| En förlaga sparas ur scenen i 1920 × 1080, 30 rutor/s, under `output/forlagor/`, med ögats plats och riktning i en json. | Behövs till 2D-filmerna: samma kamera, samma rörelse. Första klippet sparat: Liv VILA → REDO ur Spelaren med Balsalen. |
+| Helfigurens mall (Livs gröna, handlägen, gräns 25 bildpunkter) står i `content/figure-frame.json`. Receptet för en ny dealer är `src/pipeline/helfigur.ts`. | Jakob: samma sittande ställningar ur en bild på vilken person som helst. Paulinas VILA/REDO och klipp är godkända som förlaga. |
+
 ## 2026-11-18, det Jakob lämnade över till agenten
 
 | Beslut | Skäl |
