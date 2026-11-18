@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "about": "Samma cykel som cykel-nyp (läs dess about), utan vila: handen lägger kortet och lämnar det i samma rörelse (life.touch 0,5, parts.onCard 0), och de små rörelserna är så stora att de syns som rörelse: andning i axlar och huvud, huvudet som svänger och vrids hela cykeln, och den vilande handens fingrar. Ett prov för Jakob (output/work/rorelse/forslag.md, variant D); den som inte väljs tas bort.",
+  "id": "cykel-nyp-flytande",
+  "from": "REDO",
+  "to": "REDO",
+  "give": "giv-nyp-plats-4",
+  "seconds": 4,
+  "parts": { "ready": 0.1, "deal": 1.8, "onCard": 0, "back": 1.8, "still": 0.3 },
+  "back": { "lift": 0.05, "release": 0.3, "look": 0.6, "open": 0.3, "close": 0.75 },
+  "flip": { "reach": 0.8, "pickUp": 0.5, "from": 50 },
+  "life": {
+    "gazeLead": 0.25,
+    "headLag": 0.1,
+    "headShare": 0.7,
+    "headSpan": 0.3,
+    "trunkLead": 0.1,
+    "trunkLag": 0.15,
+    "leanLeast": 0.04,
+    "effort": 0,
+    "breath": { "rise": 0.012, "head": 0.008, "sway": 0.018, "turn": 4, "fingers": 0.01, "cycles": 1 },
+    "calm": { "hand": 6, "body": 20 },
+    "touch": 0.5
+  },
+  "basis": "antaget",
+  "source": "Valt av agenten 2026-11-18 som variant D, efter provklippen A, B och C (output/tagningar/paulina_spelaren_cykel-nyp_4-0_t3, paulina_spelaren_cykel-nyp-lugn_4-0_t1, paulina_spelaren_cykel-nyp_4-0_t4): Kling följde dockans väg och takt men stod nästan stilla medan handen vilade på kortet och i skon (stillhet 0,12–0,22 mot dockans 0,03; huvudet i vila 0,012–0,027 mot dockans 0,058, mätt med rorelse.ts film). Vilan på kortet är borttagen (onCard 0, deal och back 1,8 s), och handen bromsar in till kortet och lyfter genast (touch 0,5: farten under en tiondel av toppen de sista 2,9 % av tiden dit och de första 2,9 % därifrån, mot 8,6 % med minsta ryck, och toppen vid 0,57 av vägen; med touch 1 låg toppen vid 0,67 och handen såg ut att rusa mot kortet i dockans film). De små rörelserna är 2–3 gånger cykel-nyp:s, eftersom Kling ungefär halverade dem: axlarna 12 mm, huvudet 8 mm upp och ned och 18 mm i sidled, huvudet vrids ±4°, och den vilande handens pek- och långfinger lyfts 10 mm. flip: reach 0,8 s, pickUp 0,5 s och läggningen 0,5 s. Resten som cykel-nyp. Inte mätt mot en verklig dealer."
+}

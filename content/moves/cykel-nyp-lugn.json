@@ -18,8 +18,9 @@
     "trunkLag": 0.15,
     "leanLeast": 0.04,
     "effort": 0,
-    "breath": { "rise": 0.005, "head": 0.004, "sway": 0.008, "cycles": 1 },
-    "calm": { "hand": 6, "body": 20 }
+    "breath": { "rise": 0.005, "head": 0.004, "sway": 0.008, "turn": 0, "fingers": 0, "cycles": 1 },
+    "calm": { "hand": 6, "body": 20 },
+    "touch": 0
   },
   "basis": "antaget",
   "source": "Valt av agenten 2026-11-18 som variant B till cykel-nyp (output/work/rorelse/forslag.md): samma life, men handen bär kortet på 2,1 s (1,52 gånger den lästa givens takt i stället för 1,88), vilar 0,5 s på kortet och går tillbaka på 2,0 s. Andningen tar hela cykeln, 12 andetag i minuten. Filmen blir 5 s (Kling 4 tar 3–30 s; tagning.ts forbered sätter längden efter cykeln). flip: reach 1,2 s, pickUp 0,4 s och läggningen 0,5 s. Inte mätt mot en verklig dealer."

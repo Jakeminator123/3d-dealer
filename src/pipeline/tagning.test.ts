@@ -21,11 +21,13 @@ const content = readTagning(root);
 const redoAnchor = content.redo.anchors.paulina!.spelaren!;
 const quiet = () => {};
 
-test('texten är pilotens med granskarens två fraser och rättelsen, och samma för varje plats', () => {
+test('texten är pilotens med granskarens fras, rättelsen och orden om hur hon rör sig, och samma för varje plats', () => {
   const text = promptFor(content);
   assert.ok(!/[{}]/.test(text), 'inga platshållare');
   assert.ok(text.includes('carries it low over the table to its place, where the last frame shows it'), 'granskarens första fras');
-  assert.ok(text.includes('her head turns with it from the shoe to the card\'s place'), 'granskarens andra fras');
+  // Granskarens andra fras ("her head turns with it from the shoe to the card's place") beskrev den gamla dockan och är
+  // ersatt av orden om blick, huvud och bål (2026-11-18, output/work/rorelse/forslag.md); de säger inte heller var platsen är.
+  assert.ok(text.includes('they go ahead of the card to its place') && text.includes('She moves like a living person, never like a mannequin'), 'orden om hur hon rör sig');
   assert.ok(text.includes('the next card stays down in the opening and is not lifted with it'), 'pilotens rättelse');
   assert.ok(!text.includes('in front of her,') && !text.includes('middle of the table'), 'inga ord om plats 4');
   assert.ok(text.startsWith('Locked camera, one continuous shot.') && text.endsWith('No sound.'));

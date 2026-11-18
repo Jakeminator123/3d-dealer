@@ -365,8 +365,11 @@ export function motionValues(tracks: Tracks, roles: Roles, options: MotionOption
   const bodyStill = roles.body.map(stillAt);
   const frozen = hand.map((_, k) => bodyStill.every((still) => still[k]!));
   const handStill = stillAt(roles.hand);
-  const out = moves[0];
-  const back = moves.length > 1 ? moves.at(-1)! : null;
+  // Vägen ut och tillbaka. En hand som lägger kortet och genast lyfter (Life.touch) gör det i en enda rörelse: då delas
+  // den vid sin djupaste dal.
+  const ways = moves.length === 1 ? pieces(hand, moves[0]!, 0.25) : moves;
+  const out = ways[0];
+  const back = ways.length > 1 ? ways.at(-1)! : null;
 
   // Ordningen på vägen ut och tillbaka: när delarna börjar och slutar mot handen, i sekunder (positivt: före handen).
   // En del börjar när den går över en tiondel av sin topp i fönstret och över stillhetens gräns.
