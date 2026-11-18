@@ -215,7 +215,11 @@ export function createFilm(
     const before = shown();
     if (before && before !== view?.picture) before.clip?.pause();
     const at = sequence[index] ? Math.min(local, Math.max(0, seconds - LAST_FRAME)) : view?.end ? Math.max(0, seconds - LAST_FRAME) : 0;
-    if (clip) await clip.seek(at);
+    // Står delen redan stilla på den tiden och visas (en följd som har ställts och sedan spelas) ställs filmen inte om:
+    // en film som ställs på den tid den står på visar ingen ny ruta, och rutan väntades då in förgäves (picture.ts,
+    // SEEK_PATIENCE).
+    const there = current === index && before === view?.picture && clip !== null && !clip.playing() && Math.abs(clip.time() - at) < 1e-6;
+    if (clip && !there) await clip.seek(at);
     if (closed || mine !== turn) return false;
     show(index);
     return true;

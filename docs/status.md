@@ -23,7 +23,7 @@ Den första serien finns och spelas: Paulina delar två kort till var och en av 
 
 ## Finns inte än
 
-- Den nya serien: spelarnas två kort, dealerns öppna kort, hålkortet och vändningen (17 klipp), och sedan dealerns extrakort och spelarnas tredje kort (9 klipp). Paketen görs med `forbered` när Jakob har valt rörelse.
+- Den nya serien: spelarnas två kort, dealerns öppna kort, hålkortet, vändningen och vänta-klippet, och sedan dealerns extrakort och spelarnas tredje kort (9 klipp). Fem provklipp finns (A, B, C, A2, D, alla plats 4 kort 0); D är filmat med den förra bågen, så dess kort glider 5,9 cm efter landningen.
 - Serier ur andra vyer. Ankaret ur Plats 7 är gjort på den gamla geometrin och görs om först.
 - Det som händer mellan givarna: samla in kort, betala ut, marker.
 - Djup i filmen, så att kameran kan flyttas med parallax. Dockans djup kan ge det; inte prövat.
@@ -43,8 +43,8 @@ Tre bakgrunder och fyra material har `utgår` och tas bort vid nästa arbetspass
 
 ## Näst
 
-1. Jakob väljer mellan provklippen A, B och C (`output/work/rorelse/`).
-2. Den nya serien med den valda rörelsen, grundrundan först. När den är godkänd arkiveras de 14 äldre klippen.
+1. Jakob ser provklipp D (`output/work/rorelse/provklipp-forut-a-a2-d.mp4` och `provklipp-d-tre-varv.mp4`, också på mobilsidan) och säger ja, nej eller vad som ska ändras. Mätt fryser D aldrig (2,1 % av tiden helt stilla, mot 12,4 % förut).
+2. Serien med D: 17 paket ligger förberedda (`output/tagningar/paulina_spelaren_cykel-nyp-flytande_*`): spelarnas två kort utom plats 4 kort 0, dealerns öppna kort, hålkortet, vändningen och vänta-klippet. Beställ ytterlägena först och låt en oberoende granskare döma dem. När serien är godkänd arkiveras de 14 äldre klippen.
 3. Mätningen för sidovyer, och ett nytt ankare och en serie ur Plats 7 på den nya geometrin.
 4. Labbets steg Dealer, Klipp och Spela, och det som händer mellan givarna.
 
