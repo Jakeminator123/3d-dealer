@@ -7,6 +7,7 @@ Ett beslut per rad, med datum och skälet i korthet; citat är Jakobs ord. Ett b
 - 2026-11-18. Ren ombyggnad i en ny mapp, `3d-dealer`. Gamla Dealer och Scoutgaming är läsreferenser, och det som hämtades därifrån är en ögonblicksbild från samma dag. (Agentens förslag; "Okej, det låter bra".)
 - 2026-11-18. Bara lokalt. Lipsync och ljud väntar. ("vi kan avvakta med lipsync och ljud tills vi har fått allt annat att fungera")
 - 2026-11-18. Målet är så många bra filmer av Paulina att hon kan dela ut kort till alla sju platser och komma tillbaka, med minst två kort per plats. (09:35)
+- 2026-11-19. Riktningen bortom en vy är Jakobs ursprungliga tanke: en animerad 3D-figur som bär 2D-filmerna, så att kameran kan dras runt med mjuka övergångar. Det är inte byggt: dealern är i dag en film per vy. Vägen dit står i [status.md](status.md), Näst. ("skulle inte detta projekt skapa en 3d-animerad meshy … som skulle få typ 2d-filmer … om man skulle dra omkring kameran så skulle smidigare övergångar göras?")
 - 2026-11-18. Paulina är visningsnamnet (förut Pau och Paow); id är `paulina`.
 - 2026-11-18. Gamla Dealer är Codex arbetsyta och rörs inte, och en gren med opushade commits tas aldrig bort utan Jakobs ja. Regeln står i [AGENTS.md](../AGENTS.md).
 

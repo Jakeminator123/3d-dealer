@@ -48,10 +48,11 @@ Tre bakgrunder och fyra material har `utgår` och tas bort vid nästa arbetspass
 
 1. Serien med E görs klar: de kort i standardrundan som saknar ett godkänt klipp, och spelarnas tredje kort och dealerns extrakort. Sedan sparas hela rundan som en film (`node src/pipeline/runda.ts paulina spelaren --nara`) och läggs på mobilsidan. När serien är godkänd arkiveras de 14 äldre klippen och provklippen A–D, och de ankare som då inte används tas bort.
 2. Två händer: Jakob ser provklippet bredvid E och väljer. En serie med två händer kostar ungefär som serien E. Jakob har föreslagit att flera rörelsemönster godkänns bredvid varandra ("Kanske ska vi godkänna flera rörelsemönster"): alla klipp ur samma ankare kedjas fritt, men rundan väljer i dag den senaste godkända tagningen per kort. Att den väljer bland flera är inte byggt.
-3. Mätfelen som granskarna har pekat ut (`output/work/granskning-e-2/omdome.json`, "matten") rättas i `src/pipeline/matning.ts` och `rorelse.ts`.
-4. Mallen prövas med en andra dealer ur en enda bild, och ankarets steg för lagning vid givhanden läggs till i `ankare.ts`.
-5. Mätningen för sidovyer, och ett nytt ankare och en serie ur Plats 7 på den nya geometrin.
-6. Labbets steg Klipp och Spela, och det som händer mellan givarna.
+3. Filmen på dockan, det första steget mot en dealer som håller när kameran dras runt (Jakobs ursprungliga tanke, [decisions.md](decisions.md), Projektet). Ett prov utan krediter på ett klipp som finns: filmen projiceras från klippets öga (registrets `eye`) på den rörliga dockan, som rör sig som filmen ruta för ruta, och kameran flyttas några tiotal grader. Sedan en film från vänster och en från höger ur samma docka, som tonar över i varandra efter kamerans vinkel, och Meshy-figuren av henne (`glb/paow/`, riggen saknar fingerleder) passad till dockans skelett som bärare med hennes form. Inget av det är prövat; risken är kanterna där dockans form inte är hennes.
+4. Mätfelen som granskarna har pekat ut (`output/work/granskning-e-2/omdome.json`, "matten") rättas i `src/pipeline/matning.ts` och `rorelse.ts`.
+5. Mallen prövas med en andra dealer ur en enda bild, och ankarets steg för lagning vid givhanden läggs till i `ankare.ts`.
+6. Mätningen för sidovyer, och ett nytt ankare och en serie ur Plats 7 på den nya geometrin.
+7. Labbets steg Klipp och Spela, och det som händer mellan givarna.
 
 ## Öppet
 
