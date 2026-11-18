@@ -2369,11 +2369,11 @@
       "group": "anchors",
       "dealer": "paulina",
       "title": "REDO ur Spelaren, på grönt",
-      "status": "att granska",
-      "note": "Gjord 2026-11-18. Paulina på enfärgad grön skärm i närbilden av vyn Spelaren (samma öga som vyn, inzoomat på dealern), i dockans ställning REDO: vänster hand nyper det gula märkkortets övre kortsida i skons mynning, höger hand vilar på filten, blicken på kortet. Skon och kortet står där scenens sko står sedd ur närbilden (kortet inom 4 bildpunkter). Händerna är krympta lokalt till dockans storlek (0,82), eftersom bildmodellerna ritade dem 1,2–1,3 gånger för stora. Inte dömd: gjord av en agent och väntar på en oberoende granskare.",
+      "status": "godkänd",
+      "note": "Gjord 2026-11-18. Paulina på enfärgad grön skärm i närbilden av vyn Spelaren (samma öga som vyn, inzoomat på dealern), i dockans ställning REDO: vänster hand nyper det gula märkkortets övre kortsida i skons mynning, höger hand vilar på filten, blicken på kortet. Skon och kortet står där scenens sko står sedd ur närbilden (kortet inom 4 bildpunkter). Händerna är krympta lokalt till dockans storlek (0,82), eftersom bildmodellerna ritade dem 1,2–1,3 gånger för stora. Granskaren (oberoende underagent Opus 5.5, 2026-11-18) rättade lokalt: kavajen slutade på rad 767–774, 21–28 bildpunkter ovanför dealerns bordskant (rad 795), så att rummet syntes mellan kavaj och list i scenen. Skärmen under fållen är fylld med kavajens färg (13, 11, 14) ned till rad 795. Originalet ligger i output/work/granskning-spelaren/opus/original/.",
       "width": 1920,
       "height": 1080,
-      "bytes": 748767,
+      "bytes": 787501,
       "pose": "redo",
       "grip": "nyp",
       "licence": "Ingen tredjepartslicens: genererad på Jakobs Runway-konto",
@@ -2413,22 +2413,28 @@
           {
             "step": "skärm",
             "what": "output/work/giv-4/platta-gront.ts: bakgrund, bord och rutnät satta till RGB (2, 182, 48)."
+          },
+          {
+            "step": "granskning",
+            "what": "output/work/granskning-spelaren/opus/rata.mjs: skärmen mellan kavajens fåll och rad 795 fylld med kavajens färg (258 kolumner, x 830–1087)."
           }
         ],
         "measured": "Mätt med output/work/giv-4/mat-ankare.ts i den färdiga bilden: vilande handens hud 124 × 88 bildpunkter (dockans 120 × 88), gult kort 1264,720–1328,800 (dockans 1264,716–1332,796), skon 1228,608–1692,840 (underlagets 1240,652–1692,840: bildmodellens sko är högre baktill).",
-        "sha256": "384333d8814d849c749582c04d2278ee5247fa4c1a22dd315c4964be77220f7e"
-      }
+        "sha256": "011de0c9982fe3e46988f4733abc14dc3dcc5e6ec4cedab5da52e7cd9d8b8170"
+      },
+      "statusBy": "Oberoende granskare (underagent Opus 5.5, 2026-11-18, har inte gjort bilden), sedd i full storlek mot docs/production.md Regler, Jakobs krav och dockans REDO. Mätt: vilande handens hud 124 × 88 bp (dockans 120 × 88); givhandens knogbredd ca 83 bp avläst, mot ca 82 väntat för 7,8 cm ur scenens antagna kamera; gula kortet 1264,720–1328,800 (dockans 1264,716–1332,796); allt utom dealer, sko och kort exakt (2, 182, 48), ingen skugga. Paulina enligt identitetsbilderna: ansikte, blont hår med mörk bena, hals- och brösttatuering, ros och fingertecken på båda händerna. Rättat av granskaren: kavajen slutade 21–28 bp ovanför bordskanten (rad 795), så att rummet syntes under bålen i scenen; fyllt med kavajens färg ned till kanten och sett i ny stillbild ur scenen. Kvar: bildens sko är högre baktill än scenens (täcks av scenens sko), en liten svart skåra i kortets högra kant, och den vilande underarmen hänger mot kanten som dockans i stället för att ligga på filten.",
+      "statusAt": "2026-11-18 09:49"
     },
     {
       "file": "dealers/paulina/anchors/spelaren-lagt-4.png",
       "group": "anchors",
       "dealer": "paulina",
       "title": "LAGT 4 ur Spelaren, på grönt",
-      "status": "att granska",
-      "note": "Gjord 2026-11-18. Samma uppställning som spelaren-redo.png, i dockans slutställning: kortet ligger på första kortplatsen för plats 4 med den blå sidan upp, vänster hand vilar med fingertopparna vid kortet, höger hand ligger kvar, blicken ned på kortet. Märkkortet är målat enfärgat blått på dockans kortplats (bildmodellen gav det vit kant och lade det 20 bildpunkter åt höger); fingertopparna ligger därför vid kortets högra kant och inte mitt på dess kortsida. Skon är flyttad 14 bildpunkter åt vänster till samma plats som i REDO. Händerna krympta som i REDO. Inte dömd: gjord av en agent och väntar på en oberoende granskare.",
+      "status": "godkänd",
+      "note": "Gjord 2026-11-18. Samma uppställning som spelaren-redo.png, i dockans slutställning: kortet ligger på första kortplatsen för plats 4 med den blå sidan upp, vänster hand vilar med fingertopparna vid kortet, höger hand ligger kvar, blicken ned på kortet. Märkkortet är målat enfärgat blått på dockans kortplats (bildmodellen gav det vit kant och lade det 20 bildpunkter åt höger); fingertopparna ligger därför vid kortets högra kant och inte mitt på dess kortsida. Skon är flyttad 14 bildpunkter åt vänster till samma plats som i REDO. Händerna krympta som i REDO. Granskaren (oberoende underagent Opus 5.5, 2026-11-18) rättade lokalt: kavajen slutade på rad 754–765, 30–41 bildpunkter ovanför dealerns bordskant (rad 795), och skärmen under fållen är fylld med kavajens färg (13, 11, 14) ned till rad 795; ett vitt streck och två prickar kvar av bildmodellens kort (x 965, rad 1004–1022, och 878–881, 958–965) är gröna; ett hål av skärmgrönt i långfingrets tatuering (27 bildpunkter vid 960,947) och en fläck vid 970,968 är tatueringsgrå. Originalet ligger i output/work/granskning-spelaren/opus/original/.",
       "width": 1920,
       "height": 1080,
-      "bytes": 822167,
+      "bytes": 773895,
       "pose": "lagt 4",
       "grip": "nyp",
       "licence": "Ingen tredjepartslicens: genererad på Jakobs Runway-konto",
@@ -2472,24 +2478,30 @@
           {
             "step": "skärm och sko",
             "what": "platta-gront.ts, och flytta-ruta.mjs: rutan med skon flyttad 14 bildpunkter åt vänster."
+          },
+          {
+            "step": "granskning",
+            "what": "output/work/granskning-spelaren/opus/rata.mjs: midjan fylld ned till rad 795 (197 kolumner, x 830–1026), kortrester gröna (49 bildpunkter), grönt i tatueringen grått (35 bildpunkter)."
           }
         ],
         "measured": "Mätt med mat-ankare.ts: blått kort 856,968–940,1024 (dockans 856,964–940,1020), vilande handens hud 112 × 84 (dockans 124 × 80), givhandens 132 × 152 med handleden (dockans 124 × 116), skon 1224,608–1692,840.",
-        "sha256": "be148f85af548bebf9db5e0194f0cfc57b9957f96e62be2e4f85cae07e0bbbaa"
-      }
+        "sha256": "2c7e96b30d156f72cffeb860081eb9f4a5704c07357d92f1bd42548e416521a3"
+      },
+      "statusBy": "Oberoende granskare (underagent Opus 5.5, 2026-11-18, har inte gjort bilden), sedd i full storlek mot docs/production.md Regler, Jakobs krav och dockans LAGT. Mätt: blått kort 856,968–940,1024 (dockans 857,967–941,1022), i scenen inom konturen för plats 4:s första kort; givhandens knogbredd ca 92 bp avläst, mot ca 95–99 väntat vid kortet ur scenens antagna kamera; vilande handens hud 112 × 84 (dockans 124 × 80); skärmen exakt (2, 182, 48), ingen skugga. Paulina, med tatueringar på hals, bröst och båda händerna. Rättat av granskaren: kavajen slutade 30–41 bp ovanför bordskanten och är fylld ned till rad 795; ett vitt streck och prickar kvar av bildmodellens kort (strecket syntes på filten i scenen) är gröna; ett skärmgrönt hål i långfingrets tatuering, som nyckeln gjorde till ett hål, är grått. Kvar: fingertopparna vilar vid kortets övre högra hörn, 15–30 bp till höger om dockans grepp mitt på kortsidan, och ärmen har en trappig kant vid handleden efter krympningen.",
+      "statusAt": "2026-11-18 09:49"
     },
     {
       "file": "dealers/paulina/clips/giv-4-nyp_spelaren_t1.mp4",
       "group": "clips",
       "dealer": "paulina",
       "title": "Giv till plats 4 (nyp) ur Spelaren, tagning 1",
-      "status": "att granska",
-      "note": "Gjord 2026-11-18 med Kling 4. Paulina på grön skärm i närbilden av vyn Spelaren ger ett kort till plats 4: REDO → LAGT 4. Första bild spelaren-redo.png, sista bild spelaren-lagt-4.png, och dockans giv ur samma närbild som rörelsereferens. Ljudet, som alltid följer med ur Kling 4, är borttaget. Sett av den som beställde, inte dömt: hon drar det gula kortet ur skons mynning, vänder det till blått och lägger det på kortplatsen; huvud och blick följer kortet och axeln rör sig; skon står still och skärmen är jämnt grön. Mitt i rörelsen syns inte handens tatuering. Väntar på en oberoende granskare.",
+      "status": "godkänd",
+      "note": "Gjord 2026-11-18 med Kling 4. Paulina på grön skärm i närbilden av vyn Spelaren ger ett kort till plats 4: REDO → LAGT 4. Första bild spelaren-redo.png, sista bild spelaren-lagt-4.png, och dockans giv ur samma närbild som rörelsereferens. Ljudet, som alltid följer med ur Kling 4, är borttaget. Sett av den som beställde, inte dömt: hon drar det gula kortet ur skons mynning, vänder det till blått och lägger det på kortplatsen; huvud och blick följer kortet och axeln rör sig; skon står still och skärmen är jämnt grön. Mitt i rörelsen syns inte handens tatuering. Granskaren (oberoende underagent Opus 5.5, 2026-11-18) rättade lokalt, ruta för ruta, samma som i ankarna: midjan fylld med kavajens färg ned till dealerns bordskant (rad 795) i alla 97 rutor; kortresten (det vita strecket vid x 965) grön från ruta 78; långfingrets tatuering, som filmen förde vidare med skärmgrönt från ankaret och som nyckeln gjorde till ett hål, tatueringsgrå i ruta 40–96. Kodad om med libx264 (crf 10, inga B-rutor, bt709, inget ljud); rutorna ligger inom 46–48 dB av de rättade. Kortet ligger platt på kortplatsen från ruta 78 (3,25 s), inte 3,0 s: lands.at är ändrad efter det. Originalet ligger i output/work/granskning-spelaren/opus/original/.",
       "width": 1920,
       "height": 1080,
       "seconds": 4.04,
       "fps": 24,
-      "bytes": 3946357,
+      "bytes": 4830154,
       "pose": "redo → lagt 4",
       "grip": "nyp",
       "seat": 4,
@@ -2502,7 +2514,7 @@
       "lands": {
         "seat": 4,
         "index": 0,
-        "at": 3
+        "at": 3.25
       },
       "source": {
         "from": "runway",
@@ -2529,7 +2541,140 @@
         ],
         "prompt": "Locked camera, one continuous shot. The woman in image 1 performs the movement of the white mannequin in video 1, with the same timing. Image 1 is the first frame of the clip and image 2 is the last frame. Her left hand at the card shoe draws the yellow card up out of the opening, holding it by its short end between thumb and fingers, and carries it low over the table to its place in front of her, where the last frame shows it. On the way her wrist rolls once and hand and card turn over together about the card's long side, like turning a key: the broad yellow side narrows to a thin edge, then the broad blue side opens upward. With the same hold she lays the card flat at its place, blue side up, and her fingertips come to rest on it, as in the last frame. She is alive and attentive: her eyes follow the card the whole way, her head turns with it from the shoe to the middle of the table, and her shoulder and upper body lean slightly with the reach, naturally, as a professional dealer moves. She blinks once. Her other hand rests on the table and does not move. Only one card moves: a small card, about half as long as her hand, which keeps the same size all the way. It is blank, solid yellow on one side and solid blue on the other. The next card in the shoe is the same blank yellow. Her hands stay small and slender, the same size as in the first frame, with the same tattoos. The black card shoe does not move. The background stays the same flat green everywhere: no table is visible, there are no shadows on the green, and nothing else appears. No sound.",
         "promptNote": "Texten utgår från gamla Dealers bästa för nyp till plats 4 (text C, tagning C2 och C3), med tillägg om blick, huvud och överkropp efter Jakobs ord 2026-11-18.",
-        "sha256": "c629d19b73d60f222c8afd929ce78796a33a359a9de6052556b7734ecd2775d5"
+        "sha256": "733bc0ba1d2a7a5aa9aebaeb431ff47e60cbe73d9f428b1ec5de7ba0c1cd0ae8",
+        "steps": [
+          {
+            "step": "efterarbete",
+            "what": "output/work/granskning-spelaren/opus/rata.mjs och ffmpeg: midja, kortrest och tatuering rättade i varje ruta (logg i output/work/granskning-spelaren/opus/fixat/logg.txt), kodad om utan ljud."
+          }
+        ]
+      },
+      "statusBy": "Oberoende granskare (underagent Opus 5.5, 2026-11-18, har inte gjort tagningen), sedd ruta för ruta i full storlek, sida vid sida med dockans film och i scenen (ny närbild med 3D-kortet), mot docs/production.md Regler och Jakobs krav. Mätt: första rutan mot REDO 35,9 dB och sista mot LAGT 34,4 dB (efter rättelsen 34,5 och 33,4), inga hopp (49 dB mellan ruta 0–1 och 95–96); inget ljudspår (ffprobe); skons ytterkontur 96 % kvar mot ruta 0; skärmen (0, 176, 47), 0,1 % mörkare punkter; kortet platt på kortplatsen från ruta 78, inom 2 bp av dockans; händerna i dockans storlek jämförda vid 0, 1,0, 1,4, 2,25, 2,75 och 3,96 s. En hel giv: gult kort ur mynningen, vänt till blått vid 1,8 s och lagt på plats 4, med huvud, blick och axel efter kortet; Paulina hela vägen. Rättat lokalt i alla 97 rutor, som i ankarna: midjan (rummet syntes 22–40 bp under kavajen), kortresten och tatueringshålet; omkodad utan ljud; lands.at 3,0 till 3,25 eftersom kortet inte ligger platt förrän ruta 78. Kvar: vid 0,79–0,88 s suddas givhandens fingertoppar ut i grönt och kortet lyfter utan synlig kontakt i tre rutor; kortbunten inne i bildens sko byter form vid 0,85 s (dold av scenens sko); fingertatueringarna är svaga 1,2–1,9 s; handen slutar vid kortets hörn.",
+      "statusAt": "2026-11-18 09:49"
+    },
+    {
+      "file": "dealers/paulina/anchors/plats-7-redo.png",
+      "group": "anchors",
+      "dealer": "paulina",
+      "title": "REDO ur Plats 7, på grönt",
+      "status": "att granska",
+      "note": "Gjord 2026-11-18. Samma giv som spelaren-redo.png, sedd från sidan: Paulina på enfärgad grön skärm i närbilden av vyn Plats 7, i dockans ställning REDO. Vänster hand nyper märkkortet i skons mynning, höger hand vilar på filten, blicken på kortet; bålen är vriden mot skon, så att kameran ser henne i trekvart. Skon står där scenens sko står sedd ur närbilden. Händerna är krympta lokalt (vilande 0,78 kring ärmen, givande 0,85 kring kortet). Kortet i mynningen är målat enfärgat gult: dockan visar där kortets blå framsida, eftersom kameran ser kortet underifrån, men gult behåller betydelsen 'kortet i skon' och tas inte bort av nyckeln som tar bort det blå när kortet ligger. Inte dömd: gjord av en agent och väntar på en oberoende granskare.",
+      "width": 1920,
+      "height": 1080,
+      "bytes": 527245,
+      "pose": "redo",
+      "grip": "nyp",
+      "licence": "Ingen tredjepartslicens: genererad på Jakobs Runway-konto",
+      "use": "dealerfilm",
+      "view": {
+        "kind": "plats",
+        "seat": 7
+      },
+      "source": {
+        "from": "runway",
+        "taskId": "c4e91df5-d093-46fc-b0f5-d1d9b52f3e14",
+        "model": "gpt-image-2.6-sunburst",
+        "imageSize": "2K",
+        "ratio": "16:9",
+        "credits": 29,
+        "creditsNote": "Antaget, inte mätt per beställning: Nano Banana Pro 2K kostar 20 och Sunburst-retuschen cirka 9 (mätt för samma slag i Spelaren). Båda beställdes 08:58 och 09:04 av en underagent som stoppades innan den läste saldot; dess sex beställningar kostade tillsammans 109 (4 577 → 4 468, whoami 09:20). Förkastade försök står i output/work/giv-4/LOGG.md.",
+        "steps": [
+          {
+            "step": "underlag",
+            "what": "Dockans REDO (content/moves/giv-nyp-plats-4.json, tid 0) ur Plats 7:s närbild i ateljén: grön skärm, ljusare grönt bord med rutnät om 10 cm, scenens sko, hudfärgade händer. output/forlagor/docka-giv-nyp-plats-4_plats-7-nara_atelje_bild_redo.png, sparad med src/pipeline/shoot.ts."
+          },
+          {
+            "step": "ställning",
+            "model": "nano-banana-pro",
+            "taskId": "09b040e2-6a89-4867-94cf-d7da9a998c2f",
+            "what": "Dockan bytt mot Paulina med identitetsbilderna som referens, utan sidobilden (som kopierades i försök 1). Skon på samma bildpunkter som underlaget."
+          },
+          {
+            "step": "likhet",
+            "model": "gpt-image-2.6-sunburst",
+            "taskId": "c4e91df5-d093-46fc-b0f5-d1d9b52f3e14",
+            "what": "Retusch av bara huvudet med ansikte-kavaj och sidobilden som identitetsreferens. Skon flyttad högst 8 bildpunkter."
+          },
+          {
+            "step": "händer",
+            "what": "output/work/giv-4/krymp-hand.ts: vilande handen 0,78 kring ärmen, givhanden 0,85 kring kortet."
+          },
+          {
+            "step": "skärm",
+            "what": "output/work/giv-4/platta-gront.ts: bakgrund, bord och rutnät satta till RGB (2, 182, 48)."
+          },
+          {
+            "step": "kort i skon",
+            "what": "output/work/giv-4/mala-skokort.ts: det synliga kortet i mynningen (bildmodellen ritade ett spelkort med blå framsida och vit hörna) målat enfärgat gult."
+          }
+        ],
+        "measured": "Mätt med output/work/giv-4/mat-ankare.ts och mat-bild.ts i den färdiga bilden, mot dockans bild ur samma närbild: vilande handens hud 96 × 72 bildpunkter (dockans 92 × 76), givhandens 100 × 84 (dockans 116 × 76, med spretande fingrar), gult kort i mynningen 888,776–924,796 (dockans synliga kort 884,772–916,792), skon under rad 800 1056,800–1276,992 (dockans 1056,800–1268,992), hjässan rad 103 (dockans 152; i Spelaren låg Paulinas hjässa 57 rader över dockans, eftersom dockans huvud är ett ägg utan hår).",
+        "sha256": "58af3b16e2870476ddff89d323d2b9af261b58a970b5842ee20b0cf7149a9269"
+      }
+    },
+    {
+      "file": "dealers/paulina/anchors/plats-7-lagt-4.png",
+      "group": "anchors",
+      "dealer": "paulina",
+      "title": "LAGT 4 ur Plats 7, på grönt",
+      "status": "att granska",
+      "note": "Gjord 2026-11-18. Samma uppställning som plats-7-redo.png, i dockans slutställning: hon har vänt sig mot bordets mitt, så att kameran ser henne från vänster sida, i profil. Vänster arm ligger utsträckt över bordet och fingertopparna vilar på kortets närmaste kortsida; kortet ligger på första kortplatsen för plats 4 med den blå sidan upp, målat enfärgat i dockans fyra korthörn. Höger hand är dold bakom underarmen, som hos dockan. Bålen står 50–130 bildpunkter längre åt höger än dockans smala kropp, men skuldran och armen följer dockans. Kroppen och armen kommer ur Nano Banana 2.1 (Nano Banana Pro vände henne mot kameran i fyra försök), huvudet ur en Sunburst-retusch av samma bild, inklistrat lokalt eftersom retuschen flyttade skon 12 bildpunkter. Givhanden krympt 0,78 kring ärmen. Kortet i skons mynning är gult som i REDO. Inte dömd: gjord av en agent och väntar på en oberoende granskare.",
+      "width": 1920,
+      "height": 1080,
+      "bytes": 546351,
+      "pose": "lagt 4",
+      "grip": "nyp",
+      "licence": "Ingen tredjepartslicens: genererad på Jakobs Runway-konto",
+      "use": "dealerfilm",
+      "view": {
+        "kind": "plats",
+        "seat": 7
+      },
+      "source": {
+        "from": "runway",
+        "taskId": "a033ce2c-de9b-4db8-806e-f588b5b88456",
+        "model": "nano-banana-2.1",
+        "imageSize": "2K",
+        "ratio": "16:9",
+        "credits": 15,
+        "creditsNote": "Mätt med whoami och verktygets svar 2026-11-18: ställningen med Nano Banana 2.1 kostade 6 (4 428 → 4 422) och retuschen 9 (4 422 → 4 413). Två försök med Nano Banana Pro (40 krediter, 4 468 → 4 428) och förra underagentens två (lagt-1, lagt-2) valdes inte; de står i output/work/giv-4/LOGG.md.",
+        "steps": [
+          {
+            "step": "underlag",
+            "what": "Dockans slutställning (tid 3,9667 s) ur Plats 7:s närbild i ateljén, output/forlagor/docka-giv-nyp-plats-4_plats-7-nara_atelje_bild_lagt.png."
+          },
+          {
+            "step": "ställning",
+            "model": "nano-banana-2.1",
+            "thinkingLevel": "high",
+            "taskId": "a033ce2c-de9b-4db8-806e-f588b5b88456",
+            "what": "Dockan bytt mot Paulina, med REDO-retuschen (c4e91df5) som referens för storlek och utseende och vridningen beskriven från den: bålen i profil, kavajens framsida inte synlig. Sko, bord och kort på underlagets bildpunkter (skon 1056,800–1276,996)."
+          },
+          {
+            "step": "likhet",
+            "model": "gpt-image-2.6-sunburst",
+            "taskId": "bafd8a20-13cd-4564-94dc-b2753b48e90f",
+            "what": "Retusch av bara huvudet med ansikte-kavaj och REDO-retuschen som referens. Retuschen flyttade kroppen och skon upp till 12 bildpunkter, så bara huvudet och halsen ovanför kragen är tagna ur den: output/work/giv-4/klistra-huvud.ts, inpassat på kavajens krage (förskjutning 5, 9)."
+          },
+          {
+            "step": "händer",
+            "what": "krymp-hand.ts: givhanden 0,78 kring ärmen (fingertopparna drogs från kortets mitt till dess närmaste kortsida)."
+          },
+          {
+            "step": "kort",
+            "what": "output/work/giv-4/mala-kort.ts plats-7 3.9667: märkkortet målat enfärgat blått i dockans fyra korthörn (468,815 – 483,832 – 395,853 – 382,835), resten av modellens kort borttaget."
+          },
+          {
+            "step": "skärm",
+            "what": "platta-gront.ts med skuggor: bakgrund, bord, rutnät och modellens skugga under handen och ärmen satta till RGB (2, 182, 48)."
+          },
+          {
+            "step": "kort i skon",
+            "what": "mala-skokort.ts: nästa kort i mynningen målat enfärgat gult."
+          }
+        ],
+        "measured": "Mätt med mat-ankare.ts och mat-bild.ts: blått kort 384,816–480,852 (dockans korthörn 382,815–483,853), givhandens hud 120 × 64 (dockans hand sedd genom närbilden 115 × 73; dockans hudfläck 112 × 88 med kortet i nypan), gult kort i mynningen 916,788–948,800, skon under rad 800 1056,800–1276,996 (REDO 1056,800–1276,992, dockans 1056,800–1268,992), hjässan rad 84 (REDO 103; dockan 145 mot 152), figurens bredd på rad 452 915–1142 (dockans 854–994).",
+        "sha256": "d706e5e215b1a7af7b59f4f1934512dec40f1cd42aa2895085e5eae364eec632"
       }
     }
   ],
