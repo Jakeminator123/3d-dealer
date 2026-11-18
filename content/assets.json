@@ -247,6 +247,148 @@
       "statusBy": "Jakob i Labbet 2026-11-18"
     },
     {
+      "file": "dealers/paulina/anchors/vila-helfigur.png",
+      "group": "anchors",
+      "dealer": "paulina",
+      "title": "VILA i helfigur, utan bord",
+      "status": "granska igen",
+      "note": "Gjord 2026-11-18. Paulina sittande i helfigur på grönt, framifrån, utan bord, sko och kort, i samma ruta som dealern Livs VILA i local-studio (1920 × 1080). Rutan är ny för att de gamla ankarna har bordskant och sko inbakade och slutar vid kanten, så att hon blir en platt skiva på bordskanten i 3D-scenen; i den här rutan ställs ett 3D-bord framför henne, och Livs klipp ska kunna vara rörelsereferens. Avviker från Livs VILA (mätt, se source.measured): händerna vilar på låren, närmare mitten och längre ned än Livs, och armbågarna ligger intill kroppen. Den bästa av tre försök; inget av dem fick både sittande och Livs händer.",
+      "width": 1920,
+      "height": 1080,
+      "bytes": 457709,
+      "pose": "vila",
+      "licence": "Ingen tredjepartslicens: genererad på Jakobs Runway-konto",
+      "source": {
+        "from": "runway",
+        "taskId": "243a4257-44bc-4bb0-b0da-e43c5e395ce4",
+        "model": "nano-banana-pro",
+        "imageSize": "2K",
+        "ratio": "16:9",
+        "credits": 20,
+        "creditsNote": "Saldot var 5 065 före första försöket, 5 045 efter det och 5 005 efter det tredje (mätt 2026-11-18): tre försök om 20 krediter, 60 sammanlagt. Kontot delas med andra sessioner.",
+        "attempts": [
+          {
+            "attempt": 1,
+            "taskId": "ad8fed49-fe7f-4395-914c-fdafa4000503",
+            "credits": 20,
+            "outcome": "Kasserad. Sittande och lik, men händerna vilar på låren, och närbilden på händerna ligger som två stora spökbilder över bakgrunden."
+          },
+          {
+            "attempt": 2,
+            "taskId": "243a4257-44bc-4bb0-b0da-e43c5e395ce4",
+            "credits": 20,
+            "outcome": "Vald. Sittande och lik, men händerna vilar på låren, och närbilden på händerna ligger som två svaga spökbilder i bakgrunden, skilda från figuren."
+          },
+          {
+            "attempt": 3,
+            "taskId": "da683339-1efd-4ce7-a4aa-ee4fc2a1c0bb",
+            "credits": 20,
+            "outcome": "Kasserad. Armar och händer nära Livs och ren bakgrund, men hon står upp med korta ben i stället för att sitta, och händerna hänger med fingrarna nedåt. Underlaget hade mörkat bort lårens form, och texten sade inte att hon sitter."
+          }
+        ],
+        "attemptsFile": "output/work/helfigur/forsok.json (de tre texterna ordagrant)",
+        "references": [
+          {
+            "tag": "pose",
+            "what": "Livs VILA ur local-studio (se poseFrom), skalad till 1920 × 1080. Bara ställning, ruta, kamera, ljus och grönt."
+          },
+          {
+            "tag": "face",
+            "what": "dealers/paulina/identity/ansikte-kavaj.png, förminskad till 2048 × 2048"
+          },
+          {
+            "tag": "outfit",
+            "what": "dealers/paulina/identity/helkropp-staende.png, förminskad till 1529 × 2048"
+          },
+          {
+            "tag": "hands",
+            "what": "dealers/paulina/identity/hander-ovansida.png, genom dess task d4121204-c145-476d-8d08-9bbe144262a5"
+          }
+        ],
+        "prompt": "Edit @pose. Keep the photograph exactly as it is: the same framing and crop, the same camera, the same soft even frontal light, the same flat uniform green background everywhere (no floor line, no shadows, no gradient), and the same seated body pose at the same size and position in the frame. Head, shoulders, elbows, forearms, hands, knees and feet all stay exactly where they are. Both hands stay where they are in @pose: hovering palm-down at waist height in front of the body, apart, elbows slightly out, fingers pointing toward the camera, not resting on the thighs.\n\nThe only change: the seated woman is replaced by a different woman, the one in @face and @outfit. Give her the face, head and hair from @face: the same face and make-up, a platinum-blonde chin-length bob with slightly darker roots, worn loose (no bun), a calm closed-mouth expression, eyes looking into the camera, the same dense black-and-grey ornamental tattoos covering the front of the neck and the upper chest down into the neckline, and the thin necklace with a small white flower pendant. Dress her as in @outfit: a fitted black single-button blazer, buttoned, with long sleeves to the wrists, a cream V-neck top underneath, slim black trousers and black leather ankle boots. Her hands carry her tattoos from @hands: a rose in a mandala covering the back of each hand and small symbol tattoos on the back of each finger, no tattoo on the thumbs, fine grey-black linework, at the right scale for hands of this size. No rings, no bracelets, no watch.\n\nNothing of the original woman remains: not her face, her dark hair or bun, her waistcoat, shirt, trousers or shoes. @face, @outfit and @hands are reference pictures only: nothing from them appears in the background, no enlarged hands, no overlay, no double exposure, no collage. The result is one single clean photograph of one person on plain uniform green. No table, no chair or stool, no card shoe, no cards, no props, no text.",
+        "poseFrom": {
+          "what": "Dealern Livs utgångsbild för VILA i local-studio (rollen keystone, \"Liv · VILA · bred helkropp\"). En annan figur: bara ställning och ruta är hämtade, ingenting av utseendet.",
+          "path": "C:/Users/jakem/dev/super-feature-sg/local-studio/blackjack-studio/data/creator/b4289e0c-90d8-4667-8817-8a68cd40cc71/assets/f9f7fbe2-ac53-4526-8ce5-f4b277103283.png",
+          "width": 1672,
+          "height": 941,
+          "sha256": "9676aa1a21c8bee666309ca271613cf85c8c50cea48e8fd826d38b69724b5090"
+        },
+        "generated": {
+          "width": 2752,
+          "height": 1536,
+          "sha256": "c8777e96d08a8898056dfd2d870643af68206e728ada75bf8ac315e011712c5b"
+        },
+        "localSteps": [
+          "Bakgrunden: figuren (det största sammanhängande området som inte är grönt, vidgat 10 bildpunkter) är behållen. Allt annat är satt till Livs gröna, RGB 2, 182, 48, och det gröna i figurens kant är räknat om från försökets gröna (7, 177, 54). Det tog bort två suddiga spökbilder av referenshänderna i bakgrunden, skilda från figuren.",
+          "Storleken: 2752 × 1536 beskuren lika i båda sidor till 16:9 och förminskad till 1920 × 1080 med samma skala åt båda håll (lanczos3). Figuren är varken flyttad eller skalad om för att passa Liv."
+        ],
+        "measured": {
+          "how": "output/work/helfigur/measure.mjs, båda bilderna i 1920 × 1080. Ram: allt som inte är grönt. Händer: sammanhängande hudfärg i ett rutnät om 4 bildpunkter.",
+          "green": {
+            "paulina": [
+              2,
+              182,
+              48
+            ],
+            "liv": [
+              2,
+              182,
+              48
+            ]
+          },
+          "figure": {
+            "paulina": {
+              "x0": 797,
+              "y0": 44,
+              "x1": 1122,
+              "y1": 1051
+            },
+            "liv": {
+              "x0": 760,
+              "y0": 45,
+              "x1": 1152,
+              "y1": 1042
+            }
+          },
+          "hands": {
+            "paulina": [
+              {
+                "x0": 856,
+                "y0": 568,
+                "x1": 940,
+                "y1": 628
+              },
+              {
+                "x0": 984,
+                "y0": 572,
+                "x1": 1068,
+                "y1": 628
+              }
+            ],
+            "liv": [
+              {
+                "x0": 792,
+                "y0": 496,
+                "x1": 868,
+                "y1": 568
+              },
+              {
+                "x0": 1056,
+                "y0": 492,
+                "x1": 1128,
+                "y1": 568
+              }
+            ]
+          }
+        },
+        "sha256": "be0d70a160a63532eaf2867fe9bf5edc164d7fdba661b55f2493f8fb988f50dc"
+      },
+      "statusBy": "Agent 2026-11-18: helfiguren sitter rätt i rutan, men händerna vilar på låren, cirka 68 bildpunkter längre in och längre ned än i Livs VILA (mätt av den som gjorde bilden). Duger som stå-in i scenen, inte som första bild till ett klipp med Livs film som referens.",
+      "statusAt": "2026-11-18 06:27",
+      "reply": "Första helfiguren av Paulina, tre försök för 60 krediter. Hon sitter rätt och har rätt kläder, men händerna ligger på låren i stället för ute vid bordshöjd som Livs. Ansiktet är något slätare än i identitetsbilden. Jag beställer inte fler nu: som förlaga i scenen räcker Livs klipp, och Paulinas riktiga ankare görs ur scenen.",
+      "replyAt": "2026-11-18 06:27"
+    },
+    {
       "file": "dealers/paulina/anchors/redo-nyp.png",
       "group": "anchors",
       "dealer": "paulina",

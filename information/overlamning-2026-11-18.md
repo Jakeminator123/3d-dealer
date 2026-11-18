@@ -47,7 +47,7 @@ Jakob pekade på `C:\Users\jakem\dev\super-feature-sg\local-studio`, och där fi
 | --- | --- | --- |
 | Scenens andra varv är klart 06:17 och sett: vyn Spelaren, zoom, bordets lutning, dölj skon. Ingen arbetar i scenens filer nu. | `src/scene`, `src/lab/SceneStep.tsx`, `content/scene.json`; skärmbilder i `output/scen-matning/spelaren-*.png` | Punkt 1 nedan är alltså gjord. Fortsätt med "tredje varvet" under den. |
 | Sidobilden med tatuerade händer är gjord (`identity/sida-kavaj-tatuerad.png`, 40 krediter). En granskare dömer den. | underagent i den gamla chatten | Omdömet och svaret står i registret när den är klar. |
-| Paulinas VILA i helfigur på grönt, i Livs ruta (betald, högst cirka 100 krediter) | underagent i den gamla chatten, skriver `assets/dealers/paulina/anchors/vila-helfigur.png` och dess post | Låt en oberoende granskare döma den. Sedan REDO i samma ruta, och ett första klipp med ett av Livs klipp som referensfilm. |
+| Paulinas VILA i helfigur är gjord 06:26 (`anchors/vila-helfigur.png`, tre försök, 60 krediter) och står som `granska igen`: hon sitter rätt i rutan, men händerna ligger på låren, cirka 68 bildpunkter längre in och ned än i Livs VILA. | jämförelse i `output/work/helfigur/jamforelse-liv-paulina.png`; receptet i postens `source` | Inget pågår längre. Som förlaga i scenen räcker Livs klipp. Behövs Paulina i helfigur med Livs händer: ett fjärde försök med låren kvar i ställningsbilden och "seated" i texten (cirka 20 krediter). Handnärbilden som referens gav spökbilder i bakgrunden; ta bort dem lokalt eller skicka en mindre referens. |
 
 Kontrollera med filernas ändringstid om de är klara. Rör inte samma filer medan de arbetar.
 

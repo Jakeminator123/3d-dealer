@@ -12,7 +12,7 @@ Senast ändrad 2026-11-18. Ersätt det som inte längre gäller.
 - Agentens väg till registret: `npm run judge` läser kön av det som fått `granska igen`, sätter omdömen och skriver svar. Reglerna står i [AGENTS.md](../AGENTS.md).
 - Spelkärnan (`src/engine`): förd över ur gamla Dealer med sju testfiler. De tio kodfilerna är byte för byte desamma som där; ursprung och avvikelser står i `src/engine/provenance.json`. Den är inte kopplad till något gränssnitt än.
 - Tester: `npm test` (122 tester, varav 71 för spelkärnan) och `npm run typecheck` gick igenom 2026-11-18.
-- 62 filer i `assets/` (134 MB), alla registrerade i `content/assets.json` med ursprung och sha256. Läget för varje fil står i registret.
+- 63 filer i `assets/` (135 MB), alla registrerade i `content/assets.json` med ursprung och sha256. Läget för varje fil står i registret.
 - Underlaget från inläsningen av gamla projektet: [information/underlag-inlasning-2026-11-18.md](../information/underlag-inlasning-2026-11-18.md).
 
 ## Finns inte än
@@ -30,7 +30,7 @@ Sedan 2026-11-18 dömer agenten, efter oberoende granskning, och Jakob ändrar d
 | Grupp | Antal | Mapp |
 | --- | --- | --- |
 | Identitet | 7 | `assets/dealers/paulina/identity/` |
-| Ankare | 5 | `assets/dealers/paulina/anchors/` |
+| Ankare | 6 | `assets/dealers/paulina/anchors/` |
 | Bakgrunder | 17 | `assets/scene/backgrounds/` |
 | Material | 12 | `assets/scene/materials/` |
 | Modeller | 2 | `assets/models/` |
@@ -49,7 +49,7 @@ Sedan 2026-11-18 dömer agenten, efter oberoende granskning, och Jakob ändrar d
 ## Näst
 
 1. Jakob går igenom bilderna i Labbet. Det som får `utgår` tas bort ur `assets/` och registret efter hans besked.
-2. Scenen, tredje varvet: rummen får golv i rätt höjd och skala, så att bakgrunden inte ser inzoomad ut och lyftet kan tas bort. Elva bakgrunder har `granska igen` med Jakobs ord och agentens svar, och väntar på det. Därefter döms resten av bakgrunderna, materialen och modellerna i scenen. Se [överlämningen](../information/overlamning-2026-11-18.md). Vägvalet 2026-11-18: Paulina görs i helfigur på grönt utan bord, som i local-studio, och scenen byggs om efter det; den första bilden (`vila-helfigur.png`) är beställd.
+2. Scenen, tredje varvet: rummen får golv i rätt höjd och skala, så att bakgrunden inte ser inzoomad ut och lyftet kan tas bort. Elva bakgrunder har `granska igen` med Jakobs ord och agentens svar, och väntar på det. Därefter döms resten av bakgrunderna, materialen och modellerna i scenen. Se [överlämningen](../information/overlamning-2026-11-18.md). Vägvalet 2026-11-18: helfiguren i scenen är förlagan, som i local-studio, och de vanliga filmerna görs ur den. En första helfigur av Paulina finns (`vila-helfigur.png`, 60 krediter), men händerna ligger på låren och inte som i Livs VILA; den duger som stå-in, inte som första bild till ett klipp.
 3. Kedjan för plats 4, det första filmprovet. Förbereds i en egen chatt; se [överlämningen](../information/overlamning-kedja-plats-4-2026-11-18.md).
 4. Resten av etapp 1: kort i scenen, en spelsession i servern, och en första vy för Casinot.
 5. De tre proven i [production.md](production.md), "Att pröva först".
