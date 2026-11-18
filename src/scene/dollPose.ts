@@ -1004,9 +1004,11 @@ function calmed(tracks: Tracks, last: number, calm: Life['calm']): Tracks {
 }
 
 // Hålkortet plant ur skon (slid): så långt utanför nosens spets kortets bakre kortsida är när det ligger plant, i meter,
-// och hur många prov vägen delas i när den mäts.
+// och hur många prov vägen delas i när den mäts. SLIDE_EASE: hur mjukt fällningen hålls tillbaka där kortets övre kant
+// annars skulle gå in i nästa kort, som andel av fällningen.
 const SLIDE_CLEAR = 0.02;
 const SLIDE_SAMPLES = 200;
+const SLIDE_EASE = 0.08;
 
 /** Ett korts axlar: långsidan, framsidan och tvärs. */
 const cardAxes = (card: Standing): Vec3[] => {
@@ -1024,8 +1026,14 @@ const cardAxes = (card: Standing): Vec3[] => {
  * långt som till läget utanför nosen), och
  * vrids under resten till sin riktning på platsen. Handen följer kortet: dess punkter räknade i kortets axlar går från
  * nypet i REDO (`hand0`) till handen på kortet när det ligger (`hand1`), och den sänks mot filten medan kortet fälls.
+ *
+ * Nästa kort (`next`) står strax innanför i mynningen. Kortets övre kant glider ned längs nästa korts gula sida och går
+ * aldrig närmare den än den stod i REDO: fällningen hålls tillbaka där kanten annars skulle gå in i nästa kort, mjukt
+ * (SLIDE_EASE), så att de två korten aldrig skär varandra. Med den rena fällningen gick kanten rakt genom nästa kort,
+ * och de två gula korten blev en trasig gul form i dockans film (variant E, hålkortet, 0,3–0,6 s; mätt i
+ * output/tagningar/paulina_spelaren_cykel-nyp-rask-hole_d-1_t1, referens.mp4), där Kling ritade nästa kort blått.
  */
-function slid(scene: SceneDescription, from: Standing, hand0: Vec3[], to: Standing, hand1: Vec3[]): { at: (share: number) => { card: Standing; hand: Vec3[]; settle: number }; tipped: number } {
+function slid(scene: SceneDescription, from: Standing, hand0: Vec3[], to: Standing, hand1: Vec3[], next: Standing): { at: (share: number) => { card: Standing; hand: Vec3[]; settle: number }; tipped: number } {
   const way = mouthWay(scene);
   const out = scene.shoe.length / 2 + scene.card.height / 2 + SLIDE_CLEAR;
   const middle: Vec3 = [scene.shoe.at[0] + way[0] * out, 0, scene.shoe.at[1] + way[2] * out];
@@ -1052,22 +1060,52 @@ function slid(scene: SceneDescription, from: Standing, hand0: Vec3[], to: Standi
   });
   const local0 = localOf(hand0, from, axes0);
   const local1 = localOf(hand1, to, axes1);
+  // Nästa korts gula sida: planet genom det, med normalen ut ur skon. Kortets övre kant hålls minst så långt framför det
+  // som den stod i REDO.
+  const outward = mul(cardAxes(next)[1]!, -1);
+  const plane = dot(next.centre, outward);
+  const least = dot(add(from.centre, mul(axes0[0]!, scene.card.height / 2)), outward) - plane;
+  /** Kortet vid andelen `s` av vägen, fällt andelen `fold`. */
+  const posed = (s: number, fold: number): { centre: Vec3; axes: Vec3[] } => {
+    const swingShare = smooth(s);
+    const axes = axes0.map((axis) => turned(turned(axis, tip.axis, tip.angle * fold), swing.axis, swing.angle * swingShare));
+    const centre = bezier(curveAt(s));
+    // Kortet lyfts av cardOnTable så att inget hörn går ned i filten; i mynningen står det på sin höjd.
+    return { centre: [centre[0], from.centre[1] * (1 - fold), centre[2]], axes };
+  };
+  /** Hur långt framför nästa kort kortets övre kant är, utöver avståndet i REDO. Minskar när kortet fälls mer. */
+  const clearOf = (s: number, fold: number): number => {
+    const { centre, axes } = posed(s, fold);
+    return dot(add(centre, mul(axes[0]!, scene.card.height / 2)), outward) - plane - least;
+  };
+  /** Den största fällning där kanten inte går närmare nästa kort än i REDO (halvering, eftersom avståndet minskar med fällningen). */
+  const mostFold = (s: number): number => {
+    if (clearOf(s, 1) >= 0) return 1;
+    let low = 0;
+    let high = 1;
+    for (let k = 0; k < 40; k++) {
+      const mid = (low + high) / 2;
+      if (clearOf(s, mid) >= 0) low = mid;
+      else high = mid;
+    }
+    return low;
+  };
+  // Mjuk övre gräns: x för x ≥ e, 0 för x ≤ −e, och en parabel emellan, alltid minst max(0, x). Så hålls fällningen
+  // tillbaka utan knyck där gränsen tar över.
+  const held = (x: number): number => (x <= -SLIDE_EASE ? 0 : x >= SLIDE_EASE ? x : (x + SLIDE_EASE) ** 2 / (4 * SLIDE_EASE));
   return {
     tipped,
     at: (share) => {
       const s = Math.max(0, Math.min(1, share));
-      const tipShare = smooth(s / tipped);
-      const swingShare = smooth(s);
-      const axes = axes0.map((axis) => turned(turned(axis, tip.axis, tip.angle * tipShare), swing.axis, swing.angle * swingShare));
-      const centre = bezier(curveAt(s));
-      // Kortet lyfts av cardOnTable så att inget hörn går ned i filten; i mynningen står det på sin höjd.
-      const lifted: Vec3 = [centre[0], from.centre[1] * (1 - tipShare), centre[2]];
-      const shape = tipShare;
+      const want = smooth(s / tipped);
+      const fold = Math.max(0, want - held(want - mostFold(s)));
+      const { centre: lifted, axes } = posed(s, fold);
+      const shape = fold;
       const hand = local0.map((point, k) => {
         const local = mix(point, local1[k]!, shape);
         return add(lifted, add(add(mul(axes[0]!, local[0]), mul(axes[1]!, local[1])), mul(axes[2]!, local[2])));
       });
-      return { card: { centre: lifted, long: axes[0]!, face: axes[1]! }, hand, settle: tipShare };
+      return { card: { centre: lifted, long: axes[0]!, face: axes[1]! }, hand, settle: fold };
     },
   };
 }
@@ -1176,7 +1214,9 @@ function cycled(scene: SceneDescription, doll: DollDescription, move: DollMove, 
 
   // Hålkortet plant ur skon (cycle.hole `flat`): kort och hand fram till att kortet ligger går längs slid, i samma takt
   // som en giv (minsta ryck med touch), och slutar där given har kortet och handen när kortet ligger.
-  const slide = action === 'hole' && cycle.hole === 'flat' ? slid(scene, cardAt(hole!, 0), leftHand.points[0]!, cardAt(hole!, laid), sampled(leftHand.points, laid, mixPoints)) : null;
+  const standing = pickUp(scene, doll);
+  const nextUp = { ...standing, centre: add(standing.centre, mul(standing.face, doll.pickUp.nextBehind)) };
+  const slide = action === 'hole' && cycle.hole === 'flat' ? slid(scene, cardAt(hole!, 0), leftHand.points[0]!, cardAt(hole!, laid), sampled(leftHand.points, laid, mixPoints), nextUp) : null;
   const slideShare = (frame: number): number => (frame <= ready ? 0 : toCard(Math.min(1, (frame - ready) / deal), life.touch));
   // Knuffen (cycle.push): kortet landar push.reach meter före sin plats och skjuts dit av fingertopparna medan de ligger
   // kvar på det, mot spelaren (från dealerns mitt mot kortplatsen), och hålkortet som förs plant längs sin väg.
