@@ -627,7 +627,7 @@ const below = (mask: Uint8Array, width: number, row: number): Uint8Array => {
  * - `hand`: huden under axlarna som inte var hud i första rutan, utom vid skon där givhanden stod, närmast förra läget.
  * Rutorna läses en gång.
  */
-export async function filmTracks(path: string, screen: Screen): Promise<{ tracks: Tracks; fps: number; frames: number; headWidth: number }> {
+export async function filmTracks(path: string, screen: Screen, blend = 0.25): Promise<{ tracks: Tracks; fps: number; frames: number; headWidth: number }> {
   const film = await probe(path);
   const frame: Frame = { width: film.width, height: film.height };
   type Start = { figure: Figure; staticSkin: Uint8Array; firstCard: Uint8Array; card: number[] };
@@ -725,6 +725,7 @@ export async function filmTracks(path: string, screen: Screen): Promise<{ tracks
   const landed = cardTop > 0 ? cardSpeed.findLastIndex((value) => value > 0.05 * cardTop) + 1 : -1;
   const wide = start!.figure.width;
   hand = hand ? [hand[0]!, hand[1]!] : null;
+  let offset: number[] | null = null;
   skins.forEach((mask, k) => {
     if (firstSeen < 0 || landed < 0 || k < firstSeen) {
       tracks.hand!.push(hand ? hand.map((value) => value * STEP) : null);
@@ -737,7 +738,11 @@ export async function filmTracks(path: string, screen: Screen): Promise<{ tracks
     }
     const found = hand ? nearestPart(mask, Math.floor(frame.width / STEP), Math.floor(frame.height / STEP), hand, wide, 30) : null;
     if (found) hand = found;
-    tracks.hand!.push(found ? found.map((value) => value * STEP) : null);
+    // Huden ligger en bit från kortets mitt: skillnaden där spåret byter från kortet till huden tonas bort på `blend`
+    // sekunder (content/tagning.json, motion.handBlend), så att bytet inte mäts som ett ryck i handen.
+    if (found && !offset) offset = cardPoints[landed]!.map((value, d) => value - found[d]! * STEP);
+    const fade = offset ? Math.max(0, 1 - (k - landed - 1) / Math.max(1, Math.round(blend * fps))) : 0;
+    tracks.hand!.push(found ? found.map((value, d) => value * STEP + (offset ? offset[d]! * fade : 0)) : null);
   });
   const out: Tracks = {};
   for (const [name, points] of Object.entries(tracks)) if (points.some(Boolean)) out[name] = { fps, points };
@@ -750,7 +755,7 @@ export const FILM_ROLES: Roles = { hand: 'hand', head: 'huvud', trunk: 'flank', 
 // Måtten för en tagning
 
 /** Hur rörelsens mått tas, så som det står i content/tagning.json (motion). Vad varje tal är står där. */
-export type MotionMeasure = { still: number; moving: number; degrees: number };
+export type MotionMeasure = { still: number; moving: number; degrees: number; handBlend: number };
 
 /** Skärmen i dockans grå ateljé och Klings gröna (content/tagning.json, reference.studio; grönt känns igen utan tal). */
 export const screenOf = (studio: { screen: number[]; table: number[] }): Screen => ({ grey: [studio.screen, studio.table], tolerance: 14 });
@@ -765,7 +770,7 @@ export function dollMotion(parts: Pick<CycleParts, 'scene' | 'doll'>, move: Para
 
 /** En film av en dealer på skärm mätt i bild, i huvudbredder. `cyclic`: filmen är en cykel som kedjas. */
 export async function filmMotion(path: string, measure: MotionMeasure, screen: Screen, cyclic = true): Promise<{ values: Record<string, Value>; tracks: Tracks; headWidth: number; frames: number; fps: number }> {
-  const { tracks, fps, frames, headWidth } = await filmTracks(path, screen);
+  const { tracks, fps, frames, headWidth } = await filmTracks(path, screen, measure.handBlend);
   return { values: motionValues(tracks, FILM_ROLES, { ...measure, scale: headWidth, smooth: 1, cyclic }), tracks, headWidth, frames, fps };
 }
 

@@ -97,16 +97,19 @@ const CYCLES: [string, Seat, number, Action][] = [
   ['cykel-nyp', 'D', 1, 'flip'],
   ['cykel-nyp-lugn', 4, 0, 'deal'],
   ['cykel-nyp-lugn', 1, 0, 'deal'],
-  // Variant D. Dess vändning av hålkortet har 6 tvära stopp och är inte gjord för den än.
+  // Variant D, med vändningen och väntan.
   ['cykel-nyp-flytande', 4, 0, 'deal'],
   ['cykel-nyp-flytande', 7, 1, 'deal'],
   ['cykel-nyp-flytande', 'D', 0, 'deal'],
+  ['cykel-nyp-flytande', 'D', 1, 'flip'],
+  ['cykel-nyp-flytande', 'D', 0, 'wait'],
 ];
 for (const [name, seat, index, action] of CYCLES) {
   test(`${name}, ${action} till ${seat === 'D' ? 'dealern' : `plats ${seat}`}, kort ${index}: dockans rörelse är inom rörelsens gränser`, () => {
     const parts = readCycleParts(name);
     const values = motionNumbers(dollMotion(parts, cycleMove(parts, { seat, index, action }), tagning.motion));
-    const limits = Object.fromEntries(MOTION.map((key) => [key, tagning.limits[key]!]));
+    // En väntan har ingen väg ut och tillbaka: ordningen mellan huvud, bål och hand mäts inte för den.
+    const limits = Object.fromEntries(MOTION.filter((key) => !(action === 'wait' && values[key] === null)).map((key) => [key, tagning.limits[key]!]));
     for (const entry of judge(values, limits)) assert.equal(entry.verdict, 'inom', `${entry.key}: ${entry.value} mot ${entry.limit}`);
   });
 }

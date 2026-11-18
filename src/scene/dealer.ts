@@ -68,7 +68,7 @@ export type OneClipNote = { kind: 'film'; file: string; view: SeatView };
 export type DealerNote =
   | FilmNote
   | OneClipNote
-  | { kind: 'docka'; move: string; pose: 'giv' | 'vila'; seat?: number | 'D'; index?: number; action?: 'deal' | 'hole' | 'flip' };
+  | { kind: 'docka'; move: string; pose: 'giv' | 'vila'; seat?: number | 'D'; index?: number; action?: 'deal' | 'hole' | 'flip' | 'wait' };
 
 /**
  * Kortet till ett ensamt klipp skrivet som förr (OneClipNote): platsen, vilket av platsens kort, vad kortet är, och från

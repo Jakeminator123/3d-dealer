@@ -11,7 +11,7 @@ import { test } from 'node:test';
 import { readScene } from './description.ts';
 import { planOf, withPlan } from './plan.ts';
 import { flyingAt, lyingAt, makeReel } from './reel.ts';
-import { dealName, dealsOf, planPlace, planRound, readRound, readyClip, roundFilm, spotPlace, type Deal, type Round, type RoundEntry, type RoundStep } from './round.ts';
+import { dealName, dealsOf, planPlace, planRound, readRound, readyClip, roundFilm, spotPlace, waitClip, type Deal, type Round, type RoundEntry, type RoundStep } from './round.ts';
 
 const project = resolve(import.meta.dirname, '..', '..');
 const readJson = (file: string): unknown => JSON.parse(readFileSync(join(project, 'content', file), 'utf8'));
@@ -126,6 +126,24 @@ test('bara godkända klipp spelas, ur rätt vy och för rätt dealer; den senast
   );
   assert.equal(readyClip(entries, 'paulina', { kind: 'spelaren' }), 'dealers/paulina/clips/prov-4-0-t1.mp4');
   assert.equal(readyClip(entries, 'paulina', { kind: 'plats', seat: 3 }), null);
+});
+
+test('väntan: klippet med action wait ur följdens ankare spelas medan spelet väntar, och hör inte till följden', () => {
+  const made = (anchor: string) => ({ source: { references: [{ role: 'startFrame', what: `dealers/paulina/anchors/${anchor}` }] } });
+  const entries: RoundEntry[] = [
+    clip('ny-4-0.mp4', { ...made('ny.png'), seat: 4, index: 0, lands: { at: 1.7 } }),
+    clip('ny-vanta-t1.mp4', { ...made('ny.png'), seat: 'D', index: 0, action: 'wait', take: 1 }),
+    clip('ny-vanta-t2.mp4', { ...made('ny.png'), seat: 'D', index: 0, action: 'wait', take: 2 }),
+    clip('ny-vanta-t3.mp4', { ...made('ny.png'), seat: 'D', index: 0, action: 'wait', take: 3, status: 'att granska' }),
+    clip('gammal-vanta.mp4', { ...made('gammal.png'), seat: 'D', index: 0, action: 'wait', take: 9 }),
+  ];
+  const plan = planRound(dealsOf(STEPS), entries, 'paulina', { kind: 'spelaren' }, FALLBACK);
+  assert.equal(plan.anchor, 'dealers/paulina/anchors/ny.png');
+  assert.ok(plan.clips.every((one) => !one.file?.includes('vanta')), 'väntan spelas inte som ett kort');
+  assert.ok(plan.unusable.every((one) => !one.file.includes('vanta')), 'och räknas inte som oanvändbar');
+  assert.equal(waitClip(entries, 'paulina', { kind: 'spelaren' }, plan.anchor), 'dealers/paulina/clips/ny-vanta-t2.mp4', 'den senaste godkända ur följdens ankare');
+  assert.equal(waitClip(entries, 'paulina', { kind: 'spelaren' }), 'dealers/paulina/clips/gammal-vanta.mp4', 'utan ankare: den senaste tagningen');
+  assert.equal(waitClip(entries, 'paulina', { kind: 'plats', seat: 3 }, plan.anchor), null);
 });
 
 test('en följd blandar aldrig klipp ur olika REDO-ankare: ankaret med flest godkända klipp för rundan väljs', () => {

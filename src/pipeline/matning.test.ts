@@ -33,6 +33,7 @@ import {
   parts,
   probe,
   quadArea,
+  seamSteps,
   whiteCorners,
   isBlue,
   type Box,
@@ -57,6 +58,22 @@ function paint(target: Picture, box: Box, colour: Rgb): Picture {
 }
 const copy = (source: Picture): Picture => ({ ...source, data: Buffer.from(source.data) });
 const whole = (source: Picture): Box => ({ x0: 0, y0: 0, x1: source.width, y1: source.height });
+
+test('skarven: ett steg som grannstegen är inget hopp, men ett hopp där allt annars står still är det', () => {
+  // En hudfärgad ruta som går 2 bp per ruta genom skarven: näst sista, sista, första och andra rutan.
+  const at = (x: number): Picture => paint(picture(60, 20), { x0: x, y0: 5, x1: x + 10, y1: 15 }, SKIN);
+  const box = { x0: 0, y0: 0, x1: 60, y1: 20 };
+  const [moving] = seamSteps({ beforeLast: at(20), last: at(22), first: at(24), second: at(26) }, [box]);
+  assert.ok(moving!.seam > 0 && moving!.around > 0, 'den rör sig genom skarven');
+  assert.ok(moving!.beyond < 0.01, `ett steg som grannarnas: ${moving!.beyond}`);
+  // Samma ruta som står still i båda ändar men hoppar 6 bp i skarven.
+  const [jump] = seamSteps({ beforeLast: at(20), last: at(20), first: at(26), second: at(26) }, [box]);
+  assert.equal(jump!.around, 0);
+  assert.ok(jump!.beyond > 0 && jump!.beyond === jump!.seam, 'hoppet räknas helt');
+  // Den som rör sig men hoppar dubbelt så långt i skarven: hoppet utöver grannstegen räknas.
+  const [both] = seamSteps({ beforeLast: at(20), last: at(22), first: at(28), second: at(30) }, [box]);
+  assert.ok(both!.beyond > 0.5 * moving!.seam, `steget utöver grannarna: ${both!.beyond}`);
+});
 
 test('en sammanhängande del: yta, tyngdpunkt, ruta och hörn som ytterpunkter', () => {
   const image = paint(picture(100, 60), { x0: 10, y0: 10, x1: 50, y1: 30 }, BLUE);

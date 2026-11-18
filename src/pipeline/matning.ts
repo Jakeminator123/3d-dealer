@@ -794,7 +794,9 @@ export function layoutFor(parts: CycleParts, view: SeatView, card: CycleCard, me
   };
   const move = cycleMove(parts, card);
   const redo = poseAt(scene, doll, move, 0);
-  const laid = poseAt(scene, doll, move, move.seconds).laid;
+  // En väntan lägger inget kort: där mäts kortet i skon som om det vore det lagda (måtten för det lagda kortet säger då
+  // att det ligger kvar i mynningen).
+  const laid = poseAt(scene, doll, move, move.seconds).laid ?? (card.action === 'wait' ? redo.card : null);
   if (!laid) throw new MeasureError(`Cykeln ${move.id} slutar utan lagt kort`);
   const corners = cornersIn(eye, laid);
   const cardBox = boxAround(corners);
@@ -924,6 +926,9 @@ export type FilmRead = {
   rows: FrameRow[];
   first: Picture;
   last: Picture;
+  /** Andra och näst sista rutan: stegen intill skarven (seamSteps). */
+  second: Picture;
+  beforeLast: Picture;
   /** Mynningens kort i första rutan. */
   mouth: Lite | null;
   /** Givhanden i startbilden. */
@@ -932,6 +937,21 @@ export type FilmRead = {
   mouthBox: Box;
   mouthYellow: Uint8Array[];
 };
+
+/**
+ * Skarven när klippet kedjas, per region: steget från sista rutan till första mot stegen på var sida om skarven (näst
+ * sista mot sista och första mot andra), som medel av största kanalskillnad. `beyond` är hur mycket skarvens steg är
+ * större än grannstegens medel: 0 när kroppen rör sig genom skarven lika fort som runt den, och lika med skarvens steg
+ * när den står still runt skarven men inte är på samma ställe i båda ändar. Ett hopp i skarven syns som ett steg som är
+ * större än grannarna, vilket det än är som rör sig.
+ */
+export function seamSteps(read: Pick<FilmRead, 'first' | 'second' | 'last' | 'beforeLast'>, boxes: Box[]): { seam: number; around: number; beyond: number }[] {
+  return boxes.map((box) => {
+    const seam = difference(read.last, read.first, box).meanMax;
+    const around = (difference(read.beforeLast, read.last, box).meanMax + difference(read.first, read.second, box).meanMax) / 2;
+    return { seam, around, beyond: Math.max(0, seam - around) };
+  });
+}
 
 /** Det lagda kortets färg: blått med framsidan upp, gult med baksidan upp (hålkortet). */
 export const laidColour = (layout: Pick<Layout, 'side'>): ((r: number, g: number, b: number) => boolean) => (layout.side === 'baksida' ? isYellow : isBlue);
@@ -950,7 +970,9 @@ export async function readFilm(path: string, fps: number, watch: Watch, onFrame?
   const startHand = handIn(start, layout.handBox, other, measure.cardPart);
   const rows: FrameRow[] = [];
   let first: Picture | null = null;
+  let second: Picture | null = null;
   let previous: Picture | null = null;
+  let beforeLast: Picture | null = null;
   let mouth: Lite | null = null;
   // Det som har kortens färger i första rutan utom kortet i mynningen står stilla (skons guldram i dockans film) och
   // räknas inte. Kortplatsen räknas alltid: där ligger hålkortet i en vändning.
@@ -1022,6 +1044,8 @@ export async function readFilm(path: string, fps: number, watch: Watch, onFrame?
     }
     rows.push(row);
     await onFrame?.(picture, i);
+    if (i === 1) second = picture;
+    beforeLast = previous;
     previous = picture;
   });
   if (!first || !previous) throw new MeasureError(`${path} har inga rutor`);
@@ -1029,7 +1053,7 @@ export async function readFilm(path: string, fps: number, watch: Watch, onFrame?
   // Sista rutan räknas alltid för det gröna.
   const end = rows.at(-1)!;
   if (key && end.green === undefined) end.green = greenOff(last, key, measure.greenInner, measure.greenOff);
-  return { rows, first, last, mouth, startHand, mouthBox, mouthYellow };
+  return { rows, first, last, second: second ?? last, beforeLast: beforeLast ?? first, mouth, startHand, mouthBox, mouthYellow };
 }
 
 /**
@@ -1300,8 +1324,9 @@ export function valuesOf(read: FilmRead, film: Probe, sound: boolean, layout: La
   const filmOnCard = median(onCard.filter((row) => row.hand).map((row) => row.hand!.w));
   const dollOnCardWidth = median(dollOnCard);
 
-  // Skarven: sista rutan mot första, per region.
+  // Skarven: sista rutan mot första, per region (seamSteps).
   const seams = Object.values(layout.regions).map((box) => difference(last, first, box));
+  const steps = seamSteps(read, Object.values(layout.regions));
   const handA = rows[0]!.hand;
   const handB = end.hand;
   const heads = rows.map((row) => row.head).filter((value): value is number => typeof value === 'number');
@@ -1321,7 +1346,7 @@ export function valuesOf(read: FilmRead, film: Probe, sound: boolean, layout: La
     handIRedo,
     handMotDockan: againstDoll('reach'),
     handBreddMotDockan: againstDoll('width'),
-    skarvRegion: Math.max(...seams.map((seam) => seam.meanMax)),
+    skarvRegion: round(Math.max(...steps.map((step) => step.beyond)), 2),
     skarvLjus: Math.max(...seams.flatMap((seam) => seam.signed.map(Math.abs))),
     skarvHand: handA && handB ? round(distance(handA.c, handB.c), 1) : null,
     forstaRutan: difference(first, images.first).psnr,

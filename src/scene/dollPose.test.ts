@@ -685,7 +685,7 @@ const NEW: [Seat, number, Action][] = [
 ];
 
 test('dealerns kortplatser och handlingarna läses, och fel sägs på svenska', () => {
-  assert.deepEqual([...ACTIONS], ['deal', 'hole', 'flip']);
+  assert.deepEqual([...ACTIONS], ['deal', 'hole', 'flip', 'wait']);
   assert.deepEqual(cardPlace(scene, 'D', 1), scene.places.dealer[1]);
   assert.throws(() => cardPlace(scene, 'D', 9), /ingen kortplats 9 för dealern/);
   assert.throws(() => cardPlace(scene, 9, 0), /ingen första kortplats för plats 9/);
@@ -754,6 +754,45 @@ for (const [seat, index, action] of NEW) {
     }
   });
 }
+
+test('väntan: REDO till REDO utan kort, handen vid kortet i skon, blicken upp mot spelarna och tillbaka, och kroppen lever', () => {
+  // Variant D:s andning och sväng (content/moves/cykel-nyp-flytande.json); med cykel-nyp:s mindre står hon still 6 % av väntan.
+  const lively = readCycle(read('moves/cykel-nyp-flytande.json'));
+  const move = moveFor(scene, doll, base, 'D', { index: 0, cycle: lively, action: 'wait' });
+  assert.equal(move.id, 'cykel-nyp-flytande-wait');
+  assert.equal(move.action, 'wait');
+  near(move.seconds, lively.seconds, 1e-9, 'väntans längd');
+  const redo = poseAt(scene, doll, base, 0);
+  samePose(poseAt(scene, doll, move, 0), redo, 'första rutan');
+  samePose(poseAt(scene, doll, move, move.seconds), redo, 'sista rutan');
+  const mouth = pickUpCard(scene, doll);
+  const down = sub(redo.gaze, redo.head);
+  let highest = 0;
+  let previous: DollPose | null = null;
+  for (let frame = 0; frame < move.frameCount; frame++) {
+    const pose = poseAt(scene, doll, move, frame / move.fps);
+    checkPose(pose, `ruta ${frame}`);
+    // Inget kort läggs, kortet i mynningen står kvar, och handen är på det.
+    assert.equal(pose.laid, null, `ruta ${frame}: inget lagt kort`);
+    pose.card!.corners.forEach((corner, k) => near(far(corner, mouth.corners[k]!), 0, EXACT, `ruta ${frame}: kortet i mynningen, hörn ${k}`));
+    assert.ok(nearestTip(pose) <= TOUCH, `ruta ${frame}: handen på kortet`);
+    near(far(pose.hands.left[0]!, redo.hands.left[0]!), 0, EXACT, `ruta ${frame}: givhanden står i REDO`);
+    const look = sub(pose.gaze, pose.head);
+    highest = Math.max(highest, Math.atan2(look[1], Math.hypot(look[0], look[2])) - Math.atan2(down[1], Math.hypot(down[0], down[2])));
+    if (previous) {
+      // Något rör sig mellan två rutor: axlar eller huvud minst 0,2 mm, huvudets riktning minst 0,1°, eller den vilande
+      // handens pekfinger minst 0,2 mm.
+      const turn = (a: DollPose): Vec3 => sub(a.face, a.head);
+      const cos = dot(turn(previous), turn(pose)) / Math.hypot(...turn(previous)) / Math.hypot(...turn(pose));
+      const turned = (Math.acos(Math.min(1, cos)) * 180) / Math.PI;
+      const moved = Math.max(far(previous.arms.left.shoulder, pose.arms.left.shoulder), far(previous.head, pose.head), far(previous.hands.right[8]!, pose.hands.right[8]!));
+      assert.ok(moved >= 0.0002 || turned >= 0.1, `ruta ${frame}: kroppen rör sig bara ${(moved * 1000).toFixed(2)} mm och huvudet ${turned.toFixed(2)}°`);
+    }
+    previous = pose;
+  }
+  assert.ok(highest > 0.15, `blicken lyfts ${((highest * 180) / Math.PI).toFixed(0)} grader upp mot spelarna`);
+  assert.throws(() => moveFor(scene, doll, base, 'D', { index: 0, cycle: { ...lively, wait: undefined }, action: 'wait' }), /säger inte hur hon väntar/);
+});
 
 test('hålkortet vänds inte: baksidan är upp hela vägen, och handen gör samma rörelse som när kortet vänds', () => {
   const hole = actTo('D', 1, 'hole');

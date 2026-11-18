@@ -230,6 +230,8 @@ export function planRound(deals: Deal[], entries: RoundEntry[], dealer: string, 
   const skipped: (Plan['unusable'][number] & { anchor: string | null })[] = [];
   entries.forEach((entry, order) => {
     if (entry.dealer !== dealer || entry.use !== 'dealerfilm' || !sameView(entry.view, view) || !isCycle(entry)) return;
+    // En väntan lägger inget kort och spelas inte i följden (waitClip).
+    if (entry.action === 'wait') return;
     const anchor = anchorOf(entry);
     const take = takeOf(entry);
     if (typeof take === 'string') return void skipped.push({ file: entry.file, why: take, anchor });
@@ -323,6 +325,23 @@ export function readyClip(entries: RoundEntry[], dealer: string, view: SeatView)
   });
   const chosen = [...count.entries()].sort(([, a], [, b]) => b.clips - a.clips || b.latest - a.latest)[0]?.[0];
   return played.find((entry) => anchorOf(entry) === chosen)?.file ?? null;
+}
+
+/**
+ * Väntan: det godkända cykelklippet med `action: 'wait'` för dealern och vyn, ur ankaret `anchor` (följdens, Plan.anchor)
+ * när det sägs, den senaste tagningen före en tidigare. Det börjar och slutar i REDO och lägger inget kort, så det spelas
+ * om och om igen medan spelet väntar på spelarens beslut, mellan två klipp, i stället för att sista rutan hålls. Null när
+ * vyn inte har någon väntan ur ankaret.
+ */
+export function waitClip(entries: RoundEntry[], dealer: string, view: SeatView, anchor: string | null = null): string | null {
+  let best: { file: string; take: number; order: number } | null = null;
+  entries.forEach((entry, order) => {
+    if (entry.action !== 'wait' || entry.dealer !== dealer || entry.use !== 'dealerfilm' || !sameView(entry.view, view) || !isCycle(entry)) return;
+    if (entry.status !== PLAYED || entry.present === false || (anchor !== null && anchorOf(entry) !== anchor)) return;
+    const take = isNumber(entry.take) ? entry.take : 0;
+    if (!best || take > best.take || (take === best.take && order > best.order)) best = { file: entry.file, take, order };
+  });
+  return (best as { file: string } | null)?.file ?? null;
 }
 
 /**

@@ -149,6 +149,8 @@ export function paintQuad(data: Buffer, width: number, height: number, quad: Pix
  * giv) är svaret null och ingen bild skrivs: då är bilden ankaret som det är.
  */
 export async function paintedPicture(parts: CycleParts, anchor: string, card: CycleCard, when: 'first' | 'last', out: string, view: SeatView) {
+  // En väntan lägger inget kort: sista bilden är ankaret som det är.
+  if (card.action === 'wait') return null;
   const lying = when === 'last' ? laidCard(parts, card) : lyingCard(parts, card, when);
   if (!lying) return null;
   const eye = cycleEye(parts, view);

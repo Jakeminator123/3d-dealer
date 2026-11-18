@@ -86,7 +86,7 @@ export type TagningContent = {
    * `text` är texten för en giv. `actions` säger vad som byts i den för de andra handlingarna: varje par är en mening ur
    * `text` och den mening som står i stället, så att det som är lika står på ett ställe.
    */
-  prompt: { text: string; source: string; actions: Record<Exclude<Action, 'deal'>, { replace: [string, string][]; source: string }> };
+  prompt: { text: string; source: string; actions: Record<Exclude<Action, 'deal' | 'wait'>, { replace: [string, string][]; source: string }> & { wait: { text: string; source: string } } };
   proof: { background: { file: string; kind: '360' | 'platt'; turn: number; blur: number; exposure: number; mirror: boolean }; face: string; fps: number };
   measure: Measure;
   /** Hur rörelsens mått tas (rorelse.ts): stillhet, rörelse och grader per huvudbredd. */
@@ -106,9 +106,10 @@ export function readTagning(root = ROOT): TagningContent {
   }
   need(typeof read.order?.model === 'string' && Number.isFinite(read.order?.duration), 'order: model och duration');
   need(Number.isFinite(read.reference?.fps) && read.reference.fps > 0, 'reference.fps');
-  need([read.motion?.still, read.motion?.moving, read.motion?.degrees].every((value) => Number.isFinite(value) && value! > 0), 'motion: still, moving och degrees över 0');
+  need([read.motion?.still, read.motion?.moving, read.motion?.degrees].every((value) => Number.isFinite(value) && value! > 0) && Number.isFinite(read.motion?.handBlend) && read.motion.handBlend >= 0, 'motion: still, moving och degrees över 0, och handBlend från 0');
   need(typeof read.prompt?.text === 'string' && !/[{}]/.test(read.prompt.text), 'prompt.text, utan platshållare');
-  for (const action of ACTIONS.filter((entry): entry is Exclude<Action, 'deal'> => entry !== 'deal')) {
+  need(typeof read.prompt?.actions?.wait?.text === 'string' && read.prompt.actions.wait.text !== '' && typeof read.prompt.actions.wait.source === 'string', 'prompt.actions.wait: text och source');
+  for (const action of ACTIONS.filter((entry): entry is Exclude<Action, 'deal' | 'wait'> => entry !== 'deal' && entry !== 'wait')) {
     const given = read.prompt?.actions?.[action];
     const pairs = Array.isArray(given?.replace) && given.replace.every((pair) => Array.isArray(pair) && pair.length === 2 && pair.every((part) => typeof part === 'string' && part !== ''));
     need(pairs && typeof given?.source === 'string' && given.source !== '', `prompt.actions.${action}: replace (par av meningar) och source`);
@@ -128,6 +129,8 @@ export function readTagning(root = ROOT): TagningContent {
  */
 export function promptFor(content: TagningContent, action: Action = 'deal'): string {
   if (action === 'deal') return content.prompt.text;
+  // En väntan delar inget kort, så den har en egen text.
+  if (action === 'wait') return content.prompt.actions.wait.text;
   let text = content.prompt.text;
   for (const [from, to] of content.prompt.actions[action].replace) {
     const at = text.indexOf(from);
@@ -161,6 +164,7 @@ export const clipFile = (spec: Spec, cycle: string, take: number): string =>
 /** Det klippet gör, i ord: "plats 4, kort 1", "dealerns kort 0", "hålkortet (dealerns kort 1)", "vändningen av hålkortet (dealerns kort 1)". */
 export function cardWords(seat: Seat, index: number, action: Action = 'deal'): string {
   const where = seat === 'D' ? `dealerns kort ${index}` : `plats ${seat}, kort ${index}`;
+  if (action === 'wait') return 'väntan i REDO';
   return action === 'hole' ? `hålkortet (${where})` : action === 'flip' ? `vändningen av hålkortet (${where})` : where;
 }
 
@@ -326,7 +330,7 @@ async function prepare(spec: Spec, options: PrepareOptions, made: { dir?: string
   const action = spec.action ?? 'deal';
   if (!WORD.test(spec.dealer)) throw new TagningError(`Ogiltig dealer: ${spec.dealer}`);
   if (!ACTIONS.includes(action)) throw new TagningError(`Okänd handling: ${action}. Skriv ${ACTIONS.join(', ')}.`);
-  if (action !== 'deal' && spec.seat !== 'D') throw new TagningError(`${action} gäller dealerns hålkort: skriv plats D`);
+  if (action !== 'deal' && spec.seat !== 'D') throw new TagningError(action === 'wait' ? 'Väntan görs vid dealerns plats: skriv plats D och kort 0' : `${action} gäller dealerns hålkort: skriv plats D`);
   const view = viewOf(spec.view);
   const parts = readCycleParts(cycle, root);
   const { scene } = parts;
@@ -351,7 +355,9 @@ async function prepare(spec: Spec, options: PrepareOptions, made: { dir?: string
   // Första bilden är ankaret; i en vändning ligger hålkortet målat gult i den. Sista bilden har kortet som det ligger.
   const firstPainted = await paintedPicture(parts, anchor, card, 'first', at('forsta.png'), { ...view, close: true });
   if (!firstPainted) copyFileSync(anchor, at('forsta.png'));
-  const painted = (await paintedPicture(parts, anchor, card, 'last', at('sista.png'), { ...view, close: true }))!;
+  // En väntan slutar som den börjar: sista bilden är ankaret.
+  const painted = await paintedPicture(parts, anchor, card, 'last', at('sista.png'), { ...view, close: true });
+  if (!painted) copyFileSync(anchor, at('sista.png'));
 
   let source = options.reference;
   if (!source) {
@@ -371,7 +377,8 @@ async function prepare(spec: Spec, options: PrepareOptions, made: { dir?: string
   const checks = content.limits.dockansHandled ? [judgeOne('dockansHandled', wrist, content.limits.dockansHandled)] : [];
   // Dockans rörelse mot rörelsens gränser (rorelse.ts), innan något beställs: en stel docka ger ett stelt klipp.
   const motion = motionNumbers(dollMotion(parts, cycleMove(parts, card), content.motion, content.reference.fps));
-  for (const [key, value] of Object.entries(motion)) if (content.limits[key]) checks.push(judgeOne(key, value, content.limits[key]!));
+  // En väntan har ingen väg ut och tillbaka: måtten för ordningen mellan huvud, bål och hand finns inte för den.
+  for (const [key, value] of Object.entries(motion)) if (content.limits[key] && !(action === 'wait' && value === null)) checks.push(judgeOne(key, value, content.limits[key]!));
   const pkg = posix(relative(root, dir));
   const order = {
     about: 'Beställningen av en tagning, gjord av src/pipeline/tagning.ts forbered. Allt Runways generate_video behöver: modell, upplösning, längd, text och vilka filer som är startFrame, endFrame och referenceVideos. Filerna ligger i paketet; source säger var de kommer ifrån.',
@@ -406,14 +413,16 @@ async function prepare(spec: Spec, options: PrepareOptions, made: { dir?: string
             corners: firstPainted.corners,
           }
         : { file: `${pkg}/forsta.png`, asset: anchorFile, sha256: sha256Of(at('forsta.png')), note: 'vyns REDO-ankare (content/tagning.json, redo.anchors), oförändrat' },
-      endFrame: {
-        file: `${pkg}/sista.png`,
-        sha256: sha256Of(at('sista.png')),
-        madeWith: `paintedPicture i src/pipeline/cykel.ts: ${anchorFile} med märkkortet målat ${painted.side === 'baksida' ? 'gult' : 'blått'} där ${kindOf(spec, cycle)} lägger kortet, ${words}`,
-        painted: painted.painted,
-        spared: painted.spared,
-        corners: painted.corners,
-      },
+      endFrame: painted
+        ? {
+            file: `${pkg}/sista.png`,
+            sha256: sha256Of(at('sista.png')),
+            madeWith: `paintedPicture i src/pipeline/cykel.ts: ${anchorFile} med märkkortet målat ${painted.side === 'baksida' ? 'gult' : 'blått'} där ${kindOf(spec, cycle)} lägger kortet, ${words}`,
+            painted: painted.painted,
+            spared: painted.spared,
+            corners: painted.corners,
+          }
+        : { file: `${pkg}/sista.png`, asset: anchorFile, sha256: sha256Of(at('sista.png')), note: 'vyns REDO-ankare, oförändrat: en väntan slutar som den börjar' },
       referenceVideos: [
         {
           file: `${pkg}/referens.mp4`,
@@ -440,7 +449,7 @@ async function prepare(spec: Spec, options: PrepareOptions, made: { dir?: string
 
   say(`Paket: ${pkg}`);
   say(`  första bild   forsta.png   (${anchorFile}${firstPainted ? `, med hålkortet målat gult: ${firstPainted.painted} bp` : ''})`);
-  say(`  sista bild    sista.png    (märkkortet ${painted.side === 'baksida' ? 'gult' : 'blått'}, ${words}: ${painted.painted} bp målade)`);
+  say(painted ? `  sista bild    sista.png    (märkkortet ${painted.side === 'baksida' ? 'gult' : 'blått'}, ${words}: ${painted.painted} bp målade)` : `  sista bild    sista.png    (${anchorFile}, som första)`);
   say(`  referens      referens.mp4 (${shown(reference.seconds)} s, ${reference.frames} rutor, ${shown(reference.fps)} rutor/s)`);
   say(`  text          text.txt`);
   say(`  dockan        ark-docka.jpg; kortet ligger ${shown(doll.seconds.lands)} s, handen åter i skon ${shown(doll.seconds.home)} s`);
@@ -736,7 +745,7 @@ export async function taEmot(id: string, download: string, receipt: Receipt, opt
     { role: 'endFrame', what: `${ordered.inputs.endFrame.file}: ${anchor} med märkkortet målat där kortet ligger, ${words} (src/pipeline/cykel.ts, paintedPicture)` },
     { role: 'referenceVideos[0]', what: `${ordered.inputs.referenceVideos[0]!.file} (förlagan ${ordered.inputs.referenceVideos[0]!.source}): dockan gör ${ordered.cycle} med ${action}, ${words}, ur ${viewTitle(view)}s närbild i grå ateljé` },
   ];
-  const doing = action === 'hole' ? 'REDO → hålkortet lagt med baksidan upp → REDO' : action === 'flip' ? 'REDO → hålkortet vänt där det ligger → REDO' : 'REDO → kortet lagt → REDO';
+  const doing = action === 'wait' ? 'REDO → väntan med handen vid kortet i skon → REDO' : action === 'hole' ? 'REDO → hålkortet lagt med baksidan upp → REDO' : action === 'flip' ? 'REDO → hålkortet vänt där det ligger → REDO' : 'REDO → kortet lagt → REDO';
   const post: Post = {
     from: '',
     file: ordered.clip,

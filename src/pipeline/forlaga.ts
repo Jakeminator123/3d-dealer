@@ -166,7 +166,7 @@ function isDealer(dealer: Partial<DealerNote> | null | undefined): dealer is Dea
   if (dealer.kind === 'docka') {
     const seated = dealer.seat === undefined || dealer.seat === 'D' || (Number.isInteger(dealer.seat) && dealer.seat > 0);
     const placed = dealer.index === undefined || (Number.isInteger(dealer.index) && dealer.index >= 0);
-    const acting = dealer.action === undefined || dealer.action === 'deal' || dealer.action === 'hole' || dealer.action === 'flip';
+    const acting = dealer.action === undefined || dealer.action === 'deal' || dealer.action === 'hole' || dealer.action === 'flip' || dealer.action === 'wait';
     return typeof dealer.move === 'string' && MOVE.test(dealer.move) && (dealer.pose === 'giv' || dealer.pose === 'vila') && seated && placed && acting;
   }
   if (dealer.kind !== 'film' || !isSeatView(dealer.view)) return false;

@@ -9,6 +9,7 @@
   "parts": { "ready": 0.1, "deal": 2.1, "onCard": 0.5, "back": 2, "still": 0.3 },
   "back": { "lift": 0.05, "release": 0.3, "look": 0.6, "open": 0.3, "close": 0.75 },
   "flip": { "reach": 1.2, "pickUp": 0.4, "from": 50 },
+  "wait": { "look": 0.6, "up": [0.8, 1.8], "down": [3.1, 4.2] },
   "life": {
     "gazeLead": 0.25,
     "headLag": 0.1,
@@ -23,5 +24,5 @@
     "touch": 0
   },
   "basis": "antaget",
-  "source": "Valt av agenten 2026-11-18 som variant B till cykel-nyp (output/work/rorelse/forslag.md): samma life, men handen bär kortet på 2,1 s (1,52 gånger den lästa givens takt i stället för 1,88), vilar 0,5 s på kortet och går tillbaka på 2,0 s. Andningen tar hela cykeln, 12 andetag i minuten. Filmen blir 5 s (Kling 4 tar 3–30 s; tagning.ts forbered sätter längden efter cykeln). flip: reach 1,2 s, pickUp 0,4 s och läggningen 0,5 s. Inte mätt mot en verklig dealer."
+  "source": "Valt av agenten 2026-11-18 som variant B till cykel-nyp (output/work/rorelse/forslag.md): samma life, men handen bär kortet på 2,1 s (1,52 gånger den lästa givens takt i stället för 1,88), vilar 0,5 s på kortet och går tillbaka på 2,0 s. Andningen tar hela cykeln, 12 andetag i minuten. Filmen blir 5 s (Kling 4 tar 3–30 s; tagning.ts forbered sätter längden efter cykeln). flip: reach 1,2 s, pickUp 0,4 s och läggningen 0,5 s. Inte mätt mot en verklig dealer. wait: väntan (handlingen wait, dollPose.ts waited), valt av agenten 2026-11-18: blicken går lugnt 60 % av vägen upp mot spelarna (doll.gaze), upp på 1,0 s och ned igen på 1,1 s, och huvudet följer den som i en giv; handen står vid kortet i skon."
 }
