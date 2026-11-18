@@ -1,25 +1,24 @@
 {
-  "schemaVersion": 1,
-  "about": "En runda: ordningen dealern delar ut korten i, valörerna scenen lägger, och hur rundan sparas som film. Läses av src/pipeline/runda.ts. Ingenting här avgör spelet: när spelkärnan delar ut säger den vilka kort som läggs och i vilken ordning.",
-  "order": [
-    { "seat": 1, "index": 0 },
-    { "seat": 2, "index": 0 },
-    { "seat": 3, "index": 0 },
-    { "seat": 4, "index": 0 },
-    { "seat": 5, "index": 0 },
-    { "seat": 6, "index": 0 },
-    { "seat": 7, "index": 0 },
-    { "seat": 1, "index": 1 },
-    { "seat": 2, "index": 1 },
-    { "seat": 3, "index": 1 },
-    { "seat": 4, "index": 1 },
-    { "seat": 5, "index": 1 },
-    { "seat": 6, "index": 1 },
-    { "seat": 7, "index": 1 }
-  ],
-  "faces": ["A♠", "K♥", "7♦", "10♣", "Q♠", "4♥", "9♦", "J♣", "2♠", "8♥", "5♣", "A♦", "6♠", "3♥"],
-  "basis": "antaget",
-  "source": "Ordningen är Jakobs mål 2026-11-18: Paulina delar ut till alla sju platser, två kort per plats, plats 1–7 första kortet och sedan plats 1–7 andra kortet. Dealerns egna kort är inte med: de har inga klipp än. index är vilket av platsens kort, 0 för det första (kortplatserna i content/scene.json). faces är valörerna i samma ordning, en fast följd vald av agenten 2026-11-18 som stå-in tills spelkärnan säger vilka kort som läggs.",
+  "schemaVersion": 2,
+  "about": "Rundan: den giv som spelkärnan delar när ingen spelar, hur länge ett kort utan klipp går självt, och hur rundan sparas som film. Läses av servern (/api/runda, src/server/game.ts), som delar rundan med spelkärnan, och av src/scene/round.ts, som väljer dealerns klipp för den i Labbet, Casinot och src/pipeline/runda.ts. Ingenting här avgör spelet: kort, ordning, pengar och utfall är spelkärnans.",
+  "deal": {
+    "seed": "runda-3",
+    "bets": [
+      { "seat": 1, "main": 10 },
+      { "seat": 4, "main": 10 },
+      { "seat": 7, "main": 10 }
+    ],
+    "hitBelow": 15,
+    "basis": "antaget",
+    "source": "Valt av agenten 2026-11-18: tre spelare (plats 1, 4 och 7, så att given går över hela bordet), insats 10, och spelare som tar Hit så länge handen är under 15, annars Stand, och aldrig försäkring. seed är fröet till skon (spelkärnans seeded-läge, src/engine/shoe-source.ts): samma frö ger samma runda. Fröet runda-3 är det första av runda-1 … runda-120 (output/work/runda-fro/sok.ts) där rundan visar dealerns öppna kort och hålkort, minst två Hit, vändningen och minst ett kort till dealern, utan försäkring eller blackjack, och där utfallen skiljer sig: plats 1 vinner, plats 4 förlorar och plats 7 får lika."
+  },
+  "fallback": {
+    "seconds": 1.2,
+    "turn": 0.8,
+    "move": 0.8,
+    "basis": "antaget",
+    "source": "Valt av agenten 2026-11-18. Ett kort utan godkänt klipp går självt, utan dealerns rörelse, medan dealern står i REDO (spelkärnans fallback 'slide'): från skons mynning till sin kortplats på seconds sekunder, vänt där det ligger på turn sekunder (hålkortet utan klipp för vändningen), och flyttat till sin nya kortplats på move sekunder när en hand delas. Inget av det är mätt mot en dealer."
+  },
   "film": {
     "background": "scene/backgrounds/balsal.jpg",
     "fps": 24,

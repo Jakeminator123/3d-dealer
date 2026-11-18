@@ -10,18 +10,20 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { createBackdrop, type Background } from './backdrop.ts';
 import { createCard, type Card } from './cards.ts';
-import type { FilmNote, Rgb, Studio } from './dealer.ts';
+import { sameSpot, type FilmNote, type Rgb, type Studio } from './dealer.ts';
 import type { Frame, SceneDescription } from './description.ts';
 import { createDoll } from './doll.ts';
 import { pickUpCard, type DollDescription, type DollMove } from './dollPose.ts';
 import { createFilm } from './film.ts';
-import { lyingAt, markerDown } from './reel.ts';
+import { flyingAt, lyingAt, markerDown, type Reel } from './reel.ts';
+import { spotName, spotPlace } from './round.ts';
 import {
   cardCorners,
   dealerEdge,
   fovYDeg,
   framed,
   onUpright,
+  placeOnTable,
   playerEye,
   roomFoot,
   tableFootprint,
@@ -36,9 +38,10 @@ import {
 import type { Clip } from './picture.ts';
 
 export type { Background } from './backdrop.ts';
-export type { CardNote, ClipCard, DealerNote, FilmClip, FilmNote, Rgb, Studio } from './dealer.ts';
+export type { CardNote, CardSpot, ClipCard, DealerNote, FilmClip, FilmNote, Rgb, Studio } from './dealer.ts';
 export type { Eye, SeatView, View } from './geometry.ts';
 export type { Clip } from './picture.ts';
+export type { Reel } from './reel.ts';
 
 /**
  * Dealern i scenen: en dealerfilm som en följd av klipp, var och en med kortet den lägger (scene/dealer.ts, FilmNote;
@@ -87,6 +90,8 @@ export type SceneHandle = {
    * efter följdens tid: varje klipps kort från att det har landat tills följden är slut.
    */
   clip: Clip | null;
+  /** Dealerfilmens tidslinje: var varje del börjar och slutar. Null utan dealerfilm, och tills klippen är lästa. */
+  reel(): Reel | null;
   /** Byter rummet bakom scenen och hur det visas. Null släcker det. Löftet uppfylls när rummet visas så. */
   setBackground(background: Background | null): Promise<void>;
   /** Ställer scenen i ateljén, eller tar den ur den med null. Rummet släcks av den som ställer dit den. */
@@ -255,12 +260,17 @@ export function buildScene(host: HTMLElement, scene: SceneDescription, options: 
       ? createFilm(
           scene,
           filmEye,
-          chosen.clips.map((clip) => ({ url: options.urlOf(clip.file), ...(clip.card ? { card: clip.card } : {}) })),
+          chosen.clips.map((clip) =>
+            clip.file === null
+              ? { url: null, seconds: clip.seconds, card: clip.card, from: clip.from }
+              : { url: options.urlOf(clip.file), ...(clip.card ? { card: clip.card } : {}) },
+          ),
           chosen.hold ?? 0,
           anisotropy,
           changed,
           problem,
           options.doll ? pickUpCard(scene, options.doll).corners : null,
+          chosen.loop ?? true,
         )
       : null;
   // Dockans punkter står redan i scenens mått med bordets lutning inräknad: hon läggs olutad i världen.
@@ -367,21 +377,29 @@ export function buildScene(host: HTMLElement, scene: SceneDescription, options: 
   }
   world.add(places);
 
-  // Scenens kort, ett för varje klipp som lägger ett, på sin kortplats. Vilka som syns avgörs för varje ritad ruta av var
-  // dealerns följd står.
-  const laid: { part: number; card: Card }[] = [];
+  // Scenens kort, ett för varje del som lägger ett, på sin kortplats (spotPlace i round.ts). Vilka som syns, och var ett
+  // kort som går självt är på väg, avgörs för varje ritad ruta av var dealerns följd står. Kortets mitt är dess läge, så
+  // att det går att flytta och vända kring mitten.
+  type Laid = { part: number; card: Card; centre: THREE.Vector3 };
+  const laid = new Map<number, Laid>();
   if (chosen?.kind === 'film') {
     chosen.clips.forEach((clip, part) => {
       const note = clip.card;
       if (!note) return;
-      const place = scene.places.seats.find((entry) => entry.seat === note.seat)?.cards[note.index];
-      if (!place) return problem(`Scenen har ingen kortplats ${note.index + 1} för plats ${note.seat}`);
+      const place = spotPlace(scene, note);
+      if (!place) return problem(`Scenen har ingen kortplats för ${spotName(note)}`);
       const card = createCard(scene, { place, face: note.face, index: note.index }, anisotropy);
+      card.mesh.geometry.computeBoundingBox();
+      const centre = card.mesh.geometry.boundingBox!.getCenter(new THREE.Vector3());
+      card.mesh.geometry.translate(-centre.x, -centre.y, -centre.z);
+      card.mesh.position.copy(centre);
       card.mesh.visible = false;
       world.add(card.mesh);
-      laid.push({ part, card });
+      laid.set(part, { part, card, centre });
     });
   }
+  // Där ett kort som går självt börjar: kortet i skons mynning (hämtstället), eller skons fot utan dockans mått.
+  const shoeMouth = new THREE.Vector3(...(options.doll ? pickUpCard(scene, options.doll).centre : placeOnTable(scene, scene.shoe.at)));
 
   let shoeShown = true;
   let shoeStand: THREE.Group | null = null;
@@ -432,8 +450,35 @@ export function buildScene(host: HTMLElement, scene: SceneDescription, options: 
     if (!film || !reel) return;
     const time = film.clip ? film.clip.time() : reel.seconds;
     const lying = new Set(lyingAt(reel, time));
-    for (const { part, card } of laid) card.mesh.visible = lying.has(part);
+    for (const { part, card, centre } of laid.values()) {
+      card.mesh.visible = lying.has(part);
+      card.mesh.position.copy(centre);
+      card.mesh.scale.setScalar(1);
+    }
+    carry(reel, time);
     film.setMarker(markerDown(reel, time));
+  }
+
+  /**
+   * Kortet som går självt, utan dealerns rörelse (spelkärnans fallback): från skons mynning till sin kortplats, från en
+   * kortplats till en annan när en hand delas, eller vänt där det ligger (det nedvända kortet smalnar till en kant och
+   * det uppvända breddas ut).
+   */
+  function carry(reel: Reel, time: number): void {
+    const flying = flyingAt(reel, time);
+    const moving = flying ? laid.get(flying.part) : undefined;
+    if (!flying || !moving) return;
+    const from = reel.parts[flying.part]!.from!;
+    const left = flying.left === null ? undefined : laid.get(flying.left);
+    const eased = THREE.MathUtils.smoothstep(flying.progress, 0, 1);
+    if (from !== 'skon' && sameSpot(from, reel.parts[flying.part]!.card!)) {
+      const shown = eased < 0.5 && left ? left : moving;
+      shown.card.mesh.visible = true;
+      shown.card.mesh.scale.x = Math.max(0.001, Math.abs(1 - 2 * eased));
+      return;
+    }
+    moving.card.mesh.visible = true;
+    moving.card.mesh.position.lerpVectors(from === 'skon' ? shoeMouth : (left?.centre ?? moving.centre), moving.centre, eased);
   }
 
   /**
@@ -490,6 +535,7 @@ export function buildScene(host: HTMLElement, scene: SceneDescription, options: 
     canvas: renderer.domElement,
     ready: Promise.all([board, shoe, dealer]).then(() => undefined),
     clip: film?.clip ?? (chosen?.kind === 'docka' && chosen.pose === 'giv' ? doll!.clip : null),
+    reel: () => film?.reel() ?? null,
     setBackground(background) {
       return backdrop.show(background);
     },
@@ -562,7 +608,7 @@ export function buildScene(host: HTMLElement, scene: SceneDescription, options: 
       backdrop.dispose();
       film?.dispose();
       doll?.dispose();
-      for (const { card } of laid) card.dispose();
+      for (const { card } of laid.values()) card.dispose();
       grid.geometry.dispose();
       gridLines.dispose();
       for (const line of places.children) (line as THREE.LineLoop).geometry.dispose();

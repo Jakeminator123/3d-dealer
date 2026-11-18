@@ -58,6 +58,15 @@ const OWN_EDGE = [3.5, 6];
 // djupare, i bp, grannen två steg bort ska ligga för att räknas så: en granne längs kanten ligger lika djupt.
 const NEAR_CARD = [6, 10];
 const DEEPER = [0.5, 1.5];
+// Hur mycket av kantens färg framsidan får där den möter skärmen. Scenens kort har en kant som är en halv bildpunkt i
+// filmen; med full kant (1) fick märkkortet en grå ram på tre bildpunkter som försvann när kortet landade. Valt i bild
+// 2026-11-18 (output/work/scen-bild/).
+const FACE_RIM = 0.35;
+// Hur stor del av en kantpunkt mot hud som ändå räknas som hud, inte kort, när huden bredvid är hel hud. Valt i bild
+// 2026-11-18 i plats 4, kort 0, ruta 43–47 (output/work/scen-bild/finger-4-0-*.png).
+const FINGER_BIAS = 0.2;
+// Hur mörk skuggan på kortet i en kantpunkt mot hud som mest blir, som andel av kortets ljus längre in.
+const CARD_SHADE_LEAST = 0.45;
 
 const glslRgb = (colour: number): string =>
   `vec3(${[(colour >> 16) & 255, (colour >> 8) & 255, colour & 255].map((part) => (part / 255).toFixed(4)).join(', ')})`;
@@ -78,6 +87,31 @@ uniform float shoeCardOn;
 uniform vec2 filmSize;
 const vec3 MARK_FACE = ${glslRgb(MARK_FACE)};
 const vec3 MARK_BACK = ${glslRgb(MARK_BACK)};
+
+// Kortets framsida med valören (cards.ts, cardFaceImage), lagd på märkkortets blå genom fyrhörningen kring det i filmens
+// ruta (faceFromFilm, se orientFace). faceOn är 0 när kortet inte går att se i rutan; då målas framsidan blank.
+uniform sampler2D faceMap;
+uniform float faceOn;
+uniform mat3 faceFromFilm;
+vec2 faceUv;
+vec2 faceDx;
+vec2 faceDy;
+// Var punkten ligger i kortets bild, och hur mycket det ändras till grannpunkterna. Räknas först i main, innan någon
+// punkt slängs, så att bilden läses lika skarpt vid kortets kant som inne i det.
+void prepareFace(vec2 at) {
+  vec2 p = vec2(at.x * filmSize.x, (1.0 - at.y) * filmSize.y) - 0.5;
+  vec3 q = faceFromFilm * vec3(p, 1.0);
+  faceUv = q.xy / max(q.z, 1e-6);
+  faceUv.y = 1.0 - faceUv.y;
+  faceDx = dFdx(faceUv);
+  faceDy = dFdy(faceUv);
+}
+// Kortets framsida i punkten: bilden med valören, eller den blanka färgen.
+vec3 facePrint() {
+  if (faceOn < 0.5) return cardFace;
+  vec4 print = textureGrad(faceMap, clamp(faceUv, 0.0, 1.0), faceDx, faceDy);
+  return mix(cardFace, print.rgb, print.a);
+}
 
 float sideOf(vec2 p, vec2 a, vec2 b) {
   vec2 e = b - a;
@@ -179,6 +213,8 @@ vec4 markCard(vec2 uv, vec3 c, vec3 colour, float alpha, float range, out float 
   // Kortets färg här (M) och färgen bredvid kortet (O). I kanten hämtas de fyra steg in i kortet och fyra steg ut.
   vec3 M = c;
   vec3 O = u;
+  // Kortets eget ljus i punkten mot kortets längre in: en fingertopp mot kortet skuggar det i filmen.
+  float cardShade = 1.0;
   vec2 toward = vec2(
     (mx1.x + mx1.y) - (mx0.x + mx0.y) + (Mx1.x + Mx1.y) - (Mx0.x + Mx0.y),
     (my1.x + my1.y) - (my0.x + my0.y) + (My1.x + My1.y) - (My0.x + My0.y));
@@ -197,6 +233,15 @@ vec4 markCard(vec2 uv, vec3 c, vec3 colour, float alpha, float range, out float 
       O = max(outside - outScreen * key, 0.0) / max(1.0 - outScreen, 0.05);
       float sO = signOf(O, face);
       float mixed = clamp((signOf(u, face) - sO) / max(signOf(M, face) - sO, ${SIGN_SPAN}), 0.0, 1.0);
+      // Hud bredvid: filmen lägger kortets blå reflex i fingertoppen, och den är finger, inte kort. Utan det blev
+      // fingertoppen över kortet fläckvis vit, och genomskinlig när kortet hade landat (plats 4, kort 0, ruta 43–47).
+      float skinBeside = ${FINGER_BIAS.toFixed(2)} * skinOf(O);
+      mixed = clamp((mixed - skinBeside) / (1.0 - skinBeside), 0.0, 1.0);
+      // Kortets färg i punkten när dealerns del är borttagen. Mörkare än kortet längre in är skugga, som linjen där
+      // fingertoppen möter kortet: den följer med till det målade kortet och, när det blå är borttaget, till scenens.
+      vec3 cardHere = (u - (1.0 - mixed) * O) / max(mixed, 0.25);
+      // Som mest så här mörk, och bara där punkten är mest kort: annars blev linjen prickig (plats 4, kort 0, ruta 45).
+      cardShade = mix(1.0, clamp(dot(cardHere, LUMA) / max(dot(M, LUMA), 0.05), ${CARD_SHADE_LEAST.toFixed(2)}, 1.0), smoothstep(0.3, 0.6, mixed));
       share = max(share, mixed * (face ? beside.x : beside.y));
     } else {
       O = u;
@@ -221,16 +266,19 @@ vec4 markCard(vec2 uv, vec3 c, vec3 colour, float alpha, float range, out float 
   float here = inShoeCard(uv);
   float rim = max(max(max(edgeFrom(uv + dx, tx1, onBack, here), edgeFrom(uv - dx, tx0, onBack, here)), max(edgeFrom(uv + dy, ty1, onBack, here), edgeFrom(uv - dy, ty0, onBack, here))),
     max(max(edgeAt(uv + d, onBack, here), edgeAt(uv - d, onBack, here)), max(edgeAt(uv + dd, onBack, here), edgeAt(uv - dd, onBack, here))));
-  vec3 facePaint = mix(cardFace, cardEdge, rim);
+  // Framsidan bär valören (facePrint) och har sin kant bara mot skärmen: mot ett finger på kortet är det fingret som syns,
+  // inte kortets kant. Kanten är svag, som på scenens kort, så att bytet när kortet landar inte syns.
+  float faceRim = max(max(screenOf(tx1, range), screenOf(tx0, range)), max(screenOf(ty1, range), screenOf(ty0, range)));
+  vec3 facePaint = mix(facePrint(), cardEdge, faceRim * ${FACE_RIM.toFixed(2)});
   vec3 backPaint = mix(cardBack, cardFace, rim);
   // Det utsmetade kortet är framsida och baksida i sina andelar; annars den sida punkten hör till.
   vec3 paint = smear ? mix(backPaint, facePaint, partB / max(partCard, 1e-4)) : face ? facePaint : backPaint;
   // Kortets ljus i filmen följer med: skugga och rörelseoskärpa.
-  paint = min(paint * clamp(dot(M, LUMA) / max(dot(nominal, LUMA), 0.05), 0.55, 1.15), 1.0);
-  // Det blå tas bort när kortet ligger; annars målas det.
+  paint = min(paint * clamp(dot(M, LUMA) / max(dot(nominal, LUMA), 0.05), 0.55, 1.15), 1.0) * cardShade;
+  // Det blå tas bort när kortet ligger; annars målas det. Skuggan på det blå ligger kvar som en svart hinna över scenens kort.
   float gone = face ? marker : 0.0;
   front = share * (1.0 - gone);
-  return vec4(alpha * ((1.0 - share) * O + share * (1.0 - gone) * paint), alpha * (1.0 - share * gone));
+  return vec4(alpha * ((1.0 - share) * O + share * (1.0 - gone) * paint), alpha * (1.0 - share * gone * cardShade));
 }
 
 // Hur mycket av punkten som är målat kort, för att det ska ritas över det som står framför den vikta ytan.
@@ -244,6 +292,357 @@ const vec = (rgb: Rgb): THREE.Vector3 => new THREE.Vector3(rgb[0] / 255, rgb[1] 
 /** Skuggarens värden för kortets färger. */
 export function markerUniforms(colours: CardColours): Record<'cardFace' | 'cardEdge' | 'cardBack', { value: THREE.Vector3 }> {
   return { cardFace: { value: vec(colours.face) }, cardEdge: { value: vec(colours.edge) }, cardBack: { value: vec(colours.back) } };
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Framsidan i luften. Ett riktigt kort visar sin valör så fort framsidan vänds upp, så märkkortets blå målas med samma
+// bild av framsidan som scenens kort får när det landar (cards.ts, cardFaceImage). Bilden läggs på kortet där filmen
+// visar det: för varje ruta letas det blå upp (findFace), dess kontur görs till en fyrhörning (quadOf), och hörnen ställs
+// i kortets ordning (orientFace). Skuggaren slår upp bilden genom fyrhörningen (faceFromFilm).
+
+/** Märkkortets blå i en bildpunkt, 0–255: blått minst så här mycket över rött och grönt. Mitt i skuggarens BLUE (0,15). */
+const FACE_BLUE = 38;
+// En bit av det blå räknas till kortet om den har minst så här många bildpunkter och minst den här andelen av den största
+// biten: ett finger över kortet delar det i bitar, och kortets blå reflex i en fingertopp är några få bildpunkter.
+const FACE_PIECE = [8, 0.1] as const;
+// Minsta yta (bp²) och minsta andel blått av fyrhörningen för att kortets bild ska läggas: ett kort sett från kanten, eller
+// en fyrhörning som är mycket större än det blå, bär ingen valör.
+const FACE_AREA = 150;
+const FACE_FILL = 0.45;
+
+/** Fyra hörn i filmens bildpunkter (y nedåt, en bildpunkts mitt på heltalet). */
+export type Quad = [Pixel, Pixel, Pixel, Pixel];
+
+const crossOf = (o: Pixel, a: Pixel, b: Pixel): number => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+
+/** Dubbla ytan med tecken: positiv när hörnen går medurs i bild (y nedåt), som kortets hörn sedda framifrån. */
+export const turning = (polygon: Pixel[]): number =>
+  polygon.reduce((sum, p, k) => {
+    const q = polygon[(k + 1) % polygon.length]!;
+    return sum + p.x * q.y - q.x * p.y;
+  }, 0);
+
+/** Det konvexa höljet kring punkterna, medurs i bild. */
+export function convexHull(points: Pixel[]): Pixel[] {
+  const sorted = [...points].sort((a, b) => a.x - b.x || a.y - b.y);
+  if (sorted.length < 3) return sorted;
+  const lower: Pixel[] = [];
+  for (const p of sorted) {
+    while (lower.length >= 2 && crossOf(lower.at(-2)!, lower.at(-1)!, p) <= 0) lower.pop();
+    lower.push(p);
+  }
+  const upper: Pixel[] = [];
+  for (const p of [...sorted].reverse()) {
+    while (upper.length >= 2 && crossOf(upper.at(-2)!, upper.at(-1)!, p) <= 0) upper.pop();
+    upper.push(p);
+  }
+  const hull = [...lower.slice(0, -1), ...upper.slice(0, -1)];
+  return turning(hull) < 0 ? hull.reverse() : hull;
+}
+
+/** Där linjen genom a och b möter linjen genom c och d. Null när de är parallella. */
+function meet(a: Pixel, b: Pixel, c: Pixel, d: Pixel): Pixel | null {
+  const r = { x: b.x - a.x, y: b.y - a.y };
+  const s = { x: d.x - c.x, y: d.y - c.y };
+  const den = r.x * s.y - r.y * s.x;
+  if (Math.abs(den) < 1e-9) return null;
+  const t = ((c.x - a.x) * s.y - (c.y - a.y) * s.x) / den;
+  return { x: a.x + t * r.x, y: a.y + t * r.y };
+}
+
+/**
+ * Den fyrhörning som ett konvext hölje (medurs) ligger i, gjord genom att ta bort en kant i taget och förlänga
+ * grannkanterna tills de möts, där det lägger till minst yta. Ett hörn som ett finger täcker blir en kort kant, och
+ * kommer tillbaka när den tas bort. Null när höljet inte går att göra till fyra hörn.
+ */
+export function quadOf(hull: Pixel[]): Quad | null {
+  const polygon = [...hull];
+  while (polygon.length > 4) {
+    const n = polygon.length;
+    let best = -1;
+    let bestArea = Infinity;
+    let bestPoint: Pixel | null = null;
+    for (let i = 0; i < n; i++) {
+      const p0 = polygon[(i + n - 1) % n]!;
+      const p1 = polygon[i]!;
+      const p2 = polygon[(i + 1) % n]!;
+      const p3 = polygon[(i + 2) % n]!;
+      const x = meet(p0, p1, p3, p2);
+      if (!x) continue;
+      // Grannkanterna ska mötas framför kanten, inte bakom: förlängda åt det håll de redan går.
+      if ((x.x - p1.x) * (p1.x - p0.x) + (x.y - p1.y) * (p1.y - p0.y) < 0) continue;
+      if ((x.x - p2.x) * (p2.x - p3.x) + (x.y - p2.y) * (p2.y - p3.y) < 0) continue;
+      const added = Math.abs(crossOf(p1, p2, x)) / 2;
+      if (added < bestArea) {
+        bestArea = added;
+        best = i;
+        bestPoint = x;
+      }
+    }
+    if (best < 0 || !bestPoint) return null;
+    if (best === n - 1) {
+      polygon.splice(best, 1, bestPoint);
+      polygon.splice(0, 1);
+    } else {
+      polygon.splice(best, 2, bestPoint);
+    }
+  }
+  return polygon.length === 4 ? (polygon as Quad) : null;
+}
+
+/** Märkkortets framsida i en ruta: fyrhörningen kring det blå, i filmens bildpunkter, och hur många bildpunkter som är blå. */
+export type FaceFind = { quad: Quad; pixels: number };
+
+/**
+ * Letar upp märkkortets blå i en bild (RGBA, `width` × `height`, rad för rad uppifrån) och ger fyrhörningen kring det.
+ * `at` är bildens övre vänstra hörn i filmen, så att hörnen kommer i filmens bildpunkter. Null när det blå är för litet
+ * eller inte bildar ett kort.
+ */
+export function findFace(data: ArrayLike<number>, width: number, height: number, at: Pixel = { x: 0, y: 0 }): FaceFind | null {
+  const blue = new Uint8Array(width * height);
+  for (let k = 0, p = 0; k < blue.length; k++, p += 4) blue[k] = data[p + 2]! - Math.max(data[p]!, data[p + 1]!) >= FACE_BLUE ? 1 : 0;
+  // Bitarna av det blå, grannar åt fyra håll.
+  const piece = new Int32Array(width * height).fill(-1);
+  const sizes: number[] = [];
+  const stack: number[] = [];
+  for (let start = 0; start < blue.length; start++) {
+    if (!blue[start] || piece[start]! >= 0) continue;
+    const id = sizes.length;
+    let size = 0;
+    piece[start] = id;
+    stack.push(start);
+    while (stack.length > 0) {
+      const k = stack.pop()!;
+      size++;
+      const x = k % width;
+      const next = [x > 0 ? k - 1 : -1, x < width - 1 ? k + 1 : -1, k - width, k + width];
+      for (const m of next) {
+        if (m < 0 || m >= blue.length || !blue[m] || piece[m]! >= 0) continue;
+        piece[m] = id;
+        stack.push(m);
+      }
+    }
+    sizes.push(size);
+  }
+  if (sizes.length === 0) return null;
+  const least = Math.max(FACE_PIECE[0], FACE_PIECE[1] * Math.max(...sizes));
+  // Höljet räknas på bildpunkternas rutor: radens första och sista blå punkt med sina hörn.
+  const points: Pixel[] = [];
+  let pixels = 0;
+  for (let y = 0; y < height; y++) {
+    let first = -1;
+    let last = -1;
+    for (let x = 0; x < width; x++) {
+      const id = piece[y * width + x]!;
+      if (id < 0 || sizes[id]! < least) continue;
+      pixels++;
+      if (first < 0) first = x;
+      last = x;
+    }
+    if (first < 0) continue;
+    for (const [x, side] of [[first, -0.5], [last, 0.5]] as const) {
+      points.push({ x: at.x + x + side, y: at.y + y - 0.5 }, { x: at.x + x + side, y: at.y + y + 0.5 });
+    }
+  }
+  if (pixels < FACE_AREA / 2) return null;
+  const quad = quadOf(convexHull(points));
+  if (!quad) return null;
+  const area = turning(quad) / 2;
+  if (area < FACE_AREA || pixels < FACE_FILL * area) return null;
+  return { quad, pixels };
+}
+
+const between = (a: Pixel, b: Pixel): number => Math.hypot(a.x - b.x, a.y - b.y);
+const rotate = (quad: Quad, k: number): Quad => [0, 1, 2, 3].map((i) => quad[(i + k) % 4]!) as Quad;
+
+/** Hur långt fyrhörningens hörn ligger från en annans, hörn för hörn: det största avståndet, bp. */
+export const quadDistance = (a: Quad, b: Quad): number => Math.max(...a.map((p, i) => between(p, b[i]!)));
+
+/**
+ * Hur illa fyrhörningen passar ett kort `width` × `height` (meter) när dess kant från hörn 0 till 1 är kortets bredd,
+ * sett med `scale` bildpunkter per meter på kortets avstånd. Kortet är litet mot sitt avstånd, så bilden av det är nära
+ * en parallellogram: kortets två kanter är vinkelräta och har sina längder, och bilden av dem är kortare eller lika långa.
+ */
+export function cardMisfit(quad: Quad, scale: number, width: number, height: number): number {
+  const a = { x: (quad[1].x - quad[0].x + quad[2].x - quad[3].x) / 2 / scale, y: (quad[1].y - quad[0].y + quad[2].y - quad[3].y) / 2 / scale };
+  const b = { x: (quad[3].x - quad[0].x + quad[2].x - quad[1].x) / 2 / scale, y: (quad[3].y - quad[0].y + quad[2].y - quad[1].y) / 2 / scale };
+  const la = Math.hypot(a.x, a.y);
+  const lb = Math.hypot(b.x, b.y);
+  // Djupet längs varje kant, så att den blir så lång som kortets kant; kanterna är vinkelräta när djupen tar ut bildens lutning.
+  const za = Math.sqrt(Math.max(0, width * width - la * la));
+  const zb = Math.sqrt(Math.max(0, height * height - lb * lb));
+  const long = (Math.max(0, la - width) / width) ** 2 + (Math.max(0, lb - height) / height) ** 2;
+  const square = ((za * zb - Math.abs(a.x * b.x + a.y * b.y)) / (width * height)) ** 2;
+  return long + square;
+}
+
+// Fyrhörningen i rutan innan behåller sin ordning när kortet har flyttat sig mindre än den här andelen av sin storlek.
+const FACE_FOLLOW = 1 / 3;
+// Inom så här många bildpunkter från scenens kort på kortplatsen (hörn för hörn, det största avståndet) läggs bilden allt
+// mer där scenens kort ligger, och helt där inom det första talet: när kortet landar byts filmens kort mot scenens, och
+// valören står då redan där scenens kort har den. Mätt 2026-11-18 i plats 2, kort 0: filmens kort ligger 0,5–4 bp från
+// kortplatsens hörn när det ligger still (ruta 46), 9 bp när det landar (ruta 44); output/work/scen-bild/prov-fyrhorning.ts.
+const FACE_LANDING = [4, 14] as const;
+
+/** Hur lika två fyrhörningar är till formen, hörn för hörn, när båda är flyttade så att deras mitt ligger i origo. */
+function shapeDistance(a: Quad, b: Quad): number {
+  const mid = (q: Quad): Pixel => ({ x: (q[0].x + q[1].x + q[2].x + q[3].x) / 4, y: (q[0].y + q[1].y + q[2].y + q[3].y) / 4 });
+  const ma = mid(a);
+  const mb = mid(b);
+  return a.reduce((sum, p, i) => sum + Math.hypot(p.x - ma.x - (b[i]!.x - mb.x), p.y - ma.y - (b[i]!.y - mb.y)), 0);
+}
+
+export type FaceGuide = {
+  /** Scenens kort på kortplatsen, sett genom filmens öga, med hörnen i kortets ordning. */
+  landing: Quad | null;
+  /** Fyrhörningen i rutan innan, i kortets ordning, om den rutan låg alldeles före. */
+  previous: Quad | null;
+  /** Bildpunkter per meter på kortets avstånd, och kortets mått: för ett kort utan kortplats. */
+  scale: number;
+  card: { width: number; height: number };
+};
+
+/**
+ * Fyrhörningen kring det blå (medurs) med hörnen i kortets ordning: uppe till vänster, uppe till höger, nere till höger,
+ * nere till vänster i kortets bild (cards.ts). Medurs i bild är framsidan sedd framifrån, så bilden blir aldrig spegelvänd.
+ *
+ * Ordningen följer rutan innan (`previous`) så länge kortet bara har flyttat sig en bit, så att bilden inte vänder sig
+ * mellan två rutor. Annars ställs hörnen som på scenens kort på kortplatsen (`landing`), det läge som är mest likt till
+ * formen: filmens kort är blankt och bär ingen egen ordning, men när det ligger ska valören stå som på scenens kort.
+ * Nära kortplatsen dras hörnen mot scenens kort (FACE_LANDING). Utan kortplats avgör kortets mått vilken kant som är
+ * bredden (cardMisfit), och överkanten är den som ligger högst i bild.
+ */
+export function orientFace(quad: Quad, guide: FaceGuide): Quad {
+  const turns = [0, 1, 2, 3].map((k) => rotate(quad, k));
+  const { landing, previous } = guide;
+  let chosen: Quad | null = null;
+  if (previous) {
+    const size = (between(previous[0], previous[2]) + between(previous[1], previous[3])) / 2;
+    const near = turns.map((turned) => turned.reduce((sum, p, i) => sum + between(p, previous[i]!), 0) / 4);
+    const k = near.indexOf(Math.min(...near));
+    if (near[k]! < size * FACE_FOLLOW) chosen = turns[k]!;
+  }
+  if (!chosen && landing) {
+    const shapes = turns.map((turned) => shapeDistance(turned, landing));
+    chosen = turns[shapes.indexOf(Math.min(...shapes))]!;
+  }
+  if (!chosen) {
+    const even = cardMisfit(turns[0]!, guide.scale, guide.card.width, guide.card.height);
+    const odd = cardMisfit(turns[1]!, guide.scale, guide.card.width, guide.card.height);
+    const [a, b] = even <= odd ? [turns[0]!, turns[2]!] : [turns[1]!, turns[3]!];
+    const top = (q: Quad): number => q[0].y + q[1].y;
+    chosen = top(a) <= top(b) ? a : b;
+  }
+  if (!landing) return chosen;
+  // Nära kortplatsen: hörnen dras mot scenens kort, i det läge som ligger närmast.
+  const placed = turns.map((turned) => quadDistance(turned, landing));
+  const k = placed.indexOf(Math.min(...placed));
+  const pull = 1 - smooth(FACE_LANDING[0], FACE_LANDING[1], placed[k]!);
+  if (pull <= 0) return chosen;
+  return turns[k]!.map((p, i) => ({ x: p.x + (landing[i]!.x - p.x) * pull, y: p.y + (landing[i]!.y - p.y) * pull })) as Quad;
+}
+
+/** Som GLSL:s smoothstep. */
+const smooth = (edge0: number, edge1: number, x: number): number => {
+  const t = Math.min(1, Math.max(0, (x - edge0) / (edge1 - edge0)));
+  return t * t * (3 - 2 * t);
+};
+
+/**
+ * Avbildningen från filmens bildpunkter till kortets bild: (x, y, 1) gånger matrisen ger (u·w, v·w, w), där u går från
+ * kortets vänstra kant till dess högra och v från överkanten nedåt, båda 0–1. Raderna står efter varandra. w är positiv
+ * inne i kortet.
+ */
+export function filmToFace(quad: Quad): number[] {
+  const [p0, p1, p2, p3] = quad;
+  // Från kortets ruta (u, v) till bilden, som Heckbert: hörnen (0,0), (1,0), (1,1), (0,1) till p0, p1, p2, p3.
+  const sx = p0.x - p1.x + p2.x - p3.x;
+  const sy = p0.y - p1.y + p2.y - p3.y;
+  const dx1 = p1.x - p2.x;
+  const dx2 = p3.x - p2.x;
+  const dy1 = p1.y - p2.y;
+  const dy2 = p3.y - p2.y;
+  const den = dx1 * dy2 - dx2 * dy1;
+  const g = Math.abs(den) < 1e-12 ? 0 : (sx * dy2 - dx2 * sy) / den;
+  const h = Math.abs(den) < 1e-12 ? 0 : (dx1 * sy - sx * dy1) / den;
+  const m = [p1.x - p0.x + g * p1.x, p3.x - p0.x + h * p3.x, p0.x, p1.y - p0.y + g * p1.y, p3.y - p0.y + h * p3.y, p0.y, g, h, 1];
+  const [a, b, c, d, e, f, gg, hh, i] = m as [number, number, number, number, number, number, number, number, number];
+  const inverse = [e * i - f * hh, c * hh - b * i, b * f - c * e, f * gg - d * i, a * i - c * gg, c * d - a * f, d * hh - e * gg, b * gg - a * hh, a * e - b * d];
+  // Tecknet ställs så att w är positiv i kortets mitt.
+  const middle = { x: (p0.x + p1.x + p2.x + p3.x) / 4, y: (p0.y + p1.y + p2.y + p3.y) / 4 };
+  const w = inverse[6]! * middle.x + inverse[7]! * middle.y + inverse[8]!;
+  return w < 0 ? inverse.map((value) => -value) : inverse;
+}
+
+/** Kortets punkt (u, v) för filmens bildpunkt `p` genom avbildningen `m` (filmToFace). */
+export function faceAt(m: number[], p: Pixel): Pixel {
+  const w = m[6]! * p.x + m[7]! * p.y + m[8]!;
+  return { x: (m[0]! * p.x + m[1]! * p.y + m[2]!) / w, y: (m[3]! * p.x + m[4]! * p.y + m[5]!) / w };
+}
+
+/** Skuggarens värden för kortets framsida i luften: bilden med valören, om kortet syns, och avbildningen dit ur filmen. */
+export function faceUniforms(): { faceMap: { value: THREE.Texture | null }; faceOn: { value: number }; faceFromFilm: { value: THREE.Matrix3 } } {
+  return { faceMap: { value: null }, faceOn: { value: 0 }, faceFromFilm: { value: new THREE.Matrix3() } };
+}
+
+/** Lägger kortets bild på fyrhörningen `quad` i kortets ordning (orientFace), eller tar bort den med null. */
+export function setFaceQuad(uniforms: ReturnType<typeof faceUniforms>, quad: Quad | null): void {
+  uniforms.faceOn.value = quad && uniforms.faceMap.value ? 1 : 0;
+  if (quad) uniforms.faceFromFilm.value.set(...(filmToFace(quad) as Parameters<THREE.Matrix3['set']>));
+}
+
+// Rutan letas först igenom i en fjärdedels storlek, och där det blå finns läses den i full storlek med så här många
+// bildpunkters luft runt om. Det blå i den lilla bilden är utspätt med skärmen, så gränsen där är hälften.
+const FACE_COARSE = 4;
+const FACE_MARGIN = 6;
+
+/** Letar upp märkkortets blå i en ruta (findFace). `width` och `height` är bildens egna mått. */
+export type FaceTracker = { find(source: CanvasImageSource, width: number, height: number): FaceFind | null };
+
+/** Letar upp märkkortets framsida i en films rutor, för en film med rutan `frame`. Bara i en webbläsare. */
+export function createFaceTracker(frame: { width: number; height: number }): FaceTracker {
+  const coarse = document.createElement('canvas');
+  coarse.width = Math.ceil(frame.width / FACE_COARSE);
+  coarse.height = Math.ceil(frame.height / FACE_COARSE);
+  const small = coarse.getContext('2d', { willReadFrequently: true })!;
+  const fine = document.createElement('canvas');
+  const near = fine.getContext('2d', { willReadFrequently: true })!;
+  return {
+    find(source, width, height) {
+      small.drawImage(source, 0, 0, width, height, 0, 0, coarse.width, coarse.height);
+      const { data } = small.getImageData(0, 0, coarse.width, coarse.height);
+      let x0 = Infinity;
+      let y0 = Infinity;
+      let x1 = -1;
+      let y1 = -1;
+      for (let k = 0, p = 0; p < data.length; k++, p += 4) {
+        if (data[p + 2]! - Math.max(data[p]!, data[p + 1]!) < FACE_BLUE / 2) continue;
+        const x = k % coarse.width;
+        const y = (k - x) / coarse.width;
+        x0 = Math.min(x0, x);
+        x1 = Math.max(x1, x);
+        y0 = Math.min(y0, y);
+        y1 = Math.max(y1, y);
+      }
+      if (x1 < 0) return null;
+      const across = frame.width / coarse.width;
+      const down = frame.height / coarse.height;
+      const left = Math.max(0, Math.floor(x0 * across) - FACE_MARGIN);
+      const top = Math.max(0, Math.floor(y0 * down) - FACE_MARGIN);
+      const right = Math.min(frame.width, Math.ceil((x1 + 1) * across) + FACE_MARGIN);
+      const bottom = Math.min(frame.height, Math.ceil((y1 + 1) * down) + FACE_MARGIN);
+      const w = right - left;
+      const h = bottom - top;
+      if (fine.width < w || fine.height < h) {
+        fine.width = Math.max(fine.width, w);
+        fine.height = Math.max(fine.height, h);
+      }
+      const sx = width / frame.width;
+      const sy = height / frame.height;
+      near.drawImage(source, left * sx, top * sy, w * sx, h * sy, 0, 0, w, h);
+      return findFace(near.getImageData(0, 0, w, h).data, w, h, { x: left, y: top });
+    },
+  };
 }
 
 /** Hur långt punkten `p` ligger till vänster om kanten från `a` till `b` (bildpunkter, y nedåt), som skuggarens sideOf. */

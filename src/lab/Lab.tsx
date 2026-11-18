@@ -45,6 +45,10 @@ export function Lab() {
             ),
           )}
         </nav>
+        {/* Casinot är ett eget läge, med samma scen: en riktig runda mot spelkärnan. */}
+        <a className="step elsewhere" href="/casino/" title="Spela en runda mot spelkärnan">
+          Casinot
+        </a>
       </header>
       {current === 'scen' ? (
         <Suspense fallback={<main className="notice">Läser scenen …</main>}>

@@ -2,7 +2,7 @@
 
 import type { SeatView } from '../scene/build.ts';
 import type { FilmNote, OneClipNote } from '../scene/dealer.ts';
-import { planRound, roundFilm, type Plan, type Round } from '../scene/round.ts';
+import { dealsOf, planRound, roundFilm, type DealtRound, type Plan, type Round } from '../scene/round.ts';
 import { kindOf, sectionsOf, type Asset, type Item, type Registry } from './registry.ts';
 
 /**
@@ -92,19 +92,22 @@ export function dealerChoices(registry: Registry, dealer: string): DealerChoice[
 }
 
 /**
- * Hela given att välja i steget Scen: för varje vy där `dealer` har cykelklipp i registret, rundan ur content/runda.json
- * som dealerfilm, vald och ordnad som src/pipeline/runda.ts gör (planRound i src/scene/round.ts). `key` är valets värde
- * i listan, `plan` vad som spelas och vad som saknas.
+ * Hela given att välja i steget Scen: för varje vy där `dealer` har cykelklipp i registret, rundan som spelkärnan har
+ * delat (`dealt`, ur /api/runda) som dealerfilm, med klippen valda som src/pipeline/runda.ts och Casinot väljer dem
+ * (dealsOf och planRound i src/scene/round.ts). Kort utan klipp går självt. `key` är valets värde i listan, `plan` vad
+ * som spelas och vad som saknas.
  */
 export type RoundChoice = { key: string; label: string; view: SeatView; plan: Plan; dealer: FilmNote };
 
-export function roundChoices(registry: Registry, dealer: string, round: Round, seats: number[]): RoundChoice[] {
+export function roundChoices(registry: Registry, dealer: string, dealt: DealtRound, round: Round, seats: number[]): RoundChoice[] {
   const views: SeatView[] = [{ kind: 'spelaren' }, ...seats.map((seat): SeatView => ({ kind: 'plats', seat }))];
+  const deals = dealsOf(dealt.steps);
   return views.flatMap((view): RoundChoice[] => {
-    const plan = planRound(round, registry.assets, dealer, view);
-    if (plan.clips.length === 0) return [];
+    const plan = planRound(deals, registry.assets, dealer, view, round.fallback);
+    const filmed = plan.dealt.filter((deal) => deal.file !== null).length;
+    if (filmed === 0) return [];
     const name = view.kind === 'plats' ? `Plats ${view.seat}` : 'Spelaren';
-    const count = plan.missing.length === 0 ? `${plan.clips.length} kort` : `${plan.clips.length} av ${round.order.length} kort`;
+    const count = plan.missing.length === 0 ? `${plan.dealt.length} kort` : `${plan.dealt.length} kort, ${plan.missing.length} utan klipp`;
     return [{ key: `runda:${view.kind === 'plats' ? `plats-${view.seat}` : 'spelaren'}`, label: `Hela given ur ${name} (${count})`, view, plan, dealer: roundFilm(plan, round, view) }];
   });
 }

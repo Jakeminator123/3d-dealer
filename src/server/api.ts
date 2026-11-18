@@ -1,11 +1,16 @@
-// Serverns egna vägar: registret, filerna i assets/ och deras förhandsbilder, och förlagorna som scenen sparar.
+// Serverns egna vägar: registret, filerna i assets/ och deras förhandsbilder, förlagorna som scenen sparar, och
+// spelsessionen (game.ts): Casinots runda mot spelkärnan, och rundan som Labbet och runda.ts visar.
 // Allt annat lämnas vidare (till Vite, som sköter sidorna).
 
+import { readFileSync } from 'node:fs';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { join } from 'node:path';
+import { SessionError } from '../engine/session.ts';
 import { ForlagaError, saveFrame, startForlaga } from '../pipeline/forlaga.ts';
 import { assetsDir, RegistryError, setStatus, setWords, stamp, viewRegistry } from '../pipeline/registry.ts';
+import { readRound, RoundError } from '../pipeline/runda.ts';
 import { pathInside, sendFile, sendJson, sendText } from './files.ts';
+import { createGame, dealRound, type GameOptions } from './game.ts';
 import { canThumbnail, thumbnail } from './thumbs.ts';
 
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
@@ -74,7 +79,15 @@ function decodeName(part: string): string {
 }
 
 /** Ett fel i en ändring som den som frågade kan rätta. Andra fel är serverns egna. */
-const askersFault = (error: unknown): error is Error => error instanceof RegistryError || error instanceof ForlagaError || error instanceof RequestError;
+const askersFault = (error: unknown): error is Error =>
+  error instanceof RegistryError || error instanceof ForlagaError || error instanceof RequestError || error instanceof RoundError;
+
+/** Ett fröord i en adress eller ett kommando: 1–200 tecken, eller inget. */
+function seedOf(value: unknown): string | undefined {
+  if (value === undefined || value === null || value === '') return undefined;
+  if (typeof value !== 'string' || value.length > 200) throw new RequestError('Fröet ska vara en text på 1–200 tecken');
+  return value;
+}
 
 /** Skälet till ett fel som serverns, skrivet så att det går att förstå i Labbet utan att se i terminalen. */
 function serversReason(error: unknown): string {
@@ -91,8 +104,11 @@ export type Api = (request: IncomingMessage, response: ServerResponse) => Promis
  * `now` ger tiden som den skrivs i registret, "ÅÅÅÅ-MM-DD TT:MM".
  * Varje fel svaras med sitt skäl: 400 när en ändring är fel ställd, annars 500 (JSON under /api/, text annars).
  */
-export function createApi(root: string, now: () => string = stamp): Api {
+export function createApi(root: string, now: () => string = stamp, gameOptions: GameOptions = {}): Api {
   const assets = assetsDir(root);
+  // Casinots spelsession: en för hela servern, så länge den kör.
+  const game = createGame(gameOptions);
+  const round = () => readRound(JSON.parse(readFileSync(join(root, 'content', 'runda.json'), 'utf8')));
 
   return async (request, response) => {
     const url = new URL(request.url ?? '/', 'http://localhost');
@@ -142,6 +158,30 @@ export function createApi(root: string, now: () => string = stamp): Api {
       if (!sentByOwnPage(request, starting ? 'application/json' : 'image/png')) return sendText(response, 403, 'Förlagor tas bara emot från Labbets egen sida');
       if (starting) sendJson(response, 200, startForlaga(root, await readJson(request)));
       else sendJson(response, 200, { saved: await saveFrame(root, decodeName(first!), Number(second), await readBody(request, FRAME_LIMIT), now()) });
+    } else if (path === '/api/game' && reading) {
+      // Bordet: sessionens läge och rundans steg hittills. Hålkortet är aldrig med före sin reveal (session.ts).
+      sendJson(response, 200, game.table());
+    } else if ((path === '/api/game' || path === '/api/game/ny') && request.method === 'POST') {
+      if (!sentByOwnPage(request)) return sendText(response, 403, 'Spelet tar bara emot kommandon från studions egna sidor');
+      const body = await readJson(request);
+      try {
+        if (path === '/api/game/ny') sendJson(response, 200, game.reset({ seed: seedOf((body as { seed?: unknown } | null)?.seed) }));
+        else sendJson(response, 200, game.command(body));
+      } catch (error) {
+        // Kärnans nej, med dess kod och skäl: ett fel i kommandot, ett gammalt kommando eller en regel.
+        if (!(error instanceof SessionError)) throw error;
+        sendJson(response, error.status, { error: error.message, code: error.code });
+      }
+    } else if (path === '/api/runda' && reading) {
+      // Rundan som Labbet och runda.ts visar: delad av spelkärnan efter content/runda.json, med ett annat frö om det sägs.
+      const { deal } = round();
+      let seed: string | undefined;
+      try {
+        seed = seedOf(url.searchParams.get('fro'));
+      } catch (error) {
+        return sendJson(response, 400, { error: (error as Error).message });
+      }
+      sendJson(response, 200, dealRound({ ...deal, seed: seed ?? deal.seed }));
     } else if (own === '/media/' && reading) {
       const file = pathInside(assets, path.slice(own.length));
       if (file) sendFile(request, response, file);

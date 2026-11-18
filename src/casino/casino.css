@@ -1,0 +1,244 @@
+:root {
+  --ground: #0d0e10;
+  --panel: #16181c;
+  --raised: #1f2227;
+  --line: #2a2d34;
+  --text: #e6e7ea;
+  --dim: #9a9ea8;
+  --accent: #d9b45a;
+  --yes: #4fb477;
+  --no: #e06c6c;
+  --warn: #e0b05c;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--ground);
+  color: var(--text);
+  font: 15px/1.45 system-ui, 'Segoe UI', sans-serif;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  padding: 7px 14px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--raised);
+}
+
+button:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+button[aria-pressed='true'] {
+  border-color: var(--accent);
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+button.go {
+  border-color: var(--accent);
+  color: #1a1608;
+  background: var(--accent);
+  font-weight: 600;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.casino {
+  display: grid;
+  grid-template-rows: 52px minmax(0, 1fr);
+  height: 100%;
+}
+
+.casinotop {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.brand {
+  font-weight: 600;
+}
+
+.brand span {
+  color: var(--dim);
+  font-weight: 400;
+  margin-left: 6px;
+}
+
+.purse strong {
+  margin-left: 6px;
+  color: var(--accent);
+  font-size: 17px;
+}
+
+.elsewhere {
+  margin-left: auto;
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+
+.notice {
+  margin: 0;
+  padding: 32px;
+  color: var(--dim);
+}
+
+.room {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  min-height: 0;
+}
+
+.tableview {
+  display: grid;
+  place-items: center;
+  min-height: 0;
+  container-type: size;
+  background: #000;
+}
+
+.stage {
+  position: relative;
+}
+
+.stage .layer {
+  position: absolute;
+  inset: 0;
+}
+
+.stage canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.panel {
+  display: grid;
+  gap: 10px;
+  padding: 14px 20px 16px;
+  border-top: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.label {
+  color: var(--dim);
+}
+
+.say {
+  font-weight: 600;
+}
+
+.seats {
+  display: flex;
+  gap: 4px;
+}
+
+.seats button {
+  min-width: 38px;
+  padding: 7px 0;
+}
+
+.stake {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stake input {
+  width: 86px;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--ground);
+  color: var(--text);
+  font: inherit;
+}
+
+.hands {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.hand {
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 2px 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--raised);
+}
+
+.hand .cards {
+  font-size: 17px;
+  letter-spacing: 0.02em;
+}
+
+.hand .total {
+  font-weight: 600;
+}
+
+.hand .stakeinfo {
+  color: var(--dim);
+}
+
+.hand .outcome {
+  grid-column: 1 / -1;
+  font-weight: 600;
+}
+
+.hand[data-outcome='win'] .outcome,
+.hand[data-outcome='blackjack'] .outcome {
+  color: var(--yes);
+}
+
+.hand[data-outcome='lose'] .outcome {
+  color: var(--no);
+}
+
+.warning {
+  margin: 0;
+  color: var(--warn);
+}
+
+.missing,
+.fine {
+  margin: 0;
+  color: var(--dim);
+  font-size: 13px;
+}

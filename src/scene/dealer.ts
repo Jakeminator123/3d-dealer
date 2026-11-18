@@ -4,22 +4,38 @@
 import type { SeatView } from './geometry.ts';
 
 /**
- * Kortet ett klipp lägger: platsen (1–7), vilket av platsens kort (0 är det första), vad kortet är (till exempel `A♠`),
- * och tiden i klippet, i sekunder, då det ligger på kortplatsen (registrets `lands.at`). Från den tiden tas klippets blå
- * märkkort bort och scenens kort ligger där, till följdens slut.
+ * Var ett kort ligger: platsen (1–7, eller `D` för dealern), vilken av platsens händer (0 är den första; en delad hand
+ * får nästa) och kortets nummer i handen, 0 för det första. Kortplatsen räknas ur content/scene.json (spotPlace i
+ * round.ts). Utan `hand` är det platsens första hand.
  */
-export type ClipCard = { seat: number; index: number; face: string; at: number };
+export type CardSpot = { seat: number | 'D'; index: number; hand?: number };
 
-/** Ett klipp i dealerns film: filen som registrets `file`, och kortet klippet lägger, om det lägger ett. */
-export type FilmClip = { file: string; card?: ClipCard };
+/**
+ * Kortet ett klipp lägger: var det ligger, vad kortet är (till exempel `A♠`), och tiden i klippet, i sekunder, då det
+ * ligger på kortplatsen (registrets `lands.at`). Från den tiden tas klippets blå märkkort bort och scenens kort ligger
+ * där, till följdens slut. Ett senare kort på samma kortplats tar det tidigares plats: så vänds hålkortet.
+ * `face` null är ett kort med baksidan upp, hålkortet innan det vänds: spelkärnan har inte sagt vad det är.
+ */
+export type ClipCard = CardSpot & { face: string | null; at: number };
+
+/**
+ * Ett klipp i dealerns film: filen som registrets `file`, och kortet klippet lägger, om det lägger ett.
+ *
+ * Utan fil (`file: null`) är det spelkärnans `fallback`: ett kort som saknar klipp. Dealern står då i REDO (filmens ruta
+ * står kvar) i `seconds` sekunder medan scenens kort glider dit självt, från `from`: skons mynning (`skon`), en annan
+ * kortplats (ett kort som flyttas när en hand delas), eller samma kortplats (kortet vänds där det ligger). Kortet ligger
+ * från `card.at`.
+ */
+export type FilmClip = { file: string; card?: ClipCard } | { file: null; seconds: number; card: ClipCard; from: CardSpot | 'skon' };
 
 /**
  * En dealerfilm: en följd av klipp av dealern på grön skärm, alla gjorda i närbilden av vyn `view` med scenens bord
  * framför sig och projicerade därifrån på den vikta ytan. Klippen spelas efter varandra utan glapp, och varje kort
  * ligger kvar från att det har landat tills följden är slut. Efter sista klippet står filmens sista ruta kvar i `hold`
- * sekunder. Ett ensamt klipp är en följd med ett klipp; en stillbild kan bara stå ensam.
+ * sekunder, och sedan börjar följden om; med `loop: false` står den kvar där. Ett ensamt klipp är en följd med ett
+ * klipp; en stillbild kan bara stå ensam.
  */
-export type FilmNote = { kind: 'film'; view: SeatView; clips: FilmClip[]; hold?: number };
+export type FilmNote = { kind: 'film'; view: SeatView; clips: FilmClip[]; hold?: number; loop?: boolean };
 
 /**
  * Ett ensamt klipp skrivet som förr: filen här, och kortet bredvid i beställningen (`card`, CardNote). Det läses som en
@@ -34,15 +50,25 @@ export type OneClipNote = { kind: 'film'; file: string; view: SeatView };
  *   rörelsen (`giv`) eller sitter i vila med händerna på filten (`vila`). Med `seat` ställs rörelsen om till den
  *   platsen: kortet hämtas på samma ställe i skon och läggs på den platsens första kortplats, eller på kortplatsen
  *   `index` (0 är den första). `move` kan också vara en cykel (content/moves/cykel-*.json): given i cykelns takt,
- *   och handen tillbaka till REDO.
+ *   och handen tillbaka till REDO. `seat` är 1–7 eller `D` för dealerns egna kort, och `action` vad en cykel gör med
+ *   kortet: `deal` (om inget sägs), `hole` (hålkortet med baksidan upp) eller `flip` (hålkortet vänds där det ligger).
  */
-export type DealerNote = FilmNote | OneClipNote | { kind: 'docka'; move: string; pose: 'giv' | 'vila'; seat?: number; index?: number };
+export type DealerNote =
+  | FilmNote
+  | OneClipNote
+  | { kind: 'docka'; move: string; pose: 'giv' | 'vila'; seat?: number | 'D'; index?: number; action?: 'deal' | 'hole' | 'flip' };
 
 /**
  * Kortet till ett ensamt klipp skrivet som förr (OneClipNote): platsen, vilket av platsens kort, vad kortet är, och från
  * vilken tid i filmen det ligger där.
  */
 export type CardNote = { seat: number; index: number; face: string; from: number };
+
+/** Om två kortplatser är samma. */
+export const sameSpot = (a: CardSpot, b: CardSpot): boolean => a.seat === b.seat && a.index === b.index && (a.hand ?? 0) === (b.hand ?? 0);
+
+/** En kortplats som ord, för en nyckel eller en utskrift: `4/0/1` är plats 4, första handen, andra kortet. */
+export const spotKey = (spot: CardSpot): string => `${spot.seat}/${spot.hand ?? 0}/${spot.index}`;
 
 /** En dealerfilm som följd: ett ensamt klipp skrivet som förr blir en följd med ett klipp, med kortet `card`. */
 export function filmOf(note: FilmNote | OneClipNote, card?: CardNote | null): FilmNote {

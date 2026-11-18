@@ -44,10 +44,19 @@ export type SceneDescription = {
   background: Marked & { liftDeg: number };
   /**
    * Rummet som en 360-bild visas som: hur högt över golvet bilden antas vara tagen och hur långt bort väggarna ligger,
-   * båda i meter och startvärden för reglagen. Skuggan under bordet: hur långt utanför bordets fotavtryck den tonar ut,
-   * i meter, och hur stor andel av ljuset den som mest tar bort.
+   * båda i meter och startvärden för reglagen. `captureHeights` är höjden för en bakgrund som har en egen, med registrets
+   * file (captureHeightOf i backdrop.ts). Skuggan under bordet: hur långt utanför bordets fotavtryck den tonar ut, i meter,
+   * och hur stor andel av ljuset den som mest tar bort. `dealerShadow` är dealerns skugga på filten (key.ts): hur långt
+   * mot spelaren och hur mjukt, i meter, och hur stor andel av ljuset den som mest tar bort.
    */
-  room: Marked & { captureHeight: number; radius: number; shadowReach: number; shadowStrength: number };
+  room: Marked & {
+    captureHeight: number;
+    captureHeights: Record<string, number>;
+    radius: number;
+    shadowReach: number;
+    shadowStrength: number;
+    dealerShadow: { offset: number; blur: number; strength: number };
+  };
   /**
    * Ateljén som ankarnas underlag sparas i: färgerna på skärm, bord och rutnät (0–255 per kanal), och rutnätet på filten i
    * meter: avståndet mellan linjerna, linjens bredd, hur långt åt sidorna och från dealerns bordskant mot spelaren det når,
@@ -63,9 +72,10 @@ export type SceneDescription = {
    * Dealerfilmen. `lift` är hur högt över filten den liggande delen ritas. Resten beskriver närbilden, den ruta en
    * dealerfilm görs i ur en vy: `frame` är rutan, och `reach` är arbetsytan som ska rymmas i den, i meter: i sidled vid
    * bordskanten (`x`), uppåt över filten vid dealern (`top`), bakom dealerns bordskant (`behind`) och förbi varje
-   * kortplats på filten (`past`). `margin` är luften mot rutans kant, som andel av rutan.
+   * kortplats på filten (`past`), för de `cards` första kortplatserna på varje plats och hos dealern: fler kortplatser
+   * flyttar inte närbilden. `margin` är luften mot rutans kant, som andel av rutan.
    */
-  film: Marked & { lift: number; frame: Frame; reach: { x: [number, number]; top: number; behind: number; past: number }; margin: number };
+  film: Marked & { lift: number; frame: Frame; reach: { x: [number, number]; top: number; behind: number; past: number; cards: number }; margin: number };
   /**
    * Kortet: bredd, höjd, tjocklek och hörnradie, och hur högt över filten scenens kort ritas (under `film.lift`); en
    * kortplats andra kort ligger en tjocklek högre. `colours` är framsidan, dess kant och baksidan, 0–255 per kanal.
@@ -77,6 +87,8 @@ export type SceneDescription = {
     corner: number;
     lift: number;
     colours: { face: [number, number, number]; edge: [number, number, number]; back: [number, number, number] };
+    /** Skuggan mot filten där kortet ligger (cards.ts): hur långt ut den når och hur mycket mot spelaren, i meter, och hur mörk. */
+    shadow: { reach: number; strength: number; offset: number };
   };
   /** Kortplatser: kortets mitt på filten, för dealern och för varje spelarplats, i den ordning korten läggs. */
   places: Marked & { dealer: FeltPoint[]; seats: { seat: number; cards: FeltPoint[] }[] };
@@ -126,6 +138,15 @@ export function readScene(value: unknown): SceneDescription {
   marked(background, 'background');
   need(isNumber(room?.captureHeight) && room.captureHeight > 0 && isNumber(room?.radius) && room.radius > 0, 'room.captureHeight och room.radius');
   need(isNumber(room?.shadowReach) && room.shadowReach > 0 && isNumber(room?.shadowStrength), 'room.shadowReach och room.shadowStrength');
+  need(
+    typeof room?.captureHeights === 'object' && room.captureHeights !== null && Object.values(room.captureHeights).every((height) => isNumber(height) && height > 0),
+    'room.captureHeights: en höjd över noll för varje bakgrund',
+  );
+  const share = (value: unknown): boolean => isNumber(value) && value >= 0 && value <= 1;
+  need(
+    isNumber(room?.dealerShadow?.offset) && isNumber(room?.dealerShadow?.blur) && room.dealerShadow.blur > 0 && share(room?.dealerShadow?.strength),
+    'room.dealerShadow',
+  );
   marked(room, 'room');
   const isRgb = (value: unknown): boolean => isPoint(value, 3) && (value as number[]).every((part) => part >= 0 && part <= 255);
   need([studio?.colours?.screen, studio?.colours?.table, studio?.colours?.grid].every(isRgb), 'studio.colours');
@@ -136,7 +157,8 @@ export function readScene(value: unknown): SceneDescription {
   need(isNumber(film?.lift), 'film.lift');
   need(isFrame(film?.frame), 'film.frame');
   need(
-    isPoint(film?.reach?.x, 2) && film!.reach.x[0] < film!.reach.x[1] && [film?.reach?.top, film?.reach?.behind, film?.reach?.past].every((value) => isNumber(value) && value > 0),
+    isPoint(film?.reach?.x, 2) && film!.reach.x[0] < film!.reach.x[1] && [film?.reach?.top, film?.reach?.behind, film?.reach?.past].every((value) => isNumber(value) && value > 0) &&
+      Number.isInteger(film?.reach?.cards) && film!.reach.cards >= 1,
     'film.reach',
   );
   need(isNumber(film?.margin) && film.margin >= 0 && film.margin < 0.5, 'film.margin');
@@ -149,6 +171,7 @@ export function readScene(value: unknown): SceneDescription {
     'card.lift, under film.lift också för kortplatsens sista kort',
   );
   need([card?.colours?.face, card?.colours?.edge, card?.colours?.back].every(isRgb), 'card.colours');
+  need(isNumber(card?.shadow?.reach) && card.shadow.reach > 0 && share(card?.shadow?.strength) && isNumber(card?.shadow?.offset), 'card.shadow');
   marked(card, 'card');
   need(Array.isArray(places?.dealer) && places.dealer.every((point) => isPoint(point, 2)), 'places.dealer');
   need(

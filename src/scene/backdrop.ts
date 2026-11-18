@@ -14,8 +14,16 @@
 // oskärpa har ingen enhet som går att föra över från gamla projektets värden, och den håller en stor extra yta per bild.
 
 import * as THREE from 'three';
-import type { FeltPoint, Vec3 } from './description.ts';
+import type { FeltPoint, SceneDescription, Vec3 } from './description.ts';
 import type { Eye } from './geometry.ts';
+
+/**
+ * Hur många meter över golvet en 360-bild antas vara tagen: bakgrundens egen höjd när scenen har en
+ * (`room.captureHeights`, med registrets file), annars scenens (`room.captureHeight`). Startvärdet för `height` nedan.
+ */
+export function captureHeightOf(scene: SceneDescription, file: string): number {
+  return scene.room.captureHeights[file] ?? scene.room.captureHeight;
+}
 
 /**
  * En bakgrund och hur den visas. `turn`: grader kring lodlinjen; 0 ställer bildens mitt rakt bakom dealern, och ett positivt

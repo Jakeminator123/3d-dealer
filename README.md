@@ -2,7 +2,7 @@
 
 Lokal studio för filmade blackjackdealers i en 3D-scen. Första dealern är Paulina.
 
-Två lägen delar samma scen: **Labbet**, där en dealer skapas och granskas, och **Casinot**, där man spelar på riktigt mot spelkärnan.
+Två lägen delar samma scen: **Labbet** (http://localhost:5310/lab/), där en dealer skapas och granskas, och **Casinot** (http://localhost:5310/casino/), där man spelar en runda mot spelkärnan: välj plats och insats, Dela, och sedan de handlingar kärnan erbjuder.
 
 ## Starta
 
@@ -16,7 +16,7 @@ npm start
 
 `npm run dev` kör servern i en terminal i stället; Ctrl+C stoppar. Servern svarar bara på den här datorn och startar om sig själv när dess kod ändras, och Labbets sida laddar då om sig. `PORT` väljer en annan port. `npm test` kör testerna och `npm run typecheck` typkontrollen.
 
-Kommandona för produktionen (`node src/pipeline/shoot.ts` för förlagor, `npm run reg` för registret) står i [docs/production.md](docs/production.md) och [AGENTS.md](AGENTS.md). Läget står i [docs/status.md](docs/status.md).
+Kommandona för produktionen (`node src/pipeline/shoot.ts` för förlagor, `node src/pipeline/runda.ts` för en runda som film, `npm run reg` för registret) står i [docs/production.md](docs/production.md) och [AGENTS.md](AGENTS.md). Läget står i [docs/status.md](docs/status.md).
 
 ## Karta
 
@@ -25,9 +25,9 @@ Kommandona för produktionen (`node src/pipeline/shoot.ts` för förlagor, `npm 
 | `src/engine` | Spelkärnan: regler, sko, slump och signaler. Inget gränssnitt. | ja |
 | `src/scene` | Den gemensamma 3D-scenen och uppspelningen: bord, sko, kort, marker, dealerfilm, kameror. | ja |
 | `src/lab` | Labbet. | ja |
-| `src/casino` | Casinot. Inte byggt; mappen finns inte än. | – |
-| `src/pipeline` | Vägen från scen till film: förlaga och registret. | ja |
-| `src/server` | Liten lokal server: registret, filerna och förlagorna. Spelsessionen kommer hit. | ja |
+| `src/casino` | Casinot: en runda mot spelkärnan i vyn Spelaren. | ja |
+| `src/pipeline` | Vägen från scen till film: förlaga, rundan som film och registret. | ja |
+| `src/server` | Liten lokal server: registret, filerna, förlagorna och spelsessionen (spelkärnan körs här). | ja |
 | `content/` | Små data som styr allt: scen, docka, rörelser, och registret (`register.db`, en databas). | ja |
 | `assets/` | Bilder, filmer och modeller. Varje fil har en post i registret. | nej |
 | `docs/` | Fyra dokument, ett ämne var. | ja |

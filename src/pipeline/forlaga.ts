@@ -7,7 +7,7 @@ import { execFile } from 'node:child_process';
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { promisify } from 'node:util';
-import type { CardNote, ClipCard, DealerNote as Dealer, FilmClip, FilmNote, OneClipNote, Rgb, Studio } from '../scene/dealer.ts';
+import type { CardNote, CardSpot, ClipCard, DealerNote as Dealer, FilmClip, FilmNote, OneClipNote, Rgb, Studio } from '../scene/dealer.ts';
 import type { Frame, Vec3 } from '../scene/description.ts';
 import { viewName, type SeatView, type View } from '../scene/geometry.ts';
 
@@ -85,9 +85,9 @@ const stem = (file: string): string => slug(file.split(/[\\/]/).at(-1)!.replace(
 // En följd heter efter sitt första klipp och hur många klipp den har; ett ensamt klipp heter som sin fil.
 const dealerName = (dealer: DealerNote): string =>
   dealer.kind === 'docka'
-    ? slug(`docka-${dealer.pose === 'vila' ? 'vila' : `${dealer.move}${dealer.seat === undefined ? '' : `-till-${dealer.seat}`}${dealer.index === undefined ? '' : `-kort-${dealer.index}`}`}`)
+    ? slug(`docka-${dealer.pose === 'vila' ? 'vila' : `${dealer.move}${dealer.action && dealer.action !== 'deal' ? `-${dealer.action}` : ''}${dealer.seat === undefined ? '' : `-till-${dealer.seat}`}${dealer.index === undefined ? '' : `-kort-${dealer.index}`}`}`)
     : 'clips' in dealer
-      ? `${stem(dealer.clips[0]?.file ?? '')}${dealer.clips.length > 1 ? `-och-${dealer.clips.length - 1}-till` : ''}`
+      ? `${stem(dealer.clips.find((clip) => clip.file !== null)?.file ?? 'utan-klipp')}${dealer.clips.length > 1 ? `-och-${dealer.clips.length - 1}-till` : ''}`
       : stem(dealer.file);
 
 /**
@@ -142,22 +142,39 @@ const MOVE = /^[a-z0-9][a-z0-9-]{0,79}$/;
 const MOST_CLIPS = 64;
 
 const isFace = (face: unknown): face is string => typeof face === 'string' && face.length >= 2 && face.length <= 3;
+const isSpot = (spot: Partial<CardSpot> | undefined): boolean =>
+  ((Number.isInteger(spot?.seat) && (spot!.seat as number) > 0) || spot?.seat === 'D') &&
+  Number.isInteger(spot!.index) &&
+  spot!.index! >= 0 &&
+  (spot!.hand === undefined || (Number.isInteger(spot!.hand) && spot!.hand >= 0));
 const isClipCard = (card: Partial<ClipCard> | undefined): card is ClipCard =>
-  Number.isInteger(card?.seat) && card!.seat! > 0 && Number.isInteger(card!.index) && card!.index! >= 0 && isFace(card!.face) && isNumber(card!.at) && card!.at >= 0;
+  isSpot(card) && (card!.face === null || isFace(card!.face)) && isNumber(card!.at) && card!.at >= 0;
+// Ett klipp är en fil med sitt kort, eller en del utan fil där kortet går självt (spelkärnans fallback).
 const isClip = (clip: Partial<FilmClip> | undefined): clip is FilmClip =>
-  typeof clip?.file === 'string' && clip.file !== '' && (clip.card === undefined || isClipCard(clip.card));
+  clip?.file === null
+    ? isNumber(clip.seconds) && clip.seconds > 0 && isClipCard(clip.card) && (clip.from === 'skon' || isSpot(clip.from as Partial<CardSpot>))
+    : typeof clip?.file === 'string' && clip.file !== '' && (clip.card === undefined || isClipCard(clip.card));
+const spotOf = (spot: CardSpot): CardSpot => ({ seat: spot.seat, index: spot.index, ...(spot.hand ? { hand: spot.hand } : {}) });
 
 function isDealer(dealer: Partial<DealerNote> | null | undefined): dealer is DealerNote {
   if (!dealer || !(dealer.time === undefined || isNumber(dealer.time))) return false;
   if (dealer.kind === 'docka') {
-    const seated = dealer.seat === undefined || (Number.isInteger(dealer.seat) && dealer.seat > 0);
+    const seated = dealer.seat === undefined || dealer.seat === 'D' || (Number.isInteger(dealer.seat) && dealer.seat > 0);
     const placed = dealer.index === undefined || (Number.isInteger(dealer.index) && dealer.index >= 0);
-    return typeof dealer.move === 'string' && MOVE.test(dealer.move) && (dealer.pose === 'giv' || dealer.pose === 'vila') && seated && placed;
+    const acting = dealer.action === undefined || dealer.action === 'deal' || dealer.action === 'hole' || dealer.action === 'flip';
+    return typeof dealer.move === 'string' && MOVE.test(dealer.move) && (dealer.pose === 'giv' || dealer.pose === 'vila') && seated && placed && acting;
   }
   if (dealer.kind !== 'film' || !isSeatView(dealer.view)) return false;
   if ('clips' in dealer) {
-    const { clips, hold } = dealer as Partial<FilmNote>;
-    return Array.isArray(clips) && clips.length >= 1 && clips.length <= MOST_CLIPS && clips.every(isClip) && (hold === undefined || (isNumber(hold) && hold >= 0));
+    const { clips, hold, loop } = dealer as Partial<FilmNote>;
+    return (
+      Array.isArray(clips) &&
+      clips.length >= 1 &&
+      clips.length <= MOST_CLIPS &&
+      clips.every(isClip) &&
+      (hold === undefined || (isNumber(hold) && hold >= 0)) &&
+      (loop === undefined || typeof loop === 'boolean')
+    );
   }
   const { file } = dealer as Partial<OneClipNote>;
   return typeof file === 'string' && file !== '';
@@ -166,14 +183,31 @@ function isDealer(dealer: Partial<DealerNote> | null | undefined): dealer is Dea
 function dealerNote(dealer: DealerNote): DealerNote {
   const time = dealer.time === undefined ? {} : { time: dealer.time };
   if (dealer.kind === 'docka') {
-    return { kind: 'docka', move: dealer.move, pose: dealer.pose, ...(dealer.seat === undefined ? {} : { seat: dealer.seat }), ...(dealer.index === undefined ? {} : { index: dealer.index }), ...time };
+    return {
+      kind: 'docka',
+      move: dealer.move,
+      pose: dealer.pose,
+      ...(dealer.seat === undefined ? {} : { seat: dealer.seat }),
+      ...(dealer.index === undefined ? {} : { index: dealer.index }),
+      ...(dealer.action === undefined || dealer.action === 'deal' ? {} : { action: dealer.action }),
+      ...time,
+    };
   }
   if ('clips' in dealer) {
-    const clips = dealer.clips.map((clip) => ({
-      file: clip.file,
-      ...(clip.card ? { card: { seat: clip.card.seat, index: clip.card.index, face: clip.card.face, at: clip.card.at } } : {}),
-    }));
-    return { kind: 'film', view: seatView(dealer.view), clips, ...(dealer.hold === undefined ? {} : { hold: dealer.hold }), ...time };
+    const cardOf = (card: ClipCard): ClipCard => ({ ...spotOf(card), face: card.face, at: card.at });
+    const clips = dealer.clips.map((clip): FilmClip =>
+      clip.file === null
+        ? { file: null, seconds: clip.seconds, card: cardOf(clip.card), from: clip.from === 'skon' ? 'skon' : spotOf(clip.from) }
+        : { file: clip.file, ...(clip.card ? { card: cardOf(clip.card) } : {}) },
+    );
+    return {
+      kind: 'film',
+      view: seatView(dealer.view),
+      clips,
+      ...(dealer.hold === undefined ? {} : { hold: dealer.hold }),
+      ...(dealer.loop === undefined ? {} : { loop: dealer.loop }),
+      ...time,
+    };
   }
   return { kind: 'film', file: dealer.file, view: seatView(dealer.view), ...time };
 }

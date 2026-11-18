@@ -79,46 +79,61 @@ test('dealerna att välja mellan är dealerns egna dealerfilmer, filmerna först
   assert.deepEqual(dealerChoices(registryOf([]), 'paulina'), []);
 });
 
-test('hela given att välja: varje vy med cykelklipp, klippen i rundans ordning med rundans valörer, och vad som saknas', () => {
+test('hela given att välja: varje vy med cykelklipp, rundan som spelkärnan delade med dess valörer, och vad som saknas', () => {
   const cycle = (file: string, seat: number, index: number, more: Record<string, unknown> = {}) =>
     asset(`dealers/paulina/clips/${file}`, 'clips', { dealer: 'paulina', use: 'dealerfilm', pose: 'redo → redo', status: 'godkänd', view: { kind: 'spelaren' }, lands: { seat, index, at: 1.9 }, seconds: 4, ...more });
   const round = {
-    order: [
-      { seat: 1, index: 0 },
-      { seat: 2, index: 0 },
-      { seat: 1, index: 1 },
-    ],
-    faces: ['A♠', 'K♥', '7♦'],
+    deal: { seed: 'prov', bets: [{ seat: 1, main: 10 }], hitBelow: 15 },
+    fallback: { seconds: 1.2, turn: 0.8, move: 0.8 },
     film: { background: 'scene/backgrounds/prov-rum.jpg', fps: 24, hold: 1.5 },
   };
+  // Spelkärnans start: plats 1 får A♠, dealern 9♦ upp, plats 1 K♥, och hålkortet. Bara det rundan läser är ifyllt.
+  const seatCard = (cardIndex: number, r: string, s: string, shoeDraw: number) => ({ type: 'deal', to: 'seat', seat: 1, hand: 0, cardIndex, card: { r, s }, faceDown: false, shoeDraw });
+  const dealt = {
+    seed: 'prov',
+    bets: round.deal.bets,
+    hitBelow: 15,
+    steps: [
+      {
+        op: 'start',
+        events: [
+          seatCard(0, 'A', '♠', 2),
+          { type: 'deal', to: 'dealer', seat: null, hand: null, cardIndex: 0, card: { r: '9', s: '♦' }, faceDown: false, shoeDraw: 3 },
+          seatCard(1, 'K', '♥', 4),
+          { type: 'deal', to: 'dealer', seat: null, hand: null, cardIndex: 1, card: null, faceDown: true, shoeDraw: 5 },
+        ],
+        view: { round: { hands: [{ seat: 1, hand: 0, cards: [{ r: 'A', s: '♠', shoeDraw: 2 }, { r: 'K', s: '♥', shoeDraw: 4 }] }] } },
+      },
+    ],
+    result: { before: 1000, after: 1015, settle: null },
+  } as unknown as Parameters<typeof roundChoices>[2];
   const registry = registryOf([
-    cycle('prov-2-0.mp4', 2, 0),
     cycle('prov-1-0.mp4', 1, 0),
     cycle('prov-1-1.mp4', 1, 1),
     cycle('prov-p7-1-0.mp4', 1, 0, { view: { kind: 'plats', seat: 7 } }),
-    cycle('prov-saknas.mp4', 2, 0, { view: { kind: 'plats', seat: 7 }, present: false }),
+    cycle('prov-saknas.mp4', 1, 1, { view: { kind: 'plats', seat: 7 }, present: false }),
   ]);
-  const choices = roundChoices(registry, 'paulina', round, [1, 2, 3, 4, 5, 6, 7]);
+  const choices = roundChoices(registry, 'paulina', dealt, round, [1, 2, 3, 4, 5, 6, 7]);
   assert.deepEqual(
     choices.map((choice) => [choice.key, choice.label]),
     [
-      ['runda:spelaren', 'Hela given ur Spelaren (3 kort)'],
-      ['runda:plats-7', 'Hela given ur Plats 7 (1 av 3 kort)'],
+      ['runda:spelaren', 'Hela given ur Spelaren (4 kort, 2 utan klipp)'],
+      ['runda:plats-7', 'Hela given ur Plats 7 (4 kort, 3 utan klipp)'],
     ],
   );
-  // Samma dealerfilm som runda.ts beställer: klippen i rundans ordning, med korten och sista rutan kvar hold sekunder.
+  // Samma dealerfilm som runda.ts beställer: korten i spelkärnans ordning, dealerns utan klipp, och sista rutan kvar hold sekunder.
   assert.deepEqual(choices[0]!.dealer, {
     kind: 'film',
     view: { kind: 'spelaren' },
     clips: [
       { file: 'dealers/paulina/clips/prov-1-0.mp4', card: { seat: 1, index: 0, face: 'A♠', at: 1.9 } },
-      { file: 'dealers/paulina/clips/prov-2-0.mp4', card: { seat: 2, index: 0, face: 'K♥', at: 1.9 } },
-      { file: 'dealers/paulina/clips/prov-1-1.mp4', card: { seat: 1, index: 1, face: '7♦', at: 1.9 } },
+      { file: null, seconds: 1.2, card: { seat: 'D', index: 0, face: '9♦', at: 1.2 }, from: 'skon' },
+      { file: 'dealers/paulina/clips/prov-1-1.mp4', card: { seat: 1, index: 1, face: 'K♥', at: 1.9 } },
+      { file: null, seconds: 1.2, card: { seat: 'D', index: 1, face: null, at: 1.2 }, from: 'skon' },
     ],
     hold: 1.5,
   });
   // En post vars fil saknas spelas inte.
-  assert.deepEqual(choices[1]!.plan.missing, [{ seat: 2, index: 0 }, { seat: 1, index: 1 }]);
   assert.deepEqual(choices[1]!.plan.unusable, [{ file: 'dealers/paulina/clips/prov-saknas.mp4', why: 'filen saknas i assets/' }]);
-  assert.deepEqual(roundChoices(registryOf([]), 'paulina', round, [1, 2]), []);
+  assert.deepEqual(roundChoices(registryOf([]), 'paulina', dealt, round, [1, 2]), []);
 });

@@ -428,6 +428,34 @@ test('närbilden står i vyns öga och rymmer dealerns arbetsyta med luft mot ru
   assert.ok(closeUp.focalPx * 0.25 / Math.hypot(player.position[1], scene.player.distance) > 200, 'huvudet blir minst 200 bildpunkter högt');
 });
 
+// Klippen är gjorda genom närbilderna så som de räknades när de gjordes (2026-11-18, före skons flytt och dealerns och
+// spelarnas senare kortplatser). Flyttar sig ögat hamnar klippen fel i scenen. Talen är avlästa ur viewEye då.
+const LOCKED: { view: { kind: 'spelaren'; close: true } | { kind: 'plats'; seat: number; close: true }; position: Vec3; forward: Vec3; focalPx: number }[] = [
+  { view: { kind: 'spelaren', close: true }, position: [0, 0.6, 0.056199999999999806], forward: [0.01781823892179732, -0.18167834580641787, -0.9831965668302396], focalPx: 2065.8972734109907 },
+  { view: { kind: 'plats', seat: 7, close: true }, position: [1.896141525921063, 0.6, -1.0486293029564782], forward: [-0.8724696186533367, -0.17359821776160222, -0.45679363318340666], focalPx: 1936.202296652254 },
+];
+
+test('närbilderna är låsta: Spelarens och Plats 7:s öga är de som klippen gjordes i, och alla kortplatser ligger i dem', () => {
+  for (const { view, position, forward, focalPx } of LOCKED) {
+    const eye = viewEye(scene, view);
+    assert.ok(Math.hypot(...eye.position.map((value, k) => value - position[k]!)) < 1e-12, `${JSON.stringify(view)}: ögats läge`);
+    assert.ok(Math.hypot(...eye.forward.map((value, k) => value - forward[k]!)) < 1e-12, `${JSON.stringify(view)}: ögats riktning`);
+    assert.ok(Math.abs(eye.focalPx - focalPx) < 1e-9, `${JSON.stringify(view)}: brännvidden ${eye.focalPx}`);
+  }
+  // Kortplatserna efter de två första flyttar inte närbilden (film.reach.cards), men de ligger i den ur varje vy.
+  assert.equal(scene.film.reach.cards, 2);
+  const every = [...scene.places.dealer, ...scene.places.seats.flatMap((entry) => entry.cards)];
+  for (const view of [{ kind: 'spelaren' as const }, ...seatsOf(scene).map((seat) => ({ kind: 'plats' as const, seat }))]) {
+    const close = viewEye(scene, { ...view, close: true });
+    for (const place of every) {
+      for (const corner of cardCorners(scene, place)) {
+        const pixel = see(close, corner)!;
+        assert.ok(pixel.x >= 0 && pixel.x <= close.frame.width - 1 && pixel.y >= 0 && pixel.y <= close.frame.height - 1, `${JSON.stringify(view)}: kortplatsen (${place}) i rutan`);
+      }
+    }
+  }
+});
+
 test('den vikta ytan för en dealerfilm rymmer gamla veckets ytor och möts vid bordskanten', () => {
   const { upright, felt } = foldSurfaces(scene);
   const old = fold(scene);

@@ -56,9 +56,10 @@ const freePort = (): Promise<number> =>
   });
 
 /** Startar studions server på en egen port och väntar tills den svarar. `data` är en egen mapp med content/ och assets/. */
-async function startServer(data?: string): Promise<{ url: string; stop(): void }> {
+export async function startServer(data?: string): Promise<{ url: string; stop(): void }> {
   const port = await freePort();
-  const env = { ...process.env, PORT: String(port), ...(data ? { STUDIO_DATA: data } : {}) };
+  // STUDIO_STILL: sidan laddas inte om när någon ändrar koden medan förlagan sparas (main.ts).
+  const env = { ...process.env, PORT: String(port), STUDIO_STILL: '1', ...(data ? { STUDIO_DATA: data } : {}) };
   const child = spawn(process.execPath, ['src/server/main.ts'], { cwd: root, env, stdio: ['ignore', 'pipe', 'pipe'] });
   let said = '';
   child.stdout!.on('data', (chunk: Buffer) => (said += chunk.toString()));
@@ -169,11 +170,13 @@ export type ShotResult = { ok: true; saved: { name: string; file: string; json: 
 /**
  * Sparar förlagorna i tur och ordning, i samma webbläsare. `said` får veta hur långt en förlaga har kommit. Med `data`
  * läser servern content/ och assets/ ur den mappen och lägger förlagorna i dess output/forlagor/ (STUDIO_DATA), så att
- * en fil som inte är registrerad kan ses i scenen utan att assets/ rörs.
+ * en fil som inte är registrerad kan ses i scenen utan att assets/ rörs. Med `server` används en server som redan går
+ * (adressen), och den lämnas igång.
  */
-export async function shootAll(shots: Shot[], said: (text: string) => void = () => {}, options: { data?: string } = {}): Promise<ShotResult[]> {
-  if (process.env.SHOOT_SERVER && options.data) throw new ShootError('SHOOT_SERVER pekar ut en server som redan går; den kan inte läsa en egen datamapp');
-  const server = process.env.SHOOT_SERVER ? { url: process.env.SHOOT_SERVER.replace(/\/$/, ''), stop: () => {} } : await startServer(options.data);
+export async function shootAll(shots: Shot[], said: (text: string) => void = () => {}, options: { data?: string; server?: string } = {}): Promise<ShotResult[]> {
+  if ((process.env.SHOOT_SERVER || options.server) && options.data) throw new ShootError('En server som redan går kan inte läsa en egen datamapp');
+  const given = options.server ?? process.env.SHOOT_SERVER;
+  const server = given ? { url: given.replace(/\/$/, ''), stop: () => {} } : await startServer(options.data);
   let browser: Awaited<ReturnType<typeof startBrowser>> | null = null;
   try {
     browser = await startBrowser();

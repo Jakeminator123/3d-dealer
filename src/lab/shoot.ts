@@ -42,7 +42,7 @@ async function dealerOf(scene: SceneDescription, note: DealerNote | null, card: 
   const cycle = isCycle(read) ? readCycle(read) : undefined;
   const base = readMove(cycle ? await json(`/content/moves/${cycle.give}.json`) : read);
   const placed = note.seat !== undefined || note.index !== undefined || cycle;
-  const move = placed ? moveFor(scene, doll, base, note.seat ?? base.seat, { index: note.index, cycle }) : base;
+  const move = placed ? moveFor(scene, doll, base, note.seat ?? base.seat, { index: note.index, cycle, action: note.action }) : base;
   return { kind: 'docka', doll, move, pose: note.pose };
 }
 

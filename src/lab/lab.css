@@ -99,6 +99,11 @@ code {
   cursor: default;
 }
 
+.step.elsewhere {
+  margin-left: auto;
+  border: 1px solid var(--line);
+}
+
 .notice {
   margin: 0;
   padding: 32px;

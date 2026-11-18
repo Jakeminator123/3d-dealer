@@ -1,11 +1,14 @@
-// Underlag för en cykel ur en vys närbild: var det lagda kortet ligger i bild, och sista bilden för filmbeställningen.
-// En cykel (content/moves/cykel-*.json) börjar och slutar i REDO; sista bilden är REDO-ankaret med märkkortet lagt på
-// kortplatsen. Kortets hörn räknas ur dockan och scenen (dollPose.ts, geometry.ts), aldrig ur bilden.
+// Underlag för en cykel ur en vys närbild: var det lagda kortet ligger i bild, och första och sista bilden för
+// filmbeställningen. En cykel (content/moves/cykel-*.json) börjar och slutar i REDO; sista bilden är REDO-ankaret med
+// märkkortet lagt på kortplatsen, blått med framsidan upp eller gult med baksidan upp (hålkortet). I en vändning är också
+// första bilden målad: hålkortet ligger gult där det sedan vänds. Kortets hörn räknas ur dockan och scenen (dollPose.ts,
+// geometry.ts), aldrig ur bilden.
 //
-// Det här är ett bibliotek. Kommandot är src/pipeline/tagning.ts, som gör sista bilden (lastPicture) när en tagning
+// Det här är ett bibliotek. Kommandot är src/pipeline/tagning.ts, som målar bilderna (paintedPicture) när en tagning
 // förbereds och mäter klippet mot kortets hörn (cornersIn) när den tas emot.
 //
-// Vyn är `spelaren` eller `plats-N`, och alltid dess närbild. Kort är kortplatsens nummer på platsen, 0 för den första.
+// Vyn är `spelaren` eller `plats-N`, och alltid dess närbild. Platsen är 1–7 eller D för dealern, kort är kortplatsens
+// nummer på platsen (0 för den första), och handlingen är deal, hole eller flip (dollPose.ts, Action).
 // Ingenting här avgör något i spelet: det räknar var dockan lägger kortet och målar det där.
 
 import { readFileSync } from 'node:fs';
@@ -14,8 +17,11 @@ import sharp from 'sharp';
 import type { Rgb } from '../scene/dealer.ts';
 import { readScene, type SceneDescription } from '../scene/description.ts';
 import { MARK_BACK, MARK_FACE } from '../scene/doll.ts';
-import { moveFor, poseAt, readCycle, readDoll, readMove, type CardPose, type DollCycle, type DollDescription, type DollMove } from '../scene/dollPose.ts';
+import { moveFor, poseAt, readCycle, readDoll, readMove, type Action, type CardPose, type DollCycle, type DollDescription, type DollMove, type Seat } from '../scene/dollPose.ts';
 import { framed, see, viewEye, type Eye, type Pixel, type SeatView } from '../scene/geometry.ts';
+
+/** Det en cykel gör: platsen (1–7 eller D), kortplatsen och handlingen. */
+export type CycleCard = { seat: Seat; index: number; action: Action };
 
 export class CycleError extends Error {}
 
@@ -42,18 +48,33 @@ export function closeView(word = 'spelaren'): SeatView {
 /** Ögat en förlaga ur vyn ritas genom: vyns öga i förlagans ruta, som scenen tar det (build.ts, shoot). */
 export const forlagaEye = (scene: SceneDescription, view: SeatView): Eye => framed(viewEye(scene, view), scene.forlaga.frame);
 
-/** Det lagda kortet när cykeln till plats `seat` och kortplats `index` är slut. */
-export function laidCard(parts: CycleParts, seat: number, index: number): CardPose {
-  const { scene, doll, cycle, base } = parts;
-  const move = moveFor(scene, doll, base, seat, { index, cycle });
-  const laid = poseAt(scene, doll, move, move.seconds).laid;
-  if (!laid) throw new CycleError(`Cykeln till plats ${seat}, kort ${index}, slutar utan lagt kort`);
+/** Cykeln som dockan gör den: rörelsen till kortplatsen, med handlingen. */
+export const cycleMove = (parts: CycleParts, card: CycleCard): DollMove =>
+  moveFor(parts.scene, parts.doll, parts.base, card.seat, { index: card.index, cycle: parts.cycle, action: card.action });
+
+/** Platsen i ord: `plats 4` eller `dealern`. */
+export const placeWords = (seat: Seat): string => (seat === 'D' ? 'dealern' : `plats ${seat}`);
+
+/** Kortet som ligger på kortplatsen i cykelns första (`first`) eller sista ruta, eller null när inget ligger där. */
+export function lyingCard(parts: CycleParts, card: CycleCard, when: 'first' | 'last'): CardPose | null {
+  const move = cycleMove(parts, card);
+  return poseAt(parts.scene, parts.doll, move, when === 'first' ? 0 : move.seconds).laid;
+}
+
+/** Det lagda kortet när cykeln till kortplatsen är slut. */
+export function laidCard(parts: CycleParts, card: CycleCard): CardPose {
+  const laid = lyingCard(parts, card, 'last');
+  if (!laid) throw new CycleError(`Cykeln till ${placeWords(card.seat)}, kort ${card.index} (${card.action}), slutar utan lagt kort`);
   return laid;
 }
 
-/** Ett korts hörn i bild, i hörnens ordning (se CardPose). */
+/**
+ * Ett korts hörn i bild, sedda uppifrån i cardCorners ordning (bortre vänstra, bortre högra, hitre högra, hitre vänstra)
+ * vilken sida som än är upp. CardPose går runt sett från framsidan; med baksidan upp är det åt andra hållet.
+ */
 export function cornersIn(eye: Eye, card: CardPose): Pixel[] {
-  return card.corners.map((corner) => {
+  const corners = card.up === 'baksida' ? [1, 0, 3, 2].map((k) => card.corners[k]!) : card.corners;
+  return corners.map((corner) => {
     const pixel = see(eye, corner);
     if (!pixel) throw new CycleError('Kortet ligger bakom ögat');
     return pixel;
@@ -113,20 +134,25 @@ export function paintQuad(data: Buffer, width: number, height: number, quad: Pix
   return { painted, spared };
 }
 
-/** Sista bilden: ankaret med märkkortet målat där cykeln lägger det, sett genom vyns närbild. */
-export async function lastPicture(parts: CycleParts, anchor: string, seat: number, index: number, out: string, view: SeatView) {
+/**
+ * Första (`first`) eller sista bilden: ankaret med märkkortet målat där det ligger i cykelns första eller sista ruta,
+ * sett genom vyns närbild, gult med baksidan upp och blått med framsidan upp. Ligger inget kort där (första bilden i en
+ * giv) är svaret null och ingen bild skrivs: då är bilden ankaret som det är.
+ */
+export async function paintedPicture(parts: CycleParts, anchor: string, card: CycleCard, when: 'first' | 'last', out: string, view: SeatView) {
+  const lying = when === 'last' ? laidCard(parts, card) : lyingCard(parts, card, when);
+  if (!lying) return null;
   const eye = forlagaEye(parts.scene, view);
   const { width, height } = eye.frame;
-  const card = laidCard(parts, seat, index);
-  const quad = cornersIn(eye, card);
+  const quad = cornersIn(eye, lying);
   const image = sharp(anchor);
   const meta = await image.metadata();
   if (meta.width !== width || meta.height !== height) throw new CycleError(`Ankaret är ${meta.width} × ${meta.height}; vyns ruta är ${width} × ${height}`);
   const data = await image.removeAlpha().raw().toBuffer();
-  const colour = markColour(card);
+  const colour = markColour(lying);
   const { painted, spared } = paintQuad(data, width, height, quad, colour);
   await sharp(data, { raw: { width, height, channels: 3 } }).png({ compressionLevel: 9 }).toFile(out);
-  return { seat, index, corners: quad.map((p) => [round(p.x), round(p.y)]), side: card.up, colour, painted, spared };
+  return { seat: card.seat, index: card.index, action: card.action, corners: quad.map((p) => [round(p.x), round(p.y)]), side: lying.up, colour, painted, spared };
 }
 
 const round = (value: number): number => Math.round(value * 100) / 100;

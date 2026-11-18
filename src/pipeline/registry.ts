@@ -496,6 +496,35 @@ export function setWords(root: string, file: string, kind: 'comment' | 'reply', 
 }
 
 /**
+ * Lägger till fält som en post saknar, och ändrar ingenting annat: ett fält som posten redan har lämnas som det är, och
+ * ett fält som har en egen kolumn (COLUMNS) eller ägs av registret (file, status, source …) tas inte emot här. Fälten
+ * står i postens `more`. Svaret är namnen på fälten som lades till. Ett fält som redan finns med ett annat värde är ett
+ * fel: då ska posten ändras på annat sätt, med ett skäl.
+ */
+export function addMissingFields(root: string, file: string, fields: Record<string, unknown>): string[] {
+  const owned = new Set([...OWN, ...COLUMNS.map(([field]) => field)]);
+  for (const field of Object.keys(fields)) {
+    if (owned.has(field)) throw new RegistryError(`${field} kan inte läggas till som ett fält: det har sin egen plats i registret`);
+  }
+  return writing(root, (db) => {
+    const entry = entryIn(db, file);
+    const row = db.prepare('SELECT more FROM files WHERE file = ?').get(file) as Row;
+    const more = JSON.parse(String(row.more)) as Record<string, unknown>;
+    const added: string[] = [];
+    for (const [field, value] of Object.entries(fields)) {
+      if (field in entry) {
+        if (JSON.stringify(entry[field]) !== JSON.stringify(value)) throw new RegistryError(`${file} har redan ${field} = ${JSON.stringify(entry[field])}, inte ${JSON.stringify(value)}`);
+        continue;
+      }
+      more[field] = value;
+      added.push(field);
+    }
+    if (added.length > 0) db.prepare('UPDATE files SET more = ? WHERE file = ?').run(JSON.stringify(more), file);
+    return added;
+  });
+}
+
+/**
  * Kön till agenten: poster vars status ber om en motivering (`asksWhy`) och som inte har fått ett svar
  * som är nyare än både Jakobs ord och statusen.
  */
@@ -1119,6 +1148,7 @@ const HELP = `Använd: npm run reg -- <ord>
   order <beställning.json>                för in en betald beställning (en eller en lista)
   upload <lokal fil> <adress> [assetId]   för in en uppladdad fils adress
   measure <fil> "<vad>" "<värde>" [mätt|antaget] ["<vem>"]  för in en mätning
+  fält <fil> '<json>'                     lägg till fält som posten saknar, till exempel '{"action":"deal"}'; inget som finns ändras
 <fil> är sökvägen under assets/, till exempel dealers/<dealer>/anchors/<namn>.png.`;
 
 const short = (value: unknown, room = 160): string => {
@@ -1221,6 +1251,16 @@ async function command(root: string, words: string[]): Promise<number> {
     const id = addUpload(root, { file: rest[0]!, url: rest[1]!, assetId: rest[2] ?? null });
     const saved = query(root, `SELECT file, url, expires FROM uploads WHERE id = ${id}`).rows[0]!;
     say(`${saved.file}: uppladdad som ${saved.url}${saved.expires ? `, gäller till ${saved.expires}` : ''} (signaturen sparas inte)`);
+  } else if ((word === 'fält' || word === 'falt') && rest.length === 2) {
+    let fields: unknown;
+    try {
+      fields = JSON.parse(rest[1]!);
+    } catch (error) {
+      throw new RegistryError(`Fälten ska vara ett JSON-objekt: ${(error as Error).message}`);
+    }
+    if (fields === null || typeof fields !== 'object' || Array.isArray(fields)) throw new RegistryError('Fälten ska vara ett JSON-objekt');
+    const added = addMissingFields(root, pathOf(rest[0]!), fields as Record<string, unknown>);
+    say(`${pathOf(rest[0]!)}: ${added.length ? `${added.join(', ')} tillagt` : 'hade redan fälten'}`);
   } else if (word === 'measure' && rest.length >= 3 && rest.length <= 5) {
     const basis = (rest[3] ?? 'mätt') as 'mätt' | 'antaget';
     addMeasurement(root, { file: rest[0]!, what: rest[1]!, value: rest[2]!, basis, who: rest[4] ?? null });

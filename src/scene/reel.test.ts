@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { ClipCard } from './dealer.ts';
-import { lyingAt, makeReel, markerDown, placeIn, reelEnd } from './reel.ts';
+import { flyingAt, lyingAt, makeReel, markerDown, placeIn, reelEnd } from './reel.ts';
 
 const SECONDS = 97 / 24;
 const card = (seat: number, index: number, face: string, at = 1.92): ClipCard => ({ seat, index, face, at });
@@ -72,6 +72,34 @@ test('ett kort ligger från att det landar tills följden är slut, och märkkor
   assert.deepEqual(lyingAt(reel, 3 * SECONDS + 1.5), [0, 1, 3]);
   assert.deepEqual(lyingAt(reel, reel.seconds), [0, 1, 3]);
   assert.equal(markerDown(reel, reel.seconds), true);
+});
+
+test('en del utan film: kortet är på väg tills det landar, märkkortet är borta, och ett kort som vänds lämnar sin plats under vändningen', () => {
+  const reel = makeReel([
+    { seconds: SECONDS, card: card(4, 0, 'A♠') },
+    // Dealerns hålkort utan klipp: från skon, med baksidan upp.
+    { seconds: 1.2, card: { seat: 'D', index: 1, face: null, at: 1.2 }, from: 'skon' },
+    // Vändningen utan klipp: från samma kortplats.
+    { seconds: 0.8, card: { seat: 'D', index: 1, face: 'K♥', at: 0.8 }, from: { seat: 'D', index: 1 } },
+  ]);
+  const slide = reel.starts[1]!;
+  const turn = reel.starts[2]!;
+  // Medan hålkortet glider står filmen på förra klippets sista ruta, där klippets kort är lagt: märkkortet är borta.
+  assert.equal(markerDown(reel, slide + 0.3), true);
+  const flying = flyingAt(reel, slide + 0.3)!;
+  assert.deepEqual([flying.part, flying.left], [1, null]);
+  close(flying.progress, 0.25);
+  assert.deepEqual(lyingAt(reel, slide + 0.3), [0]);
+  assert.deepEqual(lyingAt(reel, turn - 1e-6), [0]);
+  // Vändningen: det nedvända kortet lämnar platsen när den börjar och är det som vänds; det uppvända ligger när den har landat.
+  assert.deepEqual(lyingAt(reel, turn), [0]);
+  const turning = flyingAt(reel, turn + 0.2)!;
+  assert.deepEqual([turning.part, turning.left], [2, 1]);
+  close(turning.progress, 0.25);
+  assert.deepEqual(lyingAt(reel, reel.seconds), [0, 2]);
+  assert.equal(flyingAt(reel, reel.seconds), null);
+  // I ett klipp bär filmen kortet: inget är på väg.
+  assert.equal(flyingAt(reel, 1), null);
 });
 
 test('ett senare kort på samma kortplats tar det tidigares plats', () => {

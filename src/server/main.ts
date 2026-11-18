@@ -51,13 +51,16 @@ async function serve(): Promise<void> {
   const { createServer: createVite } = await import('vite');
   const { default: react } = await import('@vitejs/plugin-react');
   const server = createServer();
+  // STUDIO_STILL=1 (en server som shoot.ts startar för förlagor): sidorna laddas inte om när en fil under src/ ändras,
+  // så att en förlaga inte börjar om mitt i när någon skriver i koden.
+  const still = process.env.STUDIO_STILL === '1';
   const vite = await createVite({
     configFile: false,
     root: join(code, 'src'),
     cacheDir: join(code, 'node_modules', '.vite'),
     appType: 'mpa',
     plugins: [react()],
-    server: { middlewareMode: true, hmr: { server } },
+    server: { middlewareMode: true, hmr: still ? false : { server }, ...(still ? { watch: null } : {}) },
     clearScreen: false,
   });
   server.on('request', handler(createApi(data), vite.middlewares));

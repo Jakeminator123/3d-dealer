@@ -1,0 +1,384 @@
+// Casinot: en riktig runda mot spelkärnan i vyn Spelaren. Jakob väljer plats och insats och delar; sedan erbjuds de
+// handlingar spelkärnan tillåter. Kärnan körs i servern (/api/game) och avgör kort och pengar; här spelas bara det den
+// har sagt. Varje steg blir dealerns film genom samma val av klipp som Labbet och runda.ts (src/scene/round.ts): ett
+// godkänt cykelklipp för varje kort, eller spelkärnans fallback när klippet saknas, där kortet går självt medan dealern
+// står i REDO. Filmen avgör ingenting: utfallet visas när filmen har lagt korten, men det är kärnans.
+
+import { useEffect, useMemo, useRef, useState } from 'react';
+import type { Action } from '../engine/round.ts';
+import type { SeatSignalEvent } from '../engine/seats.ts';
+import { buildScene, type Background, type FilmNote, type SceneHandle, type SeatView } from '../scene/build.ts';
+import { readScene, type SceneDescription } from '../scene/description.ts';
+import { readDoll, type DollDescription } from '../scene/dollPose.ts';
+import { reelEnd } from '../scene/reel.ts';
+import { anchorName, backgroundOf, dealName, dealsOf, planRound, readRound, readyClip, type Plan, type Round, type RoundEntry } from '../scene/round.ts';
+import { fetchContent, fetchEntries, fetchTable, mediaUrl, newSession, sendCommand, type Table } from './server.ts';
+
+// Första dealern. Tills dealerns egen fil finns i content/ står hennes id här, som i Labbet.
+const DEALER = 'paulina';
+// Vyn man spelar i.
+const VIEW: SeatView = { kind: 'spelaren' };
+
+const ACTION_LABELS: Record<Action, string> = { hit: 'Hit', stand: 'Stand', double: 'Dubbla', split: 'Dela upp' };
+const OUTCOME_LABELS = { blackjack: 'Blackjack', win: 'Vinst', push: 'Lika', lose: 'Förlust' } as const;
+
+const comma = (value: number): string => String(value).replace('.', ',');
+
+/** Det Casinot läser en gång: scenen, dockans mått, rundans fallback och rum, registrets poster och rummet som bakgrund. */
+type Content = { scene: SceneDescription; doll: DollDescription; round: Round; entries: RoundEntry[]; background: Background | null };
+
+async function loadContent(): Promise<Content> {
+  const [scene, doll, round, entries] = await Promise.all([fetchContent('scene.json', readScene), fetchContent('doll.json', readDoll), fetchContent('runda.json', readRound), fetchEntries()]);
+  const room = entries.find((entry) => entry.file === round.film.background);
+  const background = room && room.present !== false ? { ...backgroundOf(room, scene), url: mediaUrl(room.file) } : null;
+  return { scene, doll, round, entries, background };
+}
+
+const planOf = (content: Content, table: Table): Plan => planRound(dealsOf(table.steps), content.entries, DEALER, VIEW, content.round.fallback);
+
+export function Casino() {
+  const [content, setContent] = useState<Content | null>(null);
+  const [table, setTable] = useState<Table | null>(null);
+  const [problem, setProblem] = useState<string | null>(null);
+  useEffect(() => {
+    loadContent().then(setContent, (error: Error) => setProblem(error.message));
+    fetchTable().then(setTable, (error: Error) => setProblem(error.message));
+  }, []);
+  return (
+    <div className="casino">
+      <header className="casinotop">
+        <div className="brand">
+          3d-dealer <span>Casinot</span>
+        </div>
+        {table && (
+          <div className="purse" aria-label="Kassa">
+            Kassa <strong>{comma(table.state.balance)}</strong>
+          </div>
+        )}
+        <a className="elsewhere" href="/lab/">
+          Labbet
+        </a>
+      </header>
+      {content && table ? <Room content={content} table={table} onTable={setTable} problem={problem} onProblem={setProblem} /> : <main className="notice">{problem ?? 'Läser bordet …'}</main>}
+    </div>
+  );
+}
+
+type RoomProps = { content: Content; table: Table; onTable: (table: Table) => void; problem: string | null; onProblem: (text: string | null) => void };
+
+function Room({ content, table, onTable, problem, onProblem }: RoomProps) {
+  const plan = useMemo(() => planOf(content, table), [content, table]);
+  // Filmen är hela rundan hittills. Efter ett steg spelas den från första nya delen; vid en omladdning står den i slutet.
+  const [from, setFrom] = useState<number | 'end'>('end');
+  const [playing, setPlaying] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const firstSeat = table.state.view.round?.hands[0]?.seat;
+  const [seat, setSeat] = useState(firstSeat ?? 4);
+  const [stake, setStake] = useState(10);
+  const skip = useRef<() => void>(() => {});
+
+  // Utan runda står dealern i REDO: första rutan av ett godkänt cykelklipp.
+  const ready = useMemo(() => readyClip(content.entries, DEALER, VIEW), [content.entries]);
+  const idle = plan.clips.length === 0;
+  const dealer: FilmNote | null = !idle ? { kind: 'film', view: VIEW, clips: plan.clips, loop: false } : ready ? { kind: 'film', view: VIEW, clips: [{ file: ready }], loop: false } : null;
+
+  const send = async (command: Record<string, unknown>): Promise<void> => {
+    if (busy || playing) return;
+    setBusy(true);
+    onProblem(null);
+    try {
+      const next = await sendCommand(table, command);
+      const before = plan.clips.length;
+      const after = planOf(content, next).clips.length;
+      if (after > before) {
+        setFrom(before);
+        setPlaying(true);
+      } else setFrom('end');
+      onTable(next);
+    } catch (error) {
+      onProblem((error as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const fresh = async (): Promise<void> => {
+    onProblem(null);
+    try {
+      setFrom('end');
+      onTable(await newSession());
+    } catch (error) {
+      onProblem((error as Error).message);
+    }
+  };
+
+  const { view, limits, balance } = table.state;
+  const round = view.round;
+  const events = table.steps.flatMap((step) => step.events);
+  const settle = events.find((event): event is Extract<SeatSignalEvent, { type: 'settle' }> => event.type === 'settle');
+  const still = busy || playing;
+
+  return (
+    <main className="room">
+      <div className="tableview">
+        <Stage
+          scene={content.scene}
+          doll={content.doll}
+          background={content.background}
+          dealer={dealer}
+          start={idle ? 0 : from}
+          play={!idle && from !== 'end' && playing}
+          onDone={() => setPlaying(false)}
+          skip={skip}
+          onProblem={onProblem}
+        />
+      </div>
+
+      <section className="panel" aria-label="Spelet">
+        {problem && <p className="warning">{problem}</p>}
+
+        {playing ? (
+          <div className="row">
+            <span className="say">Dealern delar …</span>
+            <button type="button" onClick={() => skip.current()}>
+              Hoppa fram
+            </button>
+          </div>
+        ) : (
+          <>
+            {round && <Hands view={view} settle={settle ?? null} />}
+
+            {!round && (
+              <div className="row">
+                <span className="label">Plats</span>
+                <div className="seats" role="group" aria-label="Plats">
+                  {content.scene.places.seats.map((entry) => (
+                    <button key={entry.seat} type="button" aria-pressed={seat === entry.seat} onClick={() => setSeat(entry.seat)}>
+                      {entry.seat}
+                    </button>
+                  ))}
+                </div>
+                <label className="stake">
+                  <span className="label">Insats</span>
+                  <input
+                    type="number"
+                    min={limits.min}
+                    max={Math.min(limits.max, balance)}
+                    step={limits.min}
+                    value={stake}
+                    onChange={(event) => setStake(Number(event.currentTarget.value))}
+                  />
+                </label>
+                <button type="button" className="go" disabled={still || !(stake >= limits.min && stake <= Math.min(limits.max, balance))} onClick={() => send({ op: 'start', bets: [{ seat, main: stake }] })}>
+                  Dela
+                </button>
+                {balance < limits.min && (
+                  <button type="button" onClick={fresh}>
+                    Ny kassa
+                  </button>
+                )}
+              </div>
+            )}
+
+            {round?.phase === 'insurance' && (
+              <div className="row">
+                <span className="say">Dealern visar ett ess. Försäkring?</span>
+                <button type="button" disabled={still} onClick={() => send({ op: 'insurance', roundId: view.roundId, take: true })}>
+                  Försäkra ({comma(round.hands.reduce((sum, hand) => sum + hand.stake / 2, 0))})
+                </button>
+                <button type="button" disabled={still} onClick={() => send({ op: 'insurance', roundId: view.roundId, take: false })}>
+                  Nej tack
+                </button>
+              </div>
+            )}
+
+            {round?.phase === 'decisions' && (
+              <div className="row">
+                <span className="say">
+                  Plats {round.activeSeat}
+                  {round.hands.filter((hand) => hand.seat === round.activeSeat).length > 1 ? `, hand ${(round.hands[round.active]?.hand ?? 0) + 1}` : ''}: {round.hands[round.active]?.total}
+                </span>
+                {round.legalActions.map((action) => (
+                  <button
+                    key={action}
+                    type="button"
+                    className="go"
+                    disabled={still}
+                    onClick={() => send({ op: 'act', action, seat: round.activeSeat, handIndex: round.active, roundId: view.roundId, turnSeq: view.turnSeq })}
+                  >
+                    {ACTION_LABELS[action]}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {round?.phase === 'settled' && (
+              <div className="row">
+                <button type="button" className="go" disabled={still} onClick={() => send({ op: 'collect', roundId: view.roundId })}>
+                  Ny runda
+                </button>
+              </div>
+            )}
+          </>
+        )}
+
+        {plan.missing.length > 0 && (
+          <p className="missing">
+            Utan klipp, kortet går självt medan dealern står i REDO: {plan.missing.map(dealName).join('; ')}.
+          </p>
+        )}
+        {plan.anchor !== null && (
+          <p className="missing">
+            Klippen är gjorda ur REDO-ankaret {anchorName(plan.anchor)}
+            {plan.anchors.length > 1 ? ` (inte valda: ${plan.anchors.slice(1).map((one) => anchorName(one.anchor)).join(', ')})` : ''}.
+          </p>
+        )}
+        <p className="fine">
+          Spelkärnan i servern avgör kort och pengar ({view.shoe?.source === 'secure' ? 'säker sko' : `sko: ${view.shoe?.source}`}, insats {limits.min}–{limits.max}). Filmen visar bara det
+          kärnan har sagt. Sessionen börjar om när servern startar om.
+        </p>
+      </section>
+    </main>
+  );
+}
+
+/** Händerna och dealern så som kärnan säger att de står, och utfallet när rundan är avgjord. */
+function Hands({ view, settle }: { view: Table['state']['view']; settle: Extract<SeatSignalEvent, { type: 'settle' }> | null }) {
+  const round = view.round!;
+  const face = (card: { r: string; s: string }) => `${card.r}${card.s}`;
+  const hidden = round.holeDraw !== null && !round.dealer.some((card) => card.shoeDraw === round.holeDraw);
+  return (
+    <div className="hands">
+      <div className="hand dealer">
+        <span className="label">Dealern</span>
+        <span className="cards">
+          {round.dealer.map(face).join(' ')}
+          {hidden ? ' + baksidan' : ''}
+        </span>
+        <span className="total">{round.dealerTotal}</span>
+      </div>
+      {round.hands.map((hand) => {
+        const result = settle?.hands.find((one) => one.handIndex === hand.handIndex);
+        return (
+          <div key={hand.handIndex} className="hand" data-outcome={result?.outcome}>
+            <span className="label">
+              Plats {hand.seat}
+              {round.hands.filter((other) => other.seat === hand.seat).length > 1 ? `, hand ${hand.hand + 1}` : ''}
+            </span>
+            <span className="cards">{hand.cards.map(face).join(' ')}</span>
+            <span className="total">
+              {hand.total}
+              {hand.soft && hand.total < 21 ? ' mjuk' : ''}
+              {hand.busted ? ', tjock' : ''}
+            </span>
+            <span className="stakeinfo">insats {comma(hand.stake)}</span>
+            {result && (
+              <span className="outcome">
+                {OUTCOME_LABELS[result.outcome]}
+                {result.returned > 0 ? `: ${comma(result.returned)} tillbaka` : ''}
+              </span>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+type StageProps = {
+  scene: SceneDescription;
+  doll: DollDescription;
+  background: Background | null;
+  /** Dealerns film: hela rundan hittills, eller dealern i REDO. */
+  dealer: FilmNote | null;
+  /** Delen filmen börjar på, eller dess slut. */
+  start: number | 'end';
+  /** Om filmen spelas därifrån när den är byggd, eller står still. Läses när en ny film byggs, och bygger inte om den. */
+  play: boolean;
+  /** Sägs till när filmen har lagt sitt sista kort. */
+  onDone: () => void;
+  /** Får det som hoppar fram till filmens slut. */
+  skip: { current: () => void };
+  onProblem: (text: string) => void;
+};
+
+/**
+ * Scenen. En ny dealerfilm byggs i en egen scen bredvid den som syns, och tar dess plats först när bord, rum och
+ * klipp är lästa och filmen står där den ska börja, så att bordet inte blinkar mellan stegen.
+ */
+function Stage({ scene, doll, background, dealer, start, play, onDone, skip, onProblem }: StageProps) {
+  const holder = useRef<HTMLDivElement>(null);
+  const shown = useRef<{ handle: SceneHandle; layer: HTMLDivElement } | null>(null);
+  const done = useRef(onDone);
+  done.current = onDone;
+  const playing = useRef(play);
+  playing.current = play;
+  const dealerKey = JSON.stringify(dealer);
+
+  useEffect(() => {
+    const host = holder.current!;
+    const layer = document.createElement('div');
+    layer.className = 'layer';
+    layer.style.visibility = 'hidden';
+    host.append(layer);
+    let alive = true;
+    let watching = 0;
+    const handle = buildScene(layer, scene, { urlOf: mediaUrl, dealer: JSON.parse(dealerKey) as FilmNote | null, doll, onProblem });
+    const fit = () => handle.resize(host.clientWidth, host.clientHeight);
+    const watcher = new ResizeObserver(fit);
+    watcher.observe(host);
+    fit();
+    handle.setView(VIEW);
+    handle.setShoe(true);
+
+    void Promise.all([handle.ready, handle.setBackground(background)]).then(async () => {
+      if (!alive) return;
+      const clip = handle.clip;
+      const reel = handle.reel();
+      const at = !reel ? 0 : start === 'end' ? reel.seconds : (reel.starts[start] ?? reel.seconds);
+      if (clip) await clip.seek(at);
+      if (!alive) return;
+      layer.style.visibility = 'visible';
+      const before = shown.current;
+      shown.current = { handle, layer };
+      before?.handle.dispose();
+      before?.layer.remove();
+      if (!clip || !reel || !playing.current) return void done.current();
+      const finish = () => {
+        cancelAnimationFrame(watching);
+        if (alive) done.current();
+      };
+      skip.current = () => void clip.seek(reel.seconds).then(finish);
+      clip.play();
+      const watch = () => {
+        if (!alive) return;
+        if (clip.time() >= reelEnd(reel) - 1e-3) return finish();
+        watching = requestAnimationFrame(watch);
+      };
+      watching = requestAnimationFrame(watch);
+    });
+
+    return () => {
+      alive = false;
+      cancelAnimationFrame(watching);
+      watcher.disconnect();
+      // Den som syns står kvar tills nästa är framme; en som aldrig kom fram städas bort direkt.
+      if (shown.current?.handle !== handle) {
+        handle.dispose();
+        layer.remove();
+      }
+    };
+  }, [scene, doll, background, dealerKey, start, onProblem, skip]);
+
+  useEffect(
+    () => () => {
+      shown.current?.handle.dispose();
+      shown.current?.layer.remove();
+      shown.current = null;
+    },
+    [],
+  );
+
+  const { width, height } = scene.camera.frame;
+  return <div ref={holder} className="stage" role="img" aria-label="Bordet i 3D" style={{ aspectRatio: `${width} / ${height}`, width: `min(100cqw, 100cqh * ${width} / ${height})` }} />;
+}

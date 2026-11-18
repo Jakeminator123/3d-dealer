@@ -3,11 +3,12 @@
 // också förlagor: scenen som bild eller klipp ur en vy.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { captureHeightOf } from '../scene/backdrop.ts';
 import { buildScene, type Background, type Dealer, type FilmNote, type SceneHandle, type View } from '../scene/build.ts';
 import { readScene, type SceneDescription } from '../scene/description.ts';
 import { readDoll, type DollDescription } from '../scene/dollPose.ts';
 import { seatsOf } from '../scene/geometry.ts';
-import { readRound, type Round } from '../scene/round.ts';
+import { anchorName, dealName, readRound, type DealtRound, type Round } from '../scene/round.ts';
 import { backdropItems, backdropKind, dealerChoices, PLAIN, roundChoices, sameLook, startLook, type Look } from './backdrops.ts';
 import { saveForlaga, type Saved } from './forlaga.ts';
 import { fetchRegistry, mediaUrl, saveComment, saveStatus, thumbUrl, type Asset, type Item, type Registry } from './registry.ts';
@@ -34,16 +35,27 @@ async function fetchContent<T>(file: string, what: string, read: (value: unknown
   return read(await response.json());
 }
 
-/** Scenen, dockans mått (där kortet står i skons mynning) och rundan, ur content/. */
-type Content = { scene: SceneDescription; doll: DollDescription; round: Round };
+/**
+ * Scenen, dockans mått (där kortet står i skons mynning) och rundan, ur content/, och rundan som spelkärnan har delat
+ * efter den (servern, /api/runda).
+ */
+type Content = { scene: SceneDescription; doll: DollDescription; round: Round; dealt: DealtRound };
+
+async function fetchDealt(): Promise<DealtRound> {
+  const response = await fetch('/api/runda');
+  const body = (await response.json().catch(() => null)) as (DealtRound & { error?: string }) | null;
+  if (!response.ok || !body) throw new Error(`Spelkärnan delade ingen runda: ${body?.error ?? response.status}`);
+  return body;
+}
 
 const fetchAll = async (): Promise<Content> => {
-  const [scene, doll, round] = await Promise.all([
+  const [scene, doll, round, dealt] = await Promise.all([
     fetchContent('scene.json', 'Scenens beskrivning', readScene),
     fetchContent('doll.json', 'Dockans mått', readDoll),
     fetchContent('runda.json', 'Rundan', readRound),
+    fetchDealt(),
   ]);
-  return { scene, doll, round };
+  return { scene, doll, round, dealt };
 };
 
 export default function SceneStep({ route }: { route: string[] }) {
@@ -87,7 +99,7 @@ type WorkbenchProps = Content & {
   onSay: Say;
 };
 
-function Workbench({ registry, scene, doll, round, route, problem, onProblem, onJudge, onSay }: WorkbenchProps) {
+function Workbench({ registry, scene, doll, round, dealt, route, problem, onProblem, onJudge, onSay }: WorkbenchProps) {
   // Den valda vyn. Ett nytt värde ställer scenen i vyn, också när det är samma vy som förut.
   const [view, setView] = useState<View>({ kind: 'spelaren' });
   // Om vyn visas som sin närbild: samma öga, inzoomat på dealern, där dealerns filmer görs.
@@ -118,8 +130,9 @@ function Workbench({ registry, scene, doll, round, route, problem, onProblem, on
   const items = backdropItems(registry);
   const chosen = items.find((item) => item.number === Number(route[0])) ?? items[0];
   const dealers = dealerChoices(registry, DEALER);
-  // Hela given ur varje vy där dealern har cykelklipp, så som runda.ts spelar den (src/scene/round.ts).
-  const rounds = roundChoices(registry, DEALER, round, seatsOf(scene));
+  // Hela given ur varje vy där dealern har cykelklipp: rundan som spelkärnan har delat, så som runda.ts och Casinot
+  // spelar den (src/scene/round.ts).
+  const rounds = roundChoices(registry, DEALER, dealt, round, seatsOf(scene));
   // Från början visas hela given, och utan den den första dealerfilmen: en film före en stillbild.
   const roundChoice = rounds.find((entry) => entry.key === dealerFile) ?? (dealerFile === '' ? (rounds[0] ?? null) : null);
   const choice = roundChoice ? null : (dealers.find((entry) => entry.dealer.file === dealerFile) ?? dealers[0] ?? null);
@@ -149,7 +162,8 @@ function Workbench({ registry, scene, doll, round, route, problem, onProblem, on
   useEffect(() => onProblem(null), [file, onProblem]);
 
   const { captureHeight, radius } = scene.room;
-  const start = chosen ? startLook(chosen.asset, { lift: scene.background.liftDeg, height: captureHeight, radius }) : null;
+  // Höjden är bakgrundens egen när scenen har en (room.captureHeights), annars scenens.
+  const start = chosen ? startLook(chosen.asset, { lift: scene.background.liftDeg, height: captureHeightOf(scene, chosen.asset.file), radius }) : null;
   const look = chosen && start ? (looks[chosen.asset.file] ?? start) : null;
   const change = (part: Partial<Look>) => {
     if (chosen && look) setLooks((all) => ({ ...all, [chosen.asset.file]: { ...look, ...part } }));
@@ -374,7 +388,7 @@ function Workbench({ registry, scene, doll, round, route, problem, onProblem, on
             </li>
             <li>
               {roundChoice
-                ? `Hela given: ${roundChoice.plan.clips.length} cykelklipp av dealern ur registret, gjorda i närbilden av ${madeIn}, i ordningen och med valörerna i content/runda.json (plats 1–7 första kortet, sedan plats 1–7 andra kortet), samma klipp och samma uppspelning som node src/pipeline/runda.ts. Klippen spelas efter varandra utan glapp, och varje kort ligger kvar på bordet från att det har landat. Efter sista klippet står sista rutan kvar ${comma(round.film.hold)} s, och sedan börjar given om; Börja om tar den från början. Bilden läggs tillbaka genom ${madeIn}s öga: sedd ur den vyn, eller dess närbild, är den bilden som den är; ur andra vyer är kroppen platt.${roundChoice.plan.missing.length > 0 ? ` Saknar klipp: ${roundChoice.plan.missing.map((place) => `plats ${place.seat}, kort ${place.index}`).join('; ')}.` : ''}`
+                ? `Hela given: en runda som spelkärnan har delat (frö ${dealt.seed}, plats ${dealt.bets.map((bet) => bet.seat).join(', ')}, Hit under ${dealt.hitBelow}; content/runda.json), ${roundChoice.plan.dealt.length} kort i spelkärnans ordning med dess valörer. Varje kort spelas med dealerns godkända cykelklipp ur registret, gjort i närbilden av ${madeIn}, eller, när klippet saknas, går kortet självt medan dealern står i REDO; samma val och samma uppspelning som node src/pipeline/runda.ts och Casinot. Hålkortet ligger med baksidan upp tills det vänds. Klippen spelas efter varandra utan glapp, och varje kort ligger kvar på bordet från att det har landat. Efter sista kortet står sista rutan kvar ${comma(round.film.hold)} s, och sedan börjar given om; Börja om tar den från början. Bilden läggs tillbaka genom ${madeIn}s öga: sedd ur den vyn, eller dess närbild, är den bilden som den är; ur andra vyer är kroppen platt. Alla klipp i given är gjorda ur samma REDO-ankare, det med flest godkända klipp för rundan: ${anchorName(roundChoice.plan.anchor)}${roundChoice.plan.anchors.length > 1 ? ` (inte valda: ${roundChoice.plan.anchors.slice(1).map((one) => `${anchorName(one.anchor)}, ${one.clips} klipp`).join('; ')})` : ''}.${roundChoice.plan.missing.length > 0 ? ` Saknar klipp: ${roundChoice.plan.missing.map(dealName).join('; ')}.` : ''}`
                 : !choice
                   ? 'Ingen dealer visas: registret har ingen dealerfilm för dealern.'
                   : `Dealern är en dealerfilm: ”${choice.label}”, en ${choice.film ? 'film' : 'stillbild'} av dealern på grön skärm, gjord i närbilden av ${madeIn}: samma öga som vyn, inzoomat på dealern. Bilden läggs tillbaka genom det ögat och viks vid bordskanten, så att kroppen står upprätt och händerna ligger på filten. Sedd ur den vyn är den bilden som den är; ur andra vyer är kroppen platt.${choice.lands ? ` När klippet har lagt sitt märkkort (${comma(choice.lands.at)} s in) tas det blå bort och scenens kort ligger på kortplatsen för plats ${choice.lands.seat}; valören är en stå-in.` : ''}`}{' '}

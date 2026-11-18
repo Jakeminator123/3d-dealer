@@ -10,7 +10,7 @@ import { after, before, test } from 'node:test';
 import sharp from 'sharp';
 import { probe } from './matning.ts';
 import { about, createRegister, getEntry } from './registry.ts';
-import { clipFile, forbered, matOm, nextTake, packageId, promptFor, readTagning, registrera, taEmot, type PostFile } from './tagning.ts';
+import { cardWords, clipFile, forbered, matOm, nextTake, packageId, promptFor, readTagning, registrera, taEmot, type PostFile } from './tagning.ts';
 
 const root = resolve(import.meta.dirname, '..', '..');
 const content = readTagning(root);
@@ -26,8 +26,30 @@ test('texten är pilotens med granskarens två fraser och rättelsen, och samma 
   assert.ok(text.startsWith('Locked camera, one continuous shot.') && text.endsWith('No sound.'));
 });
 
+test('texten för hålkortet och vändningen är givens med bara de meningar bytta som handlingen kräver', () => {
+  const deal = promptFor(content);
+  const hole = promptFor(content, 'hole');
+  const flip = promptFor(content, 'flip');
+  assert.equal(promptFor(content, 'deal'), deal);
+  // Hålkortet: läggs gult, vänds inte, och slutar med två gula kort i bild.
+  assert.ok(hole.includes('the card is not turned over') && hole.includes('yellow side up') && hole.includes('the yellow one face down on the table'));
+  assert.ok(!hole.includes('turn over together') && !hole.includes('blue side up') && !hole.includes('the blue card lies'));
+  // Vändningen: inget kort dras; hålkortet ligger på bordet från början och vänds där med samma nyckelvridning som i given.
+  assert.ok(flip.includes('A yellow card already lies flat on the table') && flip.includes('without taking a card') && flip.includes('lays the card flat in the same place, blue side up'));
+  assert.ok(flip.includes("turn over together about the card's long side, like turning a key"), 'samma vändning som i given');
+  assert.ok(!flip.includes('draws the yellow card up out of the opening') && !flip.includes('the whole way out'));
+  // Det som inte rör handlingen är ordagrant givens.
+  for (const text of [hole, flip]) {
+    for (const same of ['Locked camera, one continuous shot.', 'Then she lifts her hand off the card, and it travels back in a calm arc to the card shoe', 'Her other hand rests on the table and does not move.', 'No sound.']) assert.ok(text.includes(same), same);
+    assert.ok(!/[{}]/.test(text));
+  }
+  // En mening som inte står i texten är ett fel: mallen har ändrats utan bytena.
+  const changed = { ...content, prompt: { ...content.prompt, text: deal.replace('On the way her wrist rolls once', 'Her wrist rolls once') } };
+  assert.throws(() => promptFor(changed, 'hole'), /står inte precis en gång/);
+});
+
 test('gränserna: granskarens alla mått, med källa, och dockans film i filmmodellens takt', () => {
-  for (const key of ['format', 'ljud', 'takt', 'kortdelar', 'gulForm', 'kortetsRorelse', 'kortetsOverlapp', 'kortetsMitt', 'kortetsYta', 'nastaKortSaknas', 'nastaKortFlyttar', 'handIRedo', 'handMotDockan', 'handBreddMotDockan', 'skarvRegion', 'skarvLjus', 'skarvHand', 'forstaRutan', 'sistaRutan', 'gront', 'skon', 'glipaRutor', 'glipaHojd', 'kortetLigger', 'handenISkon', 'bevisBlatt']) {
+  for (const key of ['format', 'ljud', 'takt', 'kortdelar', 'gulForm', 'vandningTillbaka', 'halkortetBlatt', 'vandningenVidPlatsen', 'kortetsRorelse', 'kortetsOverlapp', 'kortetsMitt', 'kortetsYta', 'nastaKortSaknas', 'nastaKortFlyttar', 'handIRedo', 'handMotDockan', 'handBreddMotDockan', 'skarvRegion', 'skarvLjus', 'skarvHand', 'forstaRutan', 'sistaRutan', 'gront', 'skon', 'glipaRutor', 'glipaHojd', 'kortetLigger', 'handenISkon', 'bevisBlatt']) {
     const limit = content.limits[key];
     assert.ok(limit, `gränsen ${key} saknas`);
     assert.ok(limit.source.length > 0, `${key}: källa`);
@@ -41,6 +63,13 @@ test('paketets namn, klippets namn i registret och nästa tagning', () => {
   const spec = { dealer: 'paulina', view: 'spelaren', seat: 4, index: 0 };
   assert.equal(packageId(spec, 'cykel-nyp', 1), 'paulina_spelaren_cykel-nyp_4-0_t1');
   assert.equal(clipFile({ ...spec, view: 'plats-7', seat: 1, index: 1 }, 'cykel-nyp', 2), 'dealers/paulina/clips/cykel-nyp-1-1_plats-7_t2.mp4');
+  // Dealern heter d i namnen, som registrets små bokstäver, och handlingen står efter cykeln när den inte är deal.
+  assert.equal(packageId({ ...spec, seat: 'D', index: 0 }, 'cykel-nyp', 1), 'paulina_spelaren_cykel-nyp_d-0_t1');
+  assert.equal(packageId({ ...spec, seat: 'D', index: 1, action: 'hole' }, 'cykel-nyp', 1), 'paulina_spelaren_cykel-nyp-hole_d-1_t1');
+  assert.equal(packageId({ ...spec, seat: 'D', index: 1, action: 'deal' }, 'cykel-nyp', 1), 'paulina_spelaren_cykel-nyp_d-1_t1');
+  assert.equal(clipFile({ ...spec, seat: 'D', index: 1, action: 'flip' }, 'cykel-nyp', 3), 'dealers/paulina/clips/cykel-nyp-flip-d-1_spelaren_t3.mp4');
+  assert.equal(cardWords('D', 1, 'flip'), 'vändningen av hålkortet (dealerns kort 1)');
+  assert.equal(cardWords(3, 2), 'plats 3, kort 2');
   const dir = mkdtempSync(join(tmpdir(), 'tagning-namn-'));
   try {
     assert.equal(nextTake(dir, spec, 'cykel-nyp'), 1);

@@ -22,11 +22,16 @@ import {
   relaxedLeft,
   restPose,
   throughShoe,
+  type Action,
   type CardPose,
   type DollCycle,
   type DollDescription,
   type DollMove,
   type DollPose,
+  type Seat,
+  ACTIONS,
+  cardPlace,
+  unturned,
 } from './dollPose.ts';
 import { cardCorners, placeOnTable, sceneEye, see, seatsOf, tilted } from './geometry.ts';
 
@@ -73,8 +78,8 @@ const EXACT = 0.0001;
 const ANCHOR_EYES = 0.58;
 
 /** Rörelsen till varje plats, räknad en gång. */
-const moves = new Map<number, DollMove>();
-const moveTo = (seat: number): DollMove => {
+const moves = new Map<Seat, DollMove>();
+const moveTo = (seat: Seat): DollMove => {
   if (!moves.has(seat)) moves.set(seat, moveFor(scene, doll, base, seat));
   return moves.get(seat)!;
 };
@@ -331,7 +336,7 @@ for (const seat of seatsOf(scene)) {
 
 test('svängen växer åt sidorna från platsen rörelsen lästes på', () => {
   const swings = seatsOf(scene).map((seat) => moveTo(seat).swingDeg!);
-  assert.equal(swings[seatsOf(scene).indexOf(base.seat)], 0);
+  assert.equal(swings[seatsOf(scene).indexOf(base.seat as number)], 0);
   for (let index = 1; index < swings.length; index++) {
     assert.ok(swings[index]! >= swings[index - 1]!, `svängarna ${swings.join(', ')} grader går inte åt ett håll över platserna`);
   }
@@ -613,5 +618,175 @@ test('given utan cykel lägger kortet på platsens andra kortplats när den säg
     cardCorners(scene, placeOf(seat, 1)).forEach((corner, k) => near(far(end.card!.corners[k]!, corner), 0, 0.001, `plats ${seat}: kortets hörn ${k}`));
     assert.deepEqual(throughShoe(scene, doll, move), []);
     assert.deepEqual(armHits(scene, doll, move), { shoe: [], restingHand: [], torso: [], table: [] });
+  }
+});
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Dealerns kort, hålkortet, vändningen och spelarnas tredje kort: samma cykel med en annan kortplats eller handling.
+
+const acted = new Map<string, DollMove>();
+/** Cykeln till en kortplats med en handling, räknad en gång. */
+const actTo = (seat: Seat, index: number, action: Action): DollMove => {
+  const key = `${seat}:${index}:${action}`;
+  if (!acted.has(key)) acted.set(key, moveFor(scene, doll, base, seat, { index, cycle, action }));
+  return acted.get(key)!;
+};
+/** Ett korts hörn sedda uppifrån, i cardCorners ordning, vilken sida som än är upp (som cornersIn i src/pipeline/cykel.ts). */
+const fromAbove = (card: CardPose): Vec3[] => (card.up === 'baksida' ? [1, 0, 3, 2].map((k) => card.corners[k]!) : card.corners);
+const where = (seat: Seat, index: number, action: Action): string => `${action} till ${seat === 'D' ? 'dealern' : `plats ${seat}`}, kort ${index}`;
+/** De nya slagen: dealerns öppna kort, hålkortet, vändningen, dealerns extrakort och tredje kortet till plats 1–7. */
+const NEW: [Seat, number, Action][] = [
+  ['D', 0, 'deal'],
+  ['D', 1, 'hole'],
+  ['D', 1, 'flip'],
+  ['D', 2, 'deal'],
+  ['D', 3, 'deal'],
+  ...seatsOf(scene).map((seat): [Seat, number, Action] => [seat, 2, 'deal']),
+];
+
+test('dealerns kortplatser och handlingarna läses, och fel sägs på svenska', () => {
+  assert.deepEqual([...ACTIONS], ['deal', 'hole', 'flip']);
+  assert.deepEqual(cardPlace(scene, 'D', 1), scene.places.dealer[1]);
+  assert.throws(() => cardPlace(scene, 'D', 9), /ingen kortplats 9 för dealern/);
+  assert.throws(() => cardPlace(scene, 9, 0), /ingen första kortplats för plats 9/);
+  assert.throws(() => moveFor(scene, doll, base, 'D', { index: 1, action: 'hole' }), /Hålkortet görs bara som cykel/);
+  assert.throws(() => moveFor(scene, doll, base, 'D', { index: 1, cycle, action: 'peek' as Action }), /Okänd handling: peek/);
+  assert.equal(actTo('D', 1, 'hole').id, 'cykel-nyp-hole-dealer-kort-1');
+  assert.equal(actTo('D', 0, 'deal').id, 'cykel-nyp-dealer-kort-0');
+  assert.equal(actTo('D', 0, 'deal').action, undefined, 'en giv bär ingen handling: deal gäller när inget sägs');
+  const whole = read('moves/cykel-nyp.json') as DollCycle;
+  assert.throws(() => readCycle({ ...whole, flip: { ...whole.flip, reach: whole.parts.deal } }), /flip:/);
+  assert.throws(() => readCycle({ ...whole, flip: undefined }), /flip:/);
+  const saved = JSON.parse(JSON.stringify(actTo('D', 1, 'flip'))) as DollMove;
+  assert.throws(() => readMove({ ...saved, seat: 0 }), /seat ska vara en plats från 1, eller D/);
+  assert.throws(() => readMove({ ...saved, action: 'peek' }), /action ska vara deal, hole, flip/);
+  assert.throws(() => readMove({ ...saved, back: { ...saved.back!, out: [40, 30] } }), /back.out/);
+});
+
+for (const [seat, index, action] of NEW) {
+  const what = where(seat, index, action);
+  test(`${what}: börjar och slutar i REDO, med kortet i kortplatsens hörn och rätt sida upp`, () => {
+    const move = actTo(seat, index, action);
+    near(move.seconds, 4, 1e-9, 'cykelns längd');
+    assert.equal(move.frameCount, 4 * move.fps + 1);
+    const first = poseAt(scene, doll, move, 0);
+    const end = last(move);
+    const redo = poseAt(scene, doll, base, 0);
+    samePose(first, redo, 'första rutan');
+    samePose(end, redo, 'sista rutan');
+    const corners = cardCorners(scene, cardPlace(scene, seat, index));
+    assert.ok(end.laid, 'kortet ligger kvar');
+    assert.equal(end.laid.up, action === 'hole' ? 'baksida' : 'framsida');
+    fromAbove(end.laid).forEach((corner, k) => near(far(corner, corners[k]!), 0, 0.001, `kortets hörn ${k}`));
+    for (const corner of end.laid.corners) near(over(corner), scene.card.thickness / 2, 0.0005, 'kortets hörn över filten');
+    if (action === 'flip') {
+      // Hålkortet ligger med baksidan upp på sin plats från början.
+      assert.equal(first.laid?.up, 'baksida');
+      fromAbove(first.laid!).forEach((corner, k) => near(far(corner, corners[k]!), 0, 0.001, `hålkortets hörn ${k} i första rutan`));
+    } else assert.equal(first.laid, null);
+    // Ett gult kort står i skons mynning där det delade stod, med handen på det.
+    assert.equal(end.card!.up, 'baksida');
+    pickUpCard(scene, doll).corners.forEach((corner, k) => near(far(end.card!.corners[k]!, corner), 0, EXACT, `nästa korts hörn ${k} mot hämtstället`));
+    assert.ok(nearestTip(end) <= TOUCH, 'handen på nästa kort');
+  });
+
+  test(`${what}: armen går fri från skon, bålen, den vilande handen och bordet, och handen håller sin storlek`, () => {
+    const move = actTo(seat, index, action);
+    assert.deepEqual(throughShoe(scene, doll, move), []);
+    assert.deepEqual(armHits(scene, doll, move), { shoe: [], restingHand: [], torso: [], table: [] });
+    const turns = move.tracks.leftArm?.turnDeg ?? [0];
+    assert.ok(Math.max(...turns.map(Math.abs)) <= 90, `armbågen vrids ${Math.max(...turns.map(Math.abs))} grader`);
+    assert.ok(move.bow! >= 0 && move.bow! <= 0.2, `bågen är ${move.bow} m`);
+    const { letsGo, out } = move.back!;
+    const end = last(move);
+    for (let frame = 0; frame < move.frameCount; frame++) {
+      const pose = poseAt(scene, doll, move, frame / move.fps);
+      checkPose(pose, `ruta ${frame}`);
+      near(handLength(pose.hands.left), HAND, 0.001, `ruta ${frame}: givhandens längd`);
+      near(handLength(pose.hands.right), HAND, 0.001, `ruta ${frame}: den vilande handens längd`);
+      // Kortet i handen från att det tas tills handen släpper det; före det i en vändning ligger hålkortet på bordet.
+      const holding = frame <= letsGo && !(out && frame < out[1]);
+      assert.equal(pose.laid === null, holding, `ruta ${frame}: kortet är ${pose.laid ? 'lagt' : 'i handen'}`);
+      if (frame >= move.moments.rests && frame <= letsGo) assert.ok(nearestTip(pose) <= TOUCH, `ruta ${frame}: fingrarna på det lagda kortet`);
+      if (frame > letsGo) near(far(pose.laid!.centre, end.laid!.centre), 0, SAME, `ruta ${frame}: kortet ligger kvar`);
+    }
+  });
+}
+
+test('hålkortet vänds inte: baksidan är upp hela vägen, och handen gör samma rörelse som när kortet vänds', () => {
+  const hole = actTo('D', 1, 'hole');
+  const dealt = actTo('D', 1, 'deal');
+  for (let frame = 0; frame < hole.frameCount; frame++) {
+    const a = poseAt(scene, doll, hole, frame / hole.fps);
+    const b = poseAt(scene, doll, dealt, frame / dealt.fps);
+    const card = a.laid ?? a.card!;
+    assert.equal(card.up, 'baksida', `ruta ${frame}: hålkortet visar baksidan`);
+    a.hands.left.forEach((point, k) => near(far(point, b.hands.left[k]!), 0, SAME, `ruta ${frame}: givhanden punkt ${k}`));
+    // Samma kort på samma ställe, utom där givens kort står på kant och hålkortet ligger nästan plant: där lyfts de olika
+    // mycket från filten (cardOnTable).
+    const turning = frame >= hole.moments.edge[0] - 3 && frame <= hole.moments.edge[1] + 3;
+    near(far(card.centre, (b.laid ?? b.card)!.centre), 0, turning ? 0.005 : 1e-6, `ruta ${frame}: kortets mitt`);
+  }
+  // Givens kort vänds en gång; hålkortet är samma kort utan vändningen: samma yta före den, och framsidan nedåt efter.
+  const read = base.tracks.card;
+  const turned = unturned(read, base.moments);
+  const before = base.moments.edge[0] - 4;
+  const after = base.moments.edge[1] + 4;
+  near(far(turned.face[before]!, read.face[before]!), 0, 1e-12, 'före vändningen');
+  const flat = (face: Vec3, long: Vec3): Vec3 => {
+    const along = dot(face, long) / dot(long, long);
+    return [face[0] - long[0] * along, face[1] - long[1] * along, face[2] - long[2] * along];
+  };
+  for (const frame of [after, base.frameCount - 1]) {
+    const minus = flat(read.face[frame]!, read.long[frame]!).map((value) => -value) as Vec3;
+    near(far(flat(turned.face[frame]!, read.long[frame]!), minus), 0, 1e-9, `ruta ${frame}: framsidan nedåt`);
+  }
+  assert.throws(() => unturned({ ...read, face: read.face.map(() => read.face[0]!), long: read.long.map(() => read.long[0]!) }, base.moments), /vänder inte kortet/);
+});
+
+test('vändningen: inget kort dras, hålkortet lyfts, vänds över sin plats och läggs där det låg', () => {
+  const move = actTo('D', 1, 'flip');
+  const [leaves, arrives] = move.back!.out!;
+  const { letsGo } = move.back!;
+  assert.ok(leaves >= Math.round(cycle.parts.ready * move.fps) && arrives > leaves && arrives < move.moments.rests);
+  const place = placeOnTable(scene, cardPlace(scene, 'D', 1));
+  const mouth = pickUpCard(scene, doll);
+  const faces: string[] = [];
+  for (let frame = 0; frame <= letsGo; frame++) {
+    const pose = poseAt(scene, doll, move, frame / move.fps);
+    if (frame < arrives) {
+      // Nästa kort står kvar i mynningen medan handen går ut, och hålkortet ligger på bordet.
+      mouth.corners.forEach((corner, k) => near(far(pose.card!.corners[k]!, corner), 0, EXACT, `ruta ${frame}: kortet i mynningen, hörn ${k}`));
+      assert.equal(pose.laid!.up, 'baksida');
+      continue;
+    }
+    // Kortet hålls över sin plats medan det lyfts, vänds och läggs.
+    const card = pose.card!;
+    const off = Math.hypot(card.centre[0] - place[0], card.centre[2] - place[2]);
+    assert.ok(off <= 0.06, `ruta ${frame}: kortet ${off.toFixed(3)} m från sin plats`);
+    if (faces.at(-1) !== card.up) faces.push(card.up);
+  }
+  assert.deepEqual(faces, ['baksida', 'framsida'], 'kortet vänds en gång, i handen');
+  // Handen når hålkortet med fingertopparna, och blicken har gått före den dit.
+  const reached = poseAt(scene, doll, move, arrives / move.fps);
+  assert.ok(Math.min(...TIPS.map((k) => toCard(reached.hands.left[k]!, reached.card!))) <= TOUCH, 'fingrarna på hålkortet');
+  near(far(poseAt(scene, doll, move, 0).gaze, mouth.centre), 0, SAME, 'blicken på kortet i mynningen i REDO');
+  near(far(reached.gaze, reached.card!.centre), 0, 0.005, 'blicken på hålkortet när handen når det');
+});
+
+test('en vändning och ett hålkort som har sparats och lästs igen spelas som de var', () => {
+  for (const action of ['flip', 'hole'] as const) {
+    const kept = actTo('D', 1, action);
+    const again = readMove(JSON.parse(JSON.stringify(kept)));
+    assert.equal(again.action, action);
+    assert.equal(again.seat, 'D');
+    for (const time of [0, 0.6, 1.3, 1.5, 2, 2.5, 3, kept.seconds]) {
+      const a = poseAt(scene, doll, kept, time);
+      const b = poseAt(scene, doll, again, time);
+      a.hands.left.forEach((point, k) => near(far(point, b.hands.left[k]!), 0, 1e-9, `${action}: punkt ${k} vid ${time} s`));
+      near(far(a.arms.left.elbow, b.arms.left.elbow), 0, 1e-9, `${action}: armbågen vid ${time} s`);
+      near(far((a.laid ?? a.card)!.centre, (b.laid ?? b.card)!.centre), 0, 1e-9, `${action}: kortet vid ${time} s`);
+      assert.equal((a.laid ?? a.card)!.up, (b.laid ?? b.card)!.up);
+    }
   }
 });

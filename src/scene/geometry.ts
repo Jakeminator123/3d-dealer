@@ -313,11 +313,12 @@ export function seatEye(scene: SceneDescription, seat: number, base: Eye = playe
 
 /**
  * Dealerns arbetsyta: punkterna en dealerfilm ska rymma. Kroppen är en låda vid och bakom bordskanten, från filten upp
- * till luften över hjässan och i sidled så långt armarna och skon når. På filten är det varje kortplats, dealerns och
- * spelarnas, med handens räckvidd förbi kortet åt sidorna och mot spelaren, där bordets lutning lägger dem.
+ * till luften över hjässan och i sidled så långt armarna och skon når. På filten är det kortplatserna, dealerns och
+ * spelarnas, med handens räckvidd förbi kortet åt sidorna och mot spelaren, där bordets lutning lägger dem: de
+ * `film.reach.cards` första på varje plats, så att en kortplats till inte flyttar närbilden och de klipp som är gjorda i den.
  */
 export function workArea(scene: SceneDescription): Vec3[] {
-  const { x, top, behind, past } = scene.film.reach;
+  const { x, top, behind, past, cards } = scene.film.reach;
   const edge = scene.dealerEdge.z;
   const body = x.flatMap((side): Vec3[] => [
     [side, top, edge - behind],
@@ -325,7 +326,7 @@ export function workArea(scene: SceneDescription): Vec3[] {
     [side, 0, edge - behind],
     [side, 0, edge],
   ]);
-  const places = [...scene.places.dealer, ...scene.places.seats.flatMap((seat) => seat.cards)];
+  const places = [...scene.places.dealer.slice(0, cards), ...scene.places.seats.flatMap((seat) => seat.cards.slice(0, cards))];
   const felt = places.flatMap((place): Vec3[] => [
     tilted(scene, [place[0] - past, 0, place[1] + past]),
     tilted(scene, [place[0] + past, 0, place[1] + past]),
