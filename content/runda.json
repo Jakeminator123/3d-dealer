@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "about": "Rundan: den giv som spelkärnan delar när ingen spelar, hur länge ett kort utan klipp går självt, och hur rundan sparas som film. Läses av servern (/api/runda, src/server/game.ts), som delar rundan med spelkärnan, och av src/scene/round.ts, som väljer dealerns klipp för den i Labbet, Casinot och src/pipeline/runda.ts. Ingenting här avgör spelet: kort, ordning, pengar och utfall är spelkärnans.",
+  "about": "Rundan: den giv som spelkärnan delar när ingen spelar, hur länge ett kort utan klipp går självt, och hur rundan sparas som film. Läses av servern (/api/runda, src/game/game.ts), som delar rundan med spelkärnan, och av src/scene/round.ts, som väljer dealerns klipp för den i Labbet, Casinot och src/pipeline/runda.ts. Ingenting här avgör spelet: kort, ordning, pengar och utfall är spelkärnans.",
   "deal": {
     "seed": "runda-3",
     "bets": [

@@ -369,7 +369,7 @@ export function waitClip(entries: RoundEntry[], dealer: string, view: SeatView, 
 /**
  * Klippen som en runda ur REDO-ankaret `anchor` kan spela för dealern och vyn, vilka kort spelkärnan än delar: för varje
  * kort som ankaret har ett klipp till (plats, kortets nummer, action) det klipp som planRound väljer, och vänta-klippet
- * (waitClip). Så vet visningen vilka filer den behöver.
+ * (waitClip). Så vet det statiska bygget (src/statisk) vilka filer det behöver.
  */
 export function clipsOf(entries: RoundEntry[], dealer: string, view: SeatView, anchor: string | null): string[] {
   const own = entries.filter((entry) => anchorOf(entry) === anchor);

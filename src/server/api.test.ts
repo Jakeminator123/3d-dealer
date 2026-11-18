@@ -393,3 +393,20 @@ test('en ändring från en annan webbsida tas inte emot', async () => {
   const own = await post(body, { 'Content-Type': 'application/json', Origin: base });
   assert.equal(own.status, 200);
 });
+
+test('dealerna: var var och en står, ur hennes fil och registret', async () => {
+  const empty = await fetch(`${base}/api/dealers`);
+  assert.deepEqual(await empty.json(), [], 'utan dealermallen inga dealers');
+  put('content/dealer.json', readFileSync(join(import.meta.dirname, '..', '..', 'content', 'dealer.json'), 'utf8'));
+  put('content/dealers/prov.json', JSON.stringify({ id: 'prov', name: 'Prov', looks: { pronoun: 'she', basis: 'antaget', source: 'prov' }, identity: { images: [], basis: 'antaget', source: 'prov' }, anchors: { redo: {}, basis: 'antaget', source: 'prov' } }));
+  try {
+    const answer = await fetch(`${base}/api/dealers`);
+    assert.equal(answer.status, 200);
+    const [state] = (await answer.json()) as { id: string; name: string; next: { commands: string[] }[]; views: { view: string }[] }[];
+    assert.deepEqual([state!.id, state!.name, state!.views[0]!.view], ['prov', 'Prov', 'spelaren']);
+    assert.match(state!.next[0]!.commands[0]!, /identitet\.ts källa prov/);
+  } finally {
+    rmSync(join(root, 'content', 'dealer.json'));
+    rmSync(join(root, 'content', 'dealers'), { recursive: true });
+  }
+});

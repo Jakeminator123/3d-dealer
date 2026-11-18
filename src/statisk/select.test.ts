@@ -1,4 +1,4 @@
-// Det som följer med visningen: utdraget ur registret bär bara de fält uppspelningen läser, klippen är de en runda ur
+// Det som följer med det statiska Casinot: utdraget ur registret bär bara de fält uppspelningen läser, klippen är de en runda ur
 // hela givens ankare kan spela, och content/ följer med utan sina texter. Filnamnen är påhittade: ett riktigt
 // registernamn i ett test pekar på posten och hindrar npm run reg -- ta-bort.
 
@@ -11,7 +11,6 @@ import { registerPath, viewRegistry } from '../pipeline/registry.ts';
 import { readScene } from '../scene/description.ts';
 import { readDoll } from '../scene/dollPose.ts';
 import { readRound, type RoundEntry } from '../scene/round.ts';
-import { withoutFilm } from './missing.ts';
 import { choose, clipEntry, glbReferences, NO_SOURCE, roomEntry, withoutTexts } from './select.ts';
 
 const project = resolve(import.meta.dirname, '..', '..');
@@ -149,7 +148,7 @@ test('en post i utdraget bär bara de fält uppspelningen läser, och ankaret so
   assert.deepEqual(roomEntry(ROOM), { file: ROOM.file, status: 'godkänd', kind: '360', oldView: { turn: 0, blur: 6, exposure: 0.42, mirror: false } });
 });
 
-test('visningen tar klippen ur hela givens ankare, den senaste godkända tagningen per kort, vänta-klippet, rummet och modellerna', () => {
+test('bygget tar klippen ur hela givens ankare, den senaste godkända tagningen per kort, vänta-klippet, rummet och modellerna', () => {
   const chosen = choose(REGISTRY, round, dealt, scene);
   assert.equal(chosen.anchor, 'dealers/prov/anchors/spelaren-redo.png');
   const clips = chosen.files.filter((file) => file.endsWith('.mp4')).sort();
@@ -200,11 +199,4 @@ test('en GLB-modell som läser andra filer syns', () => {
   assert.deepEqual(glbReferences(glb({ buffers: [{ byteLength: 4 }], images: [{ uri: 'data:image/png;base64,AAAA' }] })), []);
   assert.deepEqual(glbReferences(glb({ buffers: [{ uri: 'table.bin' }], images: [{ uri: 'felt.jpg' }] })), ['table.bin', 'felt.jpg']);
   assert.throws(() => glbReferences(new Uint8Array(24)), /ingen GLB/);
-});
-
-test('raden om vad som saknar film säger det som läggs utan dealerns rörelse', () => {
-  const chosen = choose(REGISTRY, round, dealt, scene);
-  assert.equal(withoutFilm(chosen.extract, [1, 2, 3, 4, 5, 6, 7]), 'Utan film än: dealerns egna kort, spelarnas tredje kort och fler, och kort på en delad hand. De läggs utan hennes rörelse.');
-  const fewer = chosen.extract.filter((entry) => !String(entry.file).includes('cykel-6-1'));
-  assert.equal(withoutFilm(fewer, [1, 2, 3, 4, 5, 6, 7]), 'Utan film än: dealerns egna kort, andra kortet till plats 6, spelarnas tredje kort och fler, och kort på en delad hand. De läggs utan hennes rörelse.');
 });

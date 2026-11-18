@@ -1,4 +1,5 @@
-// Vad som följer med visningen (bygg.ts): klippen ur det REDO-ankare som hela given väljer, rummet och modellerna, ett
+// Vad som följer med det statiska Casinot (bygg.ts): klippen ur det REDO-ankare som rundan i content/runda.json väljer
+// (hela given, som i Labbet), rummet och modellerna, ett
 // utdrag ur registret med bara de fält uppspelningen läser, och beskrivningarna i content/ utan sina källtexter. Inga
 // beställningar, inga omdömestexter, inga av Jakobs ord, inga sökvägar på datorn. Här läses inga filer.
 
@@ -45,7 +46,7 @@ export function clipEntry(entry: RoundEntry): RoundEntry {
   };
 }
 
-/** Rummet så som Casinot läser det (backgroundOf i round.ts): filen, om den är en 360-bild eller platt, och visningen. */
+/** Rummet så som Casinot läser det (backgroundOf i round.ts): filen, om den är en 360-bild eller platt, och hur den visas. */
 export function roomEntry(entry: RoundEntry): RoundEntry {
   const old = entry.oldView as Record<string, unknown> | undefined;
   return {
@@ -58,7 +59,7 @@ export function roomEntry(entry: RoundEntry): RoundEntry {
   };
 }
 
-/** Det visningen visar: ankaret, utdraget ur registret och filerna ur assets/ som följer med. */
+/** Det som följer med: ankaret, utdraget ur registret och filerna ur assets/. */
 export type Chosen = { anchor: string; extract: RoundEntry[]; files: string[]; notes: string[] };
 
 /**
@@ -70,7 +71,7 @@ export type Chosen = { anchor: string; extract: RoundEntry[]; files: string[]; n
 export function choose(entries: RoundEntry[], round: Round, dealt: DealtRound, scene: SceneDescription): Chosen {
   const deals = dealsOf(dealt.steps);
   const plan = planRound(deals, entries, DEALER, VIEW, round.fallback);
-  if (plan.anchor === null) throw new SelectError('Hela given har inget godkänt klipp ur Spelaren: visningen har ingen dealer att visa');
+  if (plan.anchor === null) throw new SelectError('Hela given har inget godkänt klipp ur Spelaren: Casinot har ingen dealer att visa');
   const clips = clipsOf(entries, DEALER, VIEW, plan.anchor);
   const room = entries.find((entry) => entry.file === round.film.background);
   if (!room || room.present === false) throw new SelectError(`Rummet ${round.film.background} (content/runda.json film.background) saknas i registret eller i assets/`);
@@ -84,12 +85,12 @@ export function choose(entries: RoundEntry[], round: Round, dealt: DealtRound, s
   const notes: string[] = [];
   const ready = readyClip(entries, DEALER, VIEW);
   const readyEntry = entries.find((entry) => entry.file === ready);
-  if (readyEntry && anchorOf(readyEntry) !== plan.anchor) notes.push(`I studion står dealern i REDO ur ett annat ankare (${anchorOf(readyEntry)}) än hela givens; visningen visar bara hela givens.`);
+  if (readyEntry && anchorOf(readyEntry) !== plan.anchor) notes.push(`I studion står dealern i REDO ur ett annat ankare (${anchorOf(readyEntry)}) än hela givens; det statiska Casinot har bara hela givens.`);
   return { anchor: plan.anchor, extract, files: [...new Set([...clips, room.file, scene.table.file, scene.shoe.file])], notes };
 }
 
 // Det som står i stället för en källtext: läsarna i src/scene vill ha en text där, och den följer inte med.
-export const NO_SOURCE = 'Utdrag för visningen: källan står i studion.';
+export const NO_SOURCE = 'Utdrag: källan står i studion.';
 
 /**
  * En beskrivning ur content/ utan sina texter: varje `source` och `about` blir NO_SOURCE. Talen, märkningen (`basis`)

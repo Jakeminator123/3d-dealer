@@ -1,6 +1,6 @@
-// node:crypto och Buffer för spelkärnan i webbläsaren, i visningen. Kärnan (src/engine) är skriven för Node och läser
-// createHash, randomFillSync, randomBytes och randomUUID ur node:crypto, och Buffer som global. Visningens bygge
-// (bygg.ts) pekar node:crypto hit, så att kärnan körs som den står, utan ändringar. Bara det kärnan använder finns:
+// node:crypto och Buffer för spelkärnan i webbläsaren, i det statiska Casinot. Kärnan (src/engine) är skriven för Node
+// och läser createHash, randomFillSync, randomBytes och randomUUID ur node:crypto, och Buffer som global. Det statiska
+// bygget (bygg.ts) pekar node:crypto hit, så att kärnan körs som den står, utan ändringar. Bara det kärnan använder finns:
 // sha256 (synkront, som Nodes), slumpen ur webbläsarens crypto.getRandomValues, och en Buffer med de metoder rng.ts läser.
 //
 // Att kärnan ger samma utfall med den här filen som med Nodes prövas i spel.test.ts: samma frö ger samma runda.

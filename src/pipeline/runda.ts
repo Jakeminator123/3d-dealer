@@ -2,7 +2,7 @@
 //
 //   node src/pipeline/runda.ts <dealer> <vy> [--fro <ord>] [--fart <tal>] [--nara] [--plan]
 //
-// <vy> är spelaren eller plats-N. Spelkärnan delar rundan i servern (/api/runda, src/server/game.ts): skon blandas ur
+// <vy> är spelaren eller plats-N. Spelkärnan delar rundan i servern (/api/runda, src/game/game.ts): skon blandas ur
 // fröet i content/runda.json, eller ur --fro, och spelarna där spelar efter dess regel. Samma frö ger samma runda.
 // Vilket klipp varje kort får väljs i src/scene/round.ts, som Labbets steg Scen och Casinot också går genom: ett
 // godkänt cykelklipp efter postens seat, index och action, eller spelkärnans fallback när klippet saknas (kortet går

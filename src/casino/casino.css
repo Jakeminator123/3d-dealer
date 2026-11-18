@@ -107,6 +107,11 @@ button.go {
   border-radius: 6px;
 }
 
+.elsewhere[aria-disabled='true'] {
+  color: var(--dim);
+  cursor: not-allowed;
+}
+
 .notice {
   margin: 0;
   padding: 32px;

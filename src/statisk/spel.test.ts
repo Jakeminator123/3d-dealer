@@ -1,8 +1,8 @@
-// Spelkärnan i webbläsaren: med visningens node:crypto och Buffer (nodecrypto.ts) ger kärnan samma händelser som i
-// servern för samma frö, och visningens sida av Casinots gränssnitt svarar som serverns.
+// Spelkärnan i webbläsaren: med det statiska byggets node:crypto och Buffer (nodecrypto.ts) ger kärnan samma händelser som i
+// servern för samma frö, och byggets sida av Casinots gränssnitt svarar som serverns.
 //
 // Samma rundor och sessioner spelas i två egna processer: en som servern, med Nodes node:crypto och Buffer, och en som
-// webbläsaren i visningen, där Buffer är borttagen och node:crypto i src/engine pekar på nodecrypto.ts, som i bygget
+// webbläsaren i det statiska Casinot, där Buffer är borttagen och node:crypto i src/engine pekar på nodecrypto.ts, som i bygget
 // (bygg.ts). Svaren ska vara lika.
 
 import assert from 'node:assert/strict';
@@ -22,7 +22,7 @@ const url = (file: string): string => pathToFileURL(join(import.meta.dirname, fi
 const PLAY = `
 import { registerHooks } from 'node:module';
 const [like, shim, gameUrl] = process.argv.slice(1);
-if (like === 'visning') {
+if (like === 'webbläsare') {
   registerHooks({
     resolve(specifier, context, next) {
       if (specifier === 'node:crypto' && context.parentURL && context.parentURL.includes('/src/engine/')) return next(shim, context);
@@ -71,10 +71,10 @@ process.stdout.write(JSON.stringify({
 
 type Played = { buffer: string; rounds: unknown[]; sessions: unknown[][]; secure: { source: string; events: number; cards: number } };
 
-const play = (like: 'server' | 'visning'): Played =>
+const play = (like: 'server' | 'webbläsare'): Played =>
   JSON.parse(execFileSync(process.execPath, ['--input-type=module', '--eval', PLAY, like, url('nodecrypto.ts'), url('../game/game.ts')], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })) as Played;
 
-test('visningens sha256, Buffer och slump gör det kärnan läser som Nodes', () => {
+test('byggets sha256, Buffer och slump gör det kärnan läser som Nodes', () => {
   for (const size of [0, 1, 55, 56, 63, 64, 65, 119, 120, 128, 1000, 5000]) {
     const bytes = randomBytes(size);
     assert.equal(shimHash('sha256').update(bytes).digest('hex'), createHash('sha256').update(bytes).digest('hex'), `${size} bytes`);
@@ -104,10 +104,10 @@ test('visningens sha256, Buffer och slump gör det kärnan läser som Nodes', ()
   assert.match(randomUUID(), /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
 });
 
-test('spelkärnan med visningens node:crypto ger samma händelser som serverns för samma frö', () => {
+test('spelkärnan med byggets node:crypto ger samma händelser som serverns för samma frö', () => {
   const server = play('server');
-  const browser = play('visning');
-  // Buffer togs bort i visningens process: den som finns där är visningens, och då läste kärnan visningens node:crypto.
+  const browser = play('webbläsare');
+  // Buffer togs bort i webbläsarens process: den som finns där är byggets, och då läste kärnan byggets node:crypto.
   assert.deepEqual([server.buffer, browser.buffer], ['Buffer', 'Bytes']);
   assert.equal(browser.rounds.length, 6);
   assert.deepEqual(browser.rounds, server.rounds);
@@ -118,7 +118,7 @@ test('spelkärnan med visningens node:crypto ger samma händelser som serverns f
   assert.ok(browser.secure.events > 0);
 });
 
-test('visningens spel svarar som serverns: bordet som över nätet, kärnans nej med dess skäl, och en ny session', async () => {
+test('byggets spel svarar som serverns: bordet som över nätet, kärnans nej med dess skäl, och en ny session', async () => {
   const game = browserGame();
   const empty = await game.table();
   assert.deepEqual([empty.state.ver, empty.state.balance, empty.state.view.round, empty.steps], [0, 1000, null, []]);

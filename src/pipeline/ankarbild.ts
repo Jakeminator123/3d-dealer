@@ -276,7 +276,9 @@ export function moveHand(picture: Picture, hand: Hand, scale: number, fixed: Pix
   const shift = Math.ceil(Math.hypot(target.x - fixed.x, target.y - fixed.y));
   const box = clipBox(growBox(hand.box, shift + 4), picture);
   const inBox = (x: number, y: number) => x >= box.x0 && x < box.x1 && y >= box.y0 && y < box.y1;
+  // Handen med två bildpunkters kant, så att den blandas in; utan det gula och blå, som är kortet och inte handen.
   const moved = growMask(hand.mask, width, box, 2);
+  for (let p = 0; p < width * height; p++) if (moved[p] && !hand.mask[p] && isCard(...rgbAt(picture, p))) moved[p] = 0;
   const removed = new Uint8Array(width * height);
   let removedYellow = 0;
   if (yellow) {

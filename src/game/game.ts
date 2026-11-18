@@ -2,14 +2,14 @@
 // kort och pengar; här hålls bara sessionen och stegen, så att Casinot kan spela upp rundan och läsa om den.
 //
 // Samma session körs på två ställen: i studions server (src/server/api.ts, /api/game och /api/runda), som sidorna når
-// över HTTP, och i webbläsaren i visningen (src/visning), där sidan inte har någon server. Casinot talar med båda genom
-// samma gränssnitt (src/casino/link.ts).
+// över HTTP, och i webbläsaren i det statiska Casinot (src/statisk), där sidan inte har någon server. Casinot talar med
+// båda genom samma gränssnitt (src/casino/link.ts).
 //
-// Här delas också rundan som Labbet, visningen och src/pipeline/runda.ts visar (dealRound): en session med frö, där
-// spelarna i content/runda.json spelar efter en enkel regel. Regeln är spelarens val, inte kärnans: kärnan avgör allt annat.
+// Här delas också rundan som Labbet och src/pipeline/runda.ts visar (dealRound): en session med frö, där spelarna i
+// content/runda.json spelar efter en enkel regel. Regeln är spelarens val, inte kärnans: kärnan avgör allt annat.
 //
 // Sessionen lever så länge processen eller sidan lever. Servern startar om sig själv när dess kod ändras, och då börjar
-// sessionen om med en ny sko och ny kassa; i visningen börjar den om när sidan laddas om.
+// sessionen om med en ny sko och ny kassa; i det statiska Casinot börjar den om när sidan laddas om.
 
 import { createSession, type Session, type Snapshot } from '../engine/session.ts';
 import type { DealtRound, Round, RoundStep } from '../scene/round.ts';

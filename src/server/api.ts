@@ -3,10 +3,11 @@
 // och runda.ts visar.
 // Allt annat lämnas vidare (till Vite, som sköter sidorna).
 
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { join } from 'node:path';
 import { SessionError } from '../engine/session.ts';
+import { dealerState, listDealers } from '../pipeline/dealer.ts';
 import { ForlagaError, saveFrame, startForlaga } from '../pipeline/forlaga.ts';
 import { PlanError, savePlan } from '../pipeline/kortplan.ts';
 import { assetsDir, RegistryError, setStatus, setWords, stamp, viewRegistry } from '../pipeline/registry.ts';
@@ -138,6 +139,12 @@ export function createApi(root: string, now: () => string = stamp, gameOptions: 
 
     if (path === '/api/registry' && reading) {
       sendJson(response, 200, viewRegistry(root));
+    } else if (path === '/api/dealers' && reading) {
+      // Dealerna med en fil i content/dealers/ och var var och en står (src/pipeline/dealer.ts): Labbets steg Dealer.
+      // Utan dealermallen (content/dealer.json) finns inga dealers att visa.
+      const entries = viewRegistry(root).assets;
+      const mall = join(root, 'content', 'dealer.json');
+      sendJson(response, 200, existsSync(mall) ? listDealers(root).map((id) => dealerState(root, id, entries)) : []);
     } else if (path === '/api/registry/status' && request.method === 'POST') {
       if (!sentByOwnPage(request)) return sendText(response, 403, 'Ändringar tas bara emot från Labbets egen sida');
       const body = (await readJson(request)) as { file?: unknown; status?: unknown };

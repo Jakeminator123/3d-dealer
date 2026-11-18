@@ -15,6 +15,9 @@
 //     plattat till skärmens gröna, kläderna ned till bordskanten och det minsta rent. Mäter bilden mot underlaget med
 //     gränserna i content/ankare.json, gör arket, och för in ankaret (att granska, med ögat och skons läge), de två
 //     beställningarna ur kvitto.json och måtten i registret.
+//   node src/pipeline/ankare.ts öga <dealer> <vy> [--underlag <png>]
+//     För över vyns ankare till dagens närbild med en homografi när kortplanen har ändrats (samma öga på samma plats),
+//     plattar skärmen och för in det som ett nytt ankare att granska, utan betald generering.
 //   node src/pipeline/ankare.ts använd <dealer> <vy> <fil>
 //     Pekar ut ett godkänt ankare som vyns REDO i dealerns fil (anchors.redo), som tagning.ts forbered sedan läser.
 //
@@ -29,7 +32,7 @@ import { poseAt } from '../scene/dollPose.ts';
 import { see, type Eye, type Pixel, type SeatView } from '../scene/geometry.ts';
 import * as bild from './ankarbild.ts';
 import { closeView, cornersIn, cycleEye, cycleMove, readCycleParts, type CycleCard, type CycleParts } from './cykel.ts';
-import { DealerError, dealerFile, fillParagraphs, placeholdersOf, readDealer, readMall, roleFile, wordKeys, wordsOf, writeDealer, type Dealer, type Words } from './dealer.ts';
+import { anchorFor, DealerError, dealerFile, fillParagraphs, placeholdersOf, readDealer, readMall, roleFile, wordKeys, wordsOf, writeDealer, type Dealer, type Words } from './dealer.ts';
 import { clipBox, edgeRow, gapIn, greenOff, grow, isYellow, judgeOne, layoutFor, parts as partsIn, union, type Box, type Judged, type Limit, type Picture, type Rgb } from './matning.ts';
 import { addMeasurement, addOrder, addUpload, getEntry, importAsset, readRegistry, sha256Of, stamp, studioRoot, type Order, type Post } from './registry.ts';
 import { shootAll } from './shoot.ts';
@@ -452,6 +455,10 @@ export function makeAnchor(guide: Picture, stallning: Picture, likhet: Picture, 
     if (scale >= local.hands.keep && side === 'rest') continue;
     const moved = bild.moveHand(picture, hand, scale, fixed, target, side === 'give');
     if (side === 'give') giveCover = moved.cover;
+    // Där bilden är gissad (fylld och inte täckt av den lagda handen): ärmen och skon kring handen.
+    let guessed = 0;
+    for (let p = 0; p < width * height; p++) if (moved.hole[p] && moved.cover[p]! < 250) guessed++;
+    (hands[side] as Record<string, unknown>).gissat = guessed;
     steps.push(`${side === 'give' ? 'givhanden' : 'vilande handen'}: ${scale} kring (${Math.round(fixed.x)}, ${Math.round(fixed.y)}), lagd på (${Math.round(target.x)}, ${Math.round(target.y)})${moved.removedYellow ? `, bildmodellens kort borttaget (${moved.removedYellow} bp)` : ''}`);
   }
   shown.händer = hands;
@@ -524,7 +531,7 @@ export function measureAnchor(picture: Picture, guide: Picture, doll: DollPoints
 }
 
 /** Arket: underlaget, bildmodellernas bilder och ankaret, och händerna och kortet närmare, dockan bredvid ankaret. */
-async function anchorSheet(out: string, guide: Picture, stallning: Picture, likhet: Picture, made: Picture, doll: DollPoints): Promise<void> {
+async function anchorSheet(out: string, guide: Picture, stallning: Picture, likhet: Picture, made: Picture, doll: DollPoints, labels: [string, string] = ['ställningen', 'likheten']): Promise<void> {
   const W = 480;
   const H = 270;
   const raw = (p: Picture) => sharp(p.data, { raw: { width: p.width, height: p.height, channels: 3 } });
@@ -536,8 +543,8 @@ async function anchorSheet(out: string, guide: Picture, stallning: Picture, likh
   };
   const tiles: [Buffer, string][] = [
     [await whole(guide), 'underlaget (dockan)'],
-    [await whole(stallning), 'ställningen'],
-    [await whole(likhet), 'likheten'],
+    [await whole(stallning), labels[0]],
+    [await whole(likhet), labels[1]],
     [await whole(made), 'ankaret'],
     [await pair(doll.grip, 110), 'givhanden och kortet: dockan | ankaret'],
     [await pair(doll.rest.hand, 130), 'vilande handen: dockan | ankaret'],
@@ -682,6 +689,104 @@ export async function taEmot(id: string, files: { stallning?: string; likhet?: s
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
+// öga: vyns ankare fört över till dagens närbild
+
+/** Bildpunkter som är gröna men inte skärmens gröna: ringarna en omsampling lämnar kring silhuetten. */
+const greenRings = (picture: Picture, key: Rgb): number => {
+  let n = 0;
+  for (let p = 0; p < picture.width * picture.height; p++) {
+    const r = picture.data[p * 3]!;
+    const g = picture.data[p * 3 + 1]!;
+    const b = picture.data[p * 3 + 2]!;
+    if (g - Math.max(r, b) > 40 && !(r === key[0] && g === key[1] && b === key[2])) n++;
+  }
+  return n;
+};
+
+/**
+ * För över vyns REDO-ankare (dealerns fil) till dagens närbild, när kortplanen har ändrats och närbilden räknats om:
+ * ögat står på samma plats men pekar annorlunda. Underlaget sparas i dagens öga, ankaret förs över med en homografi
+ * (ankarbild.ts, toEye), skärmen plattas, eftersom omsamplingen lämnar gröna ringar kring silhuetten, och bilden mäts
+ * mot underlaget och förs in som ett nytt ankare att granska, utan betald generering. Huvudet och händerna ändras inte:
+ * har dockans REDO ändrats (till exempel blicken) görs likheten om med paketets ankare.png som @base.
+ */
+export async function oga(dealerId: string, viewWord: string, options: PrepareOptions & { register?: boolean } = {}): Promise<{ id: string; dir: string; values: Record<string, number | null> }> {
+  const root = options.root ?? studioRoot();
+  const out = options.out ?? join(root, PACKAGES);
+  const say = options.say ?? ((text: string) => console.log(text));
+  const content = readAnkare(root);
+  const dealer = readDealer(root, dealerId);
+  const view = viewOf(viewWord);
+  const current = anchorFor(dealer, viewWord);
+  if (!current) throw new AnkareError(`${dealerFile(dealerId)} har inget ankare ur ${viewWord} att föra över`);
+  const oldEye = getEntry(root, current)?.eye as FilmEye | undefined;
+  if (!oldEye?.frame) throw new AnkareError(`${current} bär inget öga i registret (eye): det går inte att föra över`);
+  const n = nextNumber(root, dealerId, viewWord, out);
+  const id = packageIdOf(dealerId, viewWord, n);
+  const dir = join(out, id);
+  if (existsSync(dir)) throw new AnkareError(`${posix(relative(root, dir))} finns redan`);
+  mkdirSync(dir, { recursive: true });
+  const at = (file: string) => join(dir, file);
+  let guidePath = options.underlag ? resolve(root, options.underlag) : '';
+  if (!guidePath) {
+    say(`Dockans REDO ur ${viewWord}s närbild sparas i ateljén …`);
+    guidePath = join(root, await shootGuide(root, content, view, `ankare-${dealerId}-${n}`, say));
+  }
+  copyFileSync(guidePath, at('underlag.png'));
+  copyFileSync(guidePath.replace(/\.png$/, '.json'), at('underlag.json'));
+  const guideJson = JSON.parse(readFileSync(at('underlag.json'), 'utf8')) as GuideJson;
+  const eye = eyeOf(guideJson);
+  const scene = JSON.parse(readFileSync(join(root, 'content', 'scene.json'), 'utf8')) as { studio: { colours: { screen: Rgb } } };
+  const key = scene.studio.colours.screen;
+  const before = await bild.readFitted(join(root, 'assets', current), oldEye.frame.width, oldEye.frame.height);
+  const moved = bild.toEye(before, oldEye, eye, key);
+  const rings = greenRings(moved.picture, key);
+  const sample = content.local.flatten.sample;
+  const { width, height } = eye.frame;
+  bild.flattenScreen(moved.picture, key, { x0: sample[0] * width, y0: sample[1] * height, x1: sample[2] * width, y1: sample[3] * height }, content.local.flatten);
+  const parts = { ...readCycleParts(content.underlag.move, root), eye: { ...eye } };
+  const doll = dollPoints(parts, view, content, root);
+  const guide = await bild.readFitted(at('underlag.png'), width, height);
+  const measure = readTagning(root).measure;
+  const measured = measureAnchor(moved.picture, guide, doll, content, key, { rows: measure.gapRows, least: measure.gapLeast }, null);
+  await bild.savePicture(moved.picture, at('ankare.png'));
+  await anchorSheet(at('ark.jpg'), guide, before, moved.picture, moved.picture, doll, ['ankaret i det gamla ögat', 'fört över och plattat']);
+  const anchor = anchorFileOf(dealerId, viewWord, n);
+  const pkg = posix(relative(root, dir));
+  const shoe = { at: [...parts.scene.shoe.at] as [number, number], yawDeg: parts.scene.shoe.yawDeg, length: parts.scene.shoe.length };
+  const summary = `${measured.judged.filter((entry) => entry.verdict === 'inom').length} av ${measured.judged.length} mått inom gränserna`;
+  write(at('bestallning.json'), { about: 'Ett ankare fört över till dagens närbild av src/pipeline/ankare.ts öga: ingen beställning.', id, made: stamp(), dealer: dealerId, view, viewWord, number: n, anchor, from: current, fromEye: oldEye, eye, shoe, doll });
+  write(at('matning.json'), { measured: stamp(), ringsBeforeFlatten: rings, outside: moved.outside, values: measured.values, judged: measured.judged, shown: measured.shown });
+  const post: Post = {
+    from: posix(relative(root, at('ankare.png'))),
+    file: anchor,
+    group: 'anchors',
+    dealer: dealerId,
+    title: `REDO ur ${view.kind === 'plats' ? `Plats ${view.seat}` : 'Spelaren'}, på grönt, fört över till dagens öga`,
+    status: 'att granska',
+    note: `Gjord ${stamp()} genom src/pipeline/ankare.ts öga (paketet ${pkg}): ${current} fört över till dagens närbild med en homografi (samma plats, nytt håll och ny brännvidd), skärmen plattad (${rings} bp gröna ringar efter omsamplingen). Huvud och händer som förut. Mätt: ${summary}. Inte dömd.`,
+    pose: 'redo',
+    grip: 'nyp',
+    licence: 'Ingen tredjepartslicens: genererad på Jakobs Runway-konto',
+    use: 'dealerfilm',
+    view,
+    eye,
+    shoe,
+    source: { from: 'runway', derivedFrom: current, credits: 0, package: pkg, steps: [{ step: 'öga', what: `src/pipeline/ankarbild.ts toEye och flattenScreen: ${current} genom sitt öga till ${pkg}/underlag.json` }], measured: Object.fromEntries(measured.judged.map((entry) => [entry.key, entry.value])) },
+  };
+  write(at('post.json'), post);
+  say(`Fört över: ${pkg}/ankare.png (${moved.outside} bp utanför den gamla bilden, ${rings} bp gröna ringar plattade); arket ${pkg}/ark.jpg`);
+  for (const entry of measured.judged) say(`  ${entry.verdict.padEnd(8)} ${entry.key.padEnd(14)} ${String(entry.value ?? '–').replace('.', ',').padStart(8)} ${entry.unit.padEnd(8)} ${entry.limit}`);
+  if (options.register !== false) {
+    const entry = await importAsset(root, post);
+    for (const one of measured.judged) addMeasurement(root, { file: anchor, what: `${one.key}: ${one.what}`, value: { value: one.value, unit: one.unit, limit: one.limit, verdict: one.verdict }, who: WHO, basis: 'mätt', note: `gränsen: ${one.source}` });
+    write(at('mottaget.json'), { at: stamp(), anchor });
+    say(`Registret: ${entry.file} införd, ${entry.status}. Godkänt: node src/pipeline/ankare.ts använd ${dealerId} ${viewWord} ${anchor}`);
+  }
+  return { id, dir, values: measured.values };
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
 // använd
 
 /** Pekar ut ett godkänt ankare som vyns REDO i dealerns fil. */
@@ -703,6 +808,7 @@ export function anvand(dealerId: string, viewWord: string, file: string, root = 
 const USAGE = `Använd:
   node src/pipeline/ankare.ts förbered <dealer> <vy> [--underlag <png>]
   node src/pipeline/ankare.ts ta-emot <id> [<ställning> <likhet>]
+  node src/pipeline/ankare.ts öga <dealer> <vy> [--underlag <png>]
   node src/pipeline/ankare.ts använd <dealer> <vy> <fil>
 Vyn är spelaren eller plats-N. Receptet: docs/production.md, Ankaret.`;
 
@@ -715,6 +821,7 @@ if (import.meta.main) {
   const words = args.filter((arg, k) => !arg.startsWith('--') && !args[k - 1]?.startsWith('--'));
   try {
     if ((word === 'förbered' || word === 'forbered') && words.length === 2) await forbered(words[0]!, words[1]!, { underlag: flag('--underlag') });
+    else if ((word === 'öga' || word === 'oga') && words.length === 2) await oga(words[0]!, words[1]!, { underlag: flag('--underlag') });
     else if (word === 'ta-emot' && (words.length === 1 || words.length === 3)) await taEmot(words[0]!, words.length === 3 ? { stallning: words[1], likhet: words[2] } : {});
     else if ((word === 'använd' || word === 'anvand') && words.length === 3) {
       anvand(words[0]!, words[1]!, words[2]!);

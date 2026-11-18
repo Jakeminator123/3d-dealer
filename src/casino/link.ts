@@ -1,5 +1,6 @@
 // Gränssnittet Casinot talar med spelet och filerna genom. I studion är det servern (server.ts: /api/game, /api/registry,
-// /content/ och /media/); i visningen är det spelkärnan i webbläsaren och visningens egna filer (src/visning/spel.ts).
+// /content/ och /media/); i det statiska bygget är det spelkärnan i webbläsaren och filerna bredvid sidan
+// (src/statisk/spel.ts).
 // Casinot är detsamma i båda: bara det som står bakom gränssnittet skiljer.
 
 import type { Table } from '../game/game.ts';
