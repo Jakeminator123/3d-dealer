@@ -39,7 +39,10 @@ function ray(eye: Eye, pixel: Pixel): Vec3 {
   return add(add(forward, mul(right, (pixel.x - centre.x) / eye.focalPx)), mul(up, -(pixel.y - centre.y) / eye.focalPx));
 }
 
-/** Filmkameran som öga: den kamera dealerns bilder är gjorda genom och läggs på den vikta ytan genom. */
+/**
+ * Gamla projektets lins som öga: den kamera scenens mått är mätta genom. Ur den räknas vecket (`fold`), och därmed var
+ * dealerbildens överkant står när ett öga för en plats siktas (`seatEye`).
+ */
 export function sceneEye(scene: SceneDescription): Eye {
   const { position, pitchDeg, focalPx, frame } = scene.camera;
   const pitch = radians(pitchDeg);
@@ -48,7 +51,7 @@ export function sceneEye(scene: SceneDescription): Eye {
 
 /**
  * Spelarens öga: vyn scenen ses i. Det står mitt för bordet, så långt från dealerns bordskant och så högt över filten
- * som beskrivningen säger, och ritar samma ruta som filmkameran med sin egen bildvinkel.
+ * som beskrivningen säger, och ritar samma ruta som gamla linsen med sin egen bildvinkel.
  */
 export function playerEye(scene: SceneDescription): Eye {
   const { height, distance, pitchDeg, fovDeg } = scene.player;
@@ -173,28 +176,9 @@ export function roomFoot(scene: SceneDescription): Vec3 {
 }
 
 /**
- * Helfigurens yta: en upprätt fyrhörning bakom dealerns bordskant, mitt för bordet. Hörnen går medurs i bild med början
- * uppe till vänster och täcker hela helfigurens ruta. Raden för händernas underkant står strax över filtens höjd.
- * Ytan lutar inte med bordet: dealern sitter på golvet bakom det.
- */
-export function figureCorners(scene: SceneDescription): Vec3[] {
-  const { width, height } = scene.figure.frame;
-  const [left, top] = onFigure(scene, { x: -0.5, y: -0.5 });
-  const [right, bottom, z] = onFigure(scene, { x: width - 0.5, y: height - 0.5 });
-  return [[left, top, z], [right, top, z], [right, bottom, z], [left, bottom, z]];
-}
-
-/** Var det som helfigurens bild har i en bildpunkt står i scenen. Rutans överkant är rad 0, en halv bildpunkt ovanför översta punktens mitt. */
-export function onFigure(scene: SceneDescription, pixel: Pixel): Vec3 {
-  const { frame, height, handRow, handLift, behindEdge } = scene.figure;
-  const metre = height / frame.height;
-  return [(pixel.x + 0.5 - frame.width / 2) * metre, handLift + (handRow - (pixel.y + 0.5)) * metre, scene.dealerEdge.z - behindEdge];
-}
-
-/**
- * Vecket: dealerfilmens två ytor, så som filmkameran ser dem. Ovanför bordskantens rad står bilden upprätt på kanten;
- * nedanför ligger den på filten. Hörnen går medurs i bild med början uppe till vänster, och täcker tillsammans hela rutan.
- * Den liggande delen anges som på ett olutat bord; den lutar med bordet.
+ * Vecket som gamla linsen ser det: ovanför bordskantens rad står bilden upprätt på kanten; nedanför ligger den på filten.
+ * Hörnen går medurs i bild med början uppe till vänster, och täcker tillsammans hela rutan. Den liggande delen anges som
+ * på ett olutat bord; den lutar med bordet.
  */
 export type Fold = { row: number; upright: Vec3[]; felt: Vec3[] };
 
@@ -227,8 +211,9 @@ export function fold(scene: SceneDescription): Fold {
 }
 
 /**
- * Var det som dealerns bild har i en bildpunkt ligger i scenen: på det upprätta planet ovanför bordskantens rad,
- * annars på filten, där bordets lutning lägger den. Med olutat bord är det punkten filmkameran ser i den bildpunkten.
+ * Var det som en bild i gamla linsens ruta har i en bildpunkt ligger i scenen: på det upprätta planet ovanför
+ * bordskantens rad, annars på filten, där bordets lutning lägger den. Med olutat bord är det punkten linsen ser där.
+ * Ankaret VILA i den rutan är måttet på dealerns kropp i testerna.
  */
 export function onFold(scene: SceneDescription, pixel: Pixel): Vec3 | null {
   const eye = sceneEye(scene);
@@ -382,21 +367,18 @@ export function closeEye(scene: SceneDescription, from: Eye): Eye {
 /**
  * Varifrån scenen betraktas. Spelaren är spelarens öga på kamerans plats, och en plats är samma sorts öga flyttat dit.
  * Med `close` är det vyns närbild: samma öga inzoomat på dealern, rutan en dealerfilm görs i.
- * Filmkameran är den kamera de gamla vikta dealerbilderna är gjorda genom: därifrån ska en sådan dealer se ut som i sin bild.
  */
 export type SeatView = { kind: 'spelaren'; close?: boolean } | { kind: 'plats'; seat: number; close?: boolean };
-export type View = SeatView | { kind: 'filmkameran' };
+export type View = SeatView;
 
 /** Ögat som en vy står i. */
 export function viewEye(scene: SceneDescription, view: View): Eye {
-  if (view.kind === 'filmkameran') return sceneEye(scene);
   const eye = view.kind === 'spelaren' ? playerEye(scene) : seatEye(scene, view.seat);
   return view.close ? closeEye(scene, eye) : eye;
 }
 
-/** Vyns namn i ett ord, för filnamn och beskrivningar: `spelaren`, `plats-7`, `filmkameran`, och närbilden med `-nara` efter. */
+/** Vyns namn i ett ord, för filnamn och beskrivningar: `spelaren`, `plats-7`, och närbilden med `-nara` efter. */
 export function viewName(view: View): string {
-  if (view.kind === 'filmkameran') return view.kind;
   return `${view.kind === 'plats' ? `plats-${view.seat}` : view.kind}${view.close ? '-nara' : ''}`;
 }
 
@@ -442,21 +424,4 @@ export function cardCorners(scene: SceneDescription, place: FeltPoint, heading =
   return [[-1, 1], [1, 1], [1, -1], [-1, -1]].map(([a, b]) =>
     tilted(scene, add(centre, add(mul(right, a! * halfWidth), mul(away, b! * halfHeight)))),
   );
-}
-
-/** Den minsta konvexa månghörning som rymmer punkterna, medurs i bild. Används för att se vilken del av rutan ett föremål täcker. */
-export function hull(points: Pixel[]): Pixel[] {
-  const sorted = [...points].sort((a, b) => a.x - b.x || a.y - b.y);
-  if (sorted.length < 3) return sorted;
-  const turn = (o: Pixel, a: Pixel, b: Pixel): number => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
-  const half = (list: Pixel[]): Pixel[] => {
-    const chain: Pixel[] = [];
-    for (const point of list) {
-      while (chain.length >= 2 && turn(chain[chain.length - 2]!, chain[chain.length - 1]!, point) <= 0) chain.pop();
-      chain.push(point);
-    }
-    chain.pop();
-    return chain;
-  };
-  return [...half(sorted), ...half(sorted.reverse())];
 }

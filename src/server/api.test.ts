@@ -201,7 +201,7 @@ test('en förlaga tas emot ruta för ruta från Labbets egen sida och hamnar und
     frame: { width: 48, height: 27 },
     view: { kind: 'plats', seat: 7 },
     eye: { position: [0.5, 0.6, 0.4], forward: [-0.1, -0.3, -0.9], focalPx: 33 },
-    dealer: { kind: 'helfigur', file: 'reference/film.mp4', time: 0.5 },
+    dealer: { kind: 'film', file: 'dealers/p/clips/film.mp4', view: { kind: 'plats', seat: 7 }, time: 0.5 },
     background: { file: 'scene/bild.png', kind: '360', turn: 0, lift: 0, blur: 6, exposure: 0.5, mirror: false, height: 1.6, radius: 8 },
     shoe: true,
   };

@@ -8,8 +8,8 @@
 // bytes, sha256 (i source), bredd och höjd, och för en film längd och takt. Statusen blir `att granska` om posten inte
 // säger något annat; ett omdöme sätts sedan med `npm run judge`. Flera poster går att lämna som en lista.
 //
-// Att stryka tar bort posten och antecknar under leftOut vad som ströks och varför. Filen flyttas till
-// output/work/struket/, utanför assets/, så att ingenting går förlorat.
+// Att stryka arkiverar: filen flyttas till output/work/struket/, utanför assets/, och posten stryks med en anteckning
+// under leftOut om vad som ströks och varför. Ingenting raderas.
 
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -25,6 +25,8 @@ const run = promisify(execFile);
 const FILE = /^[a-z0-9][a-z0-9_.-]*(\/[a-z0-9][a-z0-9_.-]*)+$/;
 const isFilm = (file: string): boolean => /\.(mp4|webm)$/i.test(file);
 const isPicture = (file: string): boolean => /\.(png|jpe?g|webp)$/i.test(file);
+// Fälten som mäts ur filen själv (factsOf). En post kan inte sätta dem.
+const MEASURED = ['width', 'height', 'bytes', 'seconds', 'fps'];
 
 export const sha256Of = (path: string): string => createHash('sha256').update(readFileSync(path)).digest('hex');
 
@@ -79,6 +81,8 @@ export async function importAsset(root: string, post: Partial<Post>): Promise<Re
   }
   const facts = await factsOf(source);
   const { file, group, dealer, title, status, note, source: origin, ...rest } = fields;
+  // Måtten är alltid de som mäts ur filen: tal som posten bär för dem följer inte med, och en bild får ingen längd.
+  const told = Object.fromEntries(Object.entries(rest).filter(([field]) => !MEASURED.includes(field)));
   // Postens fält i registrets vanliga ordning: vad det är, läget, måtten, och sist ursprunget.
   const entry: RegistryEntry = {
     file: file!,
@@ -88,7 +92,7 @@ export async function importAsset(root: string, post: Partial<Post>): Promise<Re
     status: typeof status === 'string' ? status : 'att granska',
     ...(note === undefined ? {} : { note }),
     ...facts,
-    ...rest,
+    ...told,
     source: { ...(origin as object), sha256 },
   };
   mkdirSync(dirname(target), { recursive: true });
@@ -96,7 +100,7 @@ export async function importAsset(root: string, post: Partial<Post>): Promise<Re
   return addEntry(root, entry, replace === true);
 }
 
-/** Stryker en post: filen flyttas ur assets/ till output/work/struket/, och leftOut får veta vad och varför. */
+/** Arkiverar en post: filen flyttas ur assets/ till output/work/struket/, posten stryks, och leftOut får veta vad och varför. */
 export function strike(root: string, file: string, why: string): string {
   const entry = readRegistry(root).assets.find((candidate) => candidate.file === file);
   if (!entry) throw new RegistryError(`Ingen post i registret för ${file}`);
@@ -111,20 +115,36 @@ export function strike(root: string, file: string, why: string): string {
   return to;
 }
 
+/** Posterna i en fil: en post eller en lista av dem. En fil som saknas eller inte är JSON sägs med sitt namn. */
+export function readPosts(path: string): Partial<Post>[] {
+  let text: string;
+  try {
+    text = readFileSync(path, 'utf8');
+  } catch {
+    throw new ImportError(`${path} går inte att läsa: finns filen?`);
+  }
+  let read: unknown;
+  try {
+    read = JSON.parse(text);
+  } catch (error) {
+    throw new ImportError(`${path} är inte giltig JSON: ${(error as Error).message}`);
+  }
+  return (Array.isArray(read) ? read : [read]) as Partial<Post>[];
+}
+
 if (import.meta.main) {
   const root = process.env.STUDIO_DATA ? resolve(process.env.STUDIO_DATA) : resolve(import.meta.dirname, '..', '..');
   const [first, second, third] = process.argv.slice(2);
   try {
     if (first === 'stryk' && second && third) {
-      console.log(`${second}: struken, filen ligger i ${strike(root, second, third)}`);
+      console.log(`${second}: arkiverad, filen ligger i ${strike(root, second, third)}`);
     } else if (first && first !== 'stryk') {
-      const read = JSON.parse(readFileSync(first, 'utf8')) as Partial<Post> | Partial<Post>[];
-      for (const post of Array.isArray(read) ? read : [read]) {
+      for (const post of readPosts(first)) {
         const entry = await importAsset(root, post);
         console.log(`${entry.file}: ${entry.status}, ${entry.width ?? '?'} × ${entry.height ?? '?'}${entry.seconds ? `, ${entry.seconds} s i ${entry.fps} rutor/s` : ''}, ${entry.bytes} byte`);
       }
     } else {
-      console.error('Använd: <post.json> | stryk <fil i assets> "<varför>"');
+      console.error('Använd: node src/pipeline/import.ts <post.json> | stryk <fil i assets> "<varför>"');
       process.exitCode = 2;
     }
   } catch (error) {

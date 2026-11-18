@@ -83,7 +83,9 @@ function slug(text: string): string {
 const stem = (file: string): string => slug(file.split(/[\\/]/).at(-1)!.replace(/\.[^.]*$/, ''));
 
 const dealerName = (dealer: DealerNote): string =>
-  dealer.kind === 'docka' ? slug(`docka-${dealer.pose === 'vila' ? 'vila' : `${dealer.move}${dealer.seat === undefined ? '' : `-till-${dealer.seat}`}`}`) : stem(dealer.file);
+  dealer.kind === 'docka'
+    ? slug(`docka-${dealer.pose === 'vila' ? 'vila' : `${dealer.move}${dealer.seat === undefined ? '' : `-till-${dealer.seat}`}${dealer.index === undefined ? '' : `-kort-${dealer.index}`}`}`)
+    : stem(dealer.file);
 
 /**
  * Förlagans namn: dealerns filnamn eller dockans rörelse, vyn och bakgrundens filnamn (`atelje` i ateljén), med
@@ -138,18 +140,18 @@ function isDealer(dealer: Partial<DealerNote> | null | undefined): dealer is Dea
   if (!dealer || !(dealer.time === undefined || isNumber(dealer.time))) return false;
   if (dealer.kind === 'docka') {
     const seated = dealer.seat === undefined || (Number.isInteger(dealer.seat) && dealer.seat > 0);
-    return typeof dealer.move === 'string' && MOVE.test(dealer.move) && (dealer.pose === 'giv' || dealer.pose === 'vila') && seated;
+    const placed = dealer.index === undefined || (Number.isInteger(dealer.index) && dealer.index >= 0);
+    return typeof dealer.move === 'string' && MOVE.test(dealer.move) && (dealer.pose === 'giv' || dealer.pose === 'vila') && seated && placed;
   }
-  const filed = typeof (dealer as { file?: unknown }).file === 'string' && (dealer as { file: string }).file !== '';
-  if (dealer.kind === 'film') return filed && isSeatView(dealer.view);
-  return filed && (dealer.kind === 'helfigur' || dealer.kind === 'ankare');
+  return dealer.kind === 'film' && typeof dealer.file === 'string' && dealer.file !== '' && isSeatView(dealer.view);
 }
 
 function dealerNote(dealer: DealerNote): DealerNote {
   const time = dealer.time === undefined ? {} : { time: dealer.time };
-  if (dealer.kind === 'docka') return { kind: 'docka', move: dealer.move, pose: dealer.pose, ...(dealer.seat === undefined ? {} : { seat: dealer.seat }), ...time };
-  if (dealer.kind === 'film') return { kind: 'film', file: dealer.file, view: seatView(dealer.view), ...time };
-  return { kind: dealer.kind, file: dealer.file, ...time };
+  if (dealer.kind === 'docka') {
+    return { kind: 'docka', move: dealer.move, pose: dealer.pose, ...(dealer.seat === undefined ? {} : { seat: dealer.seat }), ...(dealer.index === undefined ? {} : { index: dealer.index }), ...time };
+  }
+  return { kind: 'film', file: dealer.file, view: seatView(dealer.view), ...time };
 }
 
 /** Tar emot det scenen säger om förlagan och säger på svenska vad som saknas. Bara det som hör till förlagan följer med. */
@@ -165,7 +167,7 @@ export function readOrder(value: unknown): ForlagaOrder {
   need(order.still !== true || order.frames === 1, 'en stillbild är en ruta');
   need(isNumber(order.fps) && order.fps > 0, 'fps');
   need(Number.isInteger(frame?.width) && frame!.width > 0 && Number.isInteger(frame?.height) && frame!.height > 0, 'frame');
-  need(view?.kind === 'filmkameran' || isSeatView(view), 'view');
+  need(isSeatView(view), 'view');
   need(isVector(eye?.position) && isVector(eye?.forward) && isNumber(eye?.focalPx) && eye.focalPx > 0, 'eye');
   need(dealer === null || isDealer(dealer), 'dealer');
   const studio = order.studio ?? null;
@@ -195,7 +197,7 @@ export function readOrder(value: unknown): ForlagaOrder {
     frames: order.frames!,
     fps: order.fps!,
     frame: { width: frame!.width, height: frame!.height },
-    view: view!.kind === 'filmkameran' ? { kind: 'filmkameran' } : seatView(view as SeatView),
+    view: seatView(view as SeatView),
     eye: { position: [...eye!.position] as Vec3, forward: [...eye!.forward] as Vec3, focalPx: eye!.focalPx },
     dealer: dealer ? dealerNote(dealer) : null,
     background: background

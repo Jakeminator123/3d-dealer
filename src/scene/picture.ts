@@ -1,5 +1,5 @@
-// Dealerns bild som textur: en film eller en stillbild på grön skärm, läst från en adress. En väg för alla dealerbilder:
-// helfiguren (figure.ts) och den vikta ytan (film.ts) läser sin bild här, och en film styrs på samma sätt i båda.
+// Dealerns bild som textur: en film eller en stillbild på grön skärm, läst från en adress, för den vikta ytan (film.ts).
+// En film styrs här på samma sätt som dockans rörelse (Clip).
 
 import * as THREE from 'three';
 import { prepareKeyTexture } from './key.ts';
@@ -40,7 +40,7 @@ const SEEK_PATIENCE = 250;
 // Rutan som visas efter en förflyttning ska vara den som gäller på tiden: den börjar högst så här många sekunder före.
 const SEEK_REACH = 0.1;
 
-export const isFilm = (url: string): boolean => /\.(mp4|webm)(\?|$)/i.test(url);
+const isFilm = (url: string): boolean => /\.(mp4|webm)(\?|$)/i.test(url);
 
 /** Skärmens färg: medelvärdet i bildens övre vänstra hörn. */
 function screenColour(picture: HTMLVideoElement | HTMLImageElement): [number, number, number] {

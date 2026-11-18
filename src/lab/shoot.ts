@@ -4,7 +4,7 @@
 
 import { buildScene, type Background, type Dealer, type DealerNote } from '../scene/build.ts';
 import { readScene, type Frame, type SceneDescription } from '../scene/description.ts';
-import { moveFor, readDoll, readMove } from '../scene/dollPose.ts';
+import { isCycle, moveFor, readCycle, readDoll, readMove } from '../scene/dollPose.ts';
 import { saveForlaga, type ForlagaOrder, type Saved } from './forlaga.ts';
 import { mediaUrl } from './registry.ts';
 
@@ -28,13 +28,20 @@ async function json(path: string): Promise<unknown> {
   return response.json();
 }
 
-/** Dealern så som scenen bygger den: dockans mått och rörelse läses ur content/, och rörelsen ställs om till platsen. */
+/**
+ * Dealern så som scenen bygger den: dockans mått och rörelse läses ur content/, och rörelsen ställs om till platsen och
+ * kortplatsen. En cykel läses med sin giv och spelas på givens egen plats om ingen annan sägs.
+ */
 async function dealerOf(scene: SceneDescription, note: DealerNote | null): Promise<Dealer | null> {
   if (!note) return null;
   if (note.kind !== 'docka') return note;
   const doll = readDoll(await json('/content/doll.json'));
-  const base = readMove(await json(`/content/moves/${note.move}.json`));
-  return { kind: 'docka', doll, move: note.seat === undefined ? base : moveFor(scene, doll, base, note.seat), pose: note.pose };
+  const read = await json(`/content/moves/${note.move}.json`);
+  const cycle = isCycle(read) ? readCycle(read) : undefined;
+  const base = readMove(cycle ? await json(`/content/moves/${cycle.give}.json`) : read);
+  const placed = note.seat !== undefined || note.index !== undefined || cycle;
+  const move = placed ? moveFor(scene, doll, base, note.seat ?? base.seat, { index: note.index, cycle }) : base;
+  return { kind: 'docka', doll, move, pose: note.pose };
 }
 
 async function shoot(problems: string[]): Promise<Saved> {

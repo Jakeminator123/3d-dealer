@@ -16,8 +16,6 @@ import './scene.css';
 const STEP = 'scen';
 // Första dealern. Tills dealerns egen fil finns i content/ står hennes id här.
 const DEALER = 'paulina';
-// Helfiguren som visas från början, som registrets file. Finns den inte visas den första som finns.
-const FIGURE = 'reference/films/liv-vila-andas.mp4';
 // Kortet scenen lägger där ett klipp har lagt sitt märkkort. Tills spelkärnan säger vilket kort det är står ett ess här.
 const SHOWN_CARD = 'A♠';
 // Skon visas från början: framifrån, i spelarens vy, står den där dealern har den vid sin vänstra hand.
@@ -96,19 +94,14 @@ function Workbench({ registry, scene, route, problem, onProblem, onJudge, onSay 
     setMoved(false);
   };
   const onMoved = useCallback(() => setMoved(true), []);
-  const viewName = view.kind === 'spelaren' ? 'Spelaren' : view.kind === 'filmkameran' ? 'Filmkameran' : `Plats ${view.seat}`;
+  const viewName = view.kind === 'spelaren' ? 'Spelaren' : `Plats ${view.seat}`;
 
   // Adressen är scen/<nummer>, med samma nummer som bakgrunden har i Granska. Utan nummer visas den första.
   const items = backdropItems(registry);
   const chosen = items.find((item) => item.number === Number(route[0])) ?? items[0];
   const dealers = dealerChoices(registry, DEALER);
-  // Från början visas dealerns egen film om hon har någon, annars den förvalda helfiguren.
-  const choice =
-    dealers.find((entry) => entry.dealer.file === dealerFile) ??
-    dealers.find((entry) => entry.dealer.kind === 'film') ??
-    dealers.find((entry) => entry.dealer.file === FIGURE) ??
-    dealers[0] ??
-    null;
+  // Från början visas den första dealerfilmen: en film före en stillbild.
+  const choice = dealers.find((entry) => entry.dealer.file === dealerFile) ?? dealers[0] ?? null;
   const dealer = choice?.dealer ?? null;
   const card: CardNote | null = choice?.lands ? { seat: choice.lands.seat, index: choice.lands.index, face: SHOWN_CARD, from: choice.lands.at } : null;
 
@@ -261,14 +254,6 @@ function Workbench({ registry, scene, route, problem, onProblem, onJudge, onSay 
                   Plats {seat}
                 </button>
               ))}
-              <button
-                type="button"
-                aria-pressed={!moved && view.kind === 'filmkameran'}
-                title="Kameran dealerns bilder är gjorda genom: härifrån ska dealern se ut som i sin bild"
-                onClick={() => choose({ kind: 'filmkameran' })}
-              >
-                Filmkameran
-              </button>
               <button type="button" aria-pressed={moved} title="Fri vy från det du ser" onClick={() => setMoved(true)}>
                 Fri
               </button>
@@ -323,12 +308,8 @@ function Workbench({ registry, scene, route, problem, onProblem, onJudge, onSay 
             </li>
             <li>
               {!choice
-                ? 'Ingen dealer visas: registret har varken en helfigur eller ett ankare i vila.'
-                : choice.dealer.kind === 'film'
-                  ? `Dealern är en dealerfilm: ”${choice.label}”, en ${choice.film ? 'film' : 'stillbild'} av dealern på grön skärm, gjord i närbilden av ${choice.dealer.view.kind === 'plats' ? `Plats ${choice.dealer.view.seat}` : 'Spelaren'}: samma öga som vyn, inzoomat på dealern. Bilden läggs tillbaka genom det ögat och viks vid bordskanten, så att kroppen står upprätt och händerna ligger på filten. Sedd ur den vyn är den bilden som den är; ur andra vyer är kroppen platt.${choice.lands ? ` När klippet har lagt sitt märkkort (${comma(choice.lands.at)} s in) tas det blå bort och scenens kort ligger på kortplatsen för plats ${choice.lands.seat}; valören är en stå-in.` : ''}`
-                : choice.dealer.kind === 'helfigur'
-                  ? `Dealern är en helfigur: ”${choice.label}”, en ${choice.film ? 'film' : 'stillbild'} av en sittande person på grön skärm, utan bord, ställd upprätt ${comma(scene.figure.behindEdge * 100)} cm bakom bordskanten. Rutan är ${comma(scene.figure.height)} m hög, händernas underkant står ${comma(scene.figure.handLift * 1000)} mm över filtens höjd, och bordet döljer underkroppen. Helfiguren är en förlaga: Spara bild och Spara klipp lägger scenen ur vald vy i output/forlagor/, ${frameText(scene)}, med en beskrivning bredvid.`
-                  : `Dealern är ett gammalt ankare: ”${choice.label}”, projicerat från filmkameran och vikt vid bordskanten. Filmkameran är kameran de gamla ankarna är gjorda genom (${comma(Math.round(scene.camera.pitchDeg))}° nedåt): därifrån ser dealern ut som i ankarbilden, så när som på händerna, som bordets lutning flyttar några bildpunkter. Skon i den bilden är övermålad där scenens sko står.`}
+                ? 'Ingen dealer visas: registret har ingen dealerfilm för dealern.'
+                : `Dealern är en dealerfilm: ”${choice.label}”, en ${choice.film ? 'film' : 'stillbild'} av dealern på grön skärm, gjord i närbilden av ${choice.dealer.view.kind === 'plats' ? `Plats ${choice.dealer.view.seat}` : 'Spelaren'}: samma öga som vyn, inzoomat på dealern. Bilden läggs tillbaka genom det ögat och viks vid bordskanten, så att kroppen står upprätt och händerna ligger på filten. Sedd ur den vyn är den bilden som den är; ur andra vyer är kroppen platt.${choice.lands ? ` När klippet har lagt sitt märkkort (${comma(choice.lands.at)} s in) tas det blå bort och scenens kort ligger på kortplatsen för plats ${choice.lands.seat}; valören är en stå-in.` : ''} Spara bild och Spara klipp lägger scenen ur vald vy i output/forlagor/, ${frameText(scene)}, med en beskrivning bredvid.`}
             </li>
             <li>
               {!round

@@ -19,7 +19,3 @@ export function useRoute(): string[] {
 
 export const routeTo = (...parts: (string | number)[]): string =>
   `#${parts.map((part) => encodeURIComponent(String(part))).join('/')}`;
-
-export function go(...parts: (string | number)[]): void {
-  window.location.hash = routeTo(...parts);
-}

@@ -1,4 +1,5 @@
-// Scenens geometri mot talen i content/scene.json och mot det som mättes i gamla projektet.
+// Scenens geometri mot talen i content/scene.json och mot det som mättes i gamla projektet. Gamla linsen (`eye`) och
+// ankaret VILA i dess ruta är måttstocken: där mättes bordskanten, kortet på plats 4 och dealerns kropp.
 
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -9,14 +10,11 @@ import {
   cardCorners,
   closeEye,
   dealerEdge,
-  figureCorners,
   floorY,
   fold,
   foldSurfaces,
   fovYDeg,
   framed,
-  hull,
-  onFigure,
   onFold,
   onPlane,
   onUpright,
@@ -356,53 +354,14 @@ test('golvet ligger vid det lutade bordets lägsta punkt, och rummet står på d
   near(under[1] + scene.room.captureHeight, player.position[1], 0.15, 'bildens höjd mot spelarens öga');
   // Bord och dealer ryms i rummet, med god marginal till väggarna.
   const centre: Vec3 = [under[0], under[1] + scene.room.captureHeight, under[2]];
-  for (const corner of [...figureCorners(scene), dealerEdge(scene), [foot.min[0], under[1], foot.min[1]] as Vec3]) {
+  for (const corner of [...workArea(scene), dealerEdge(scene), [foot.min[0], under[1], foot.min[1]] as Vec3]) {
     const away = Math.hypot(corner[0] - centre[0], corner[1] - centre[1], corner[2] - centre[2]);
     assert.ok(away < scene.room.radius / 2, `punkten (${corner}) ligger ${away} m från bildens punkt`);
   }
 });
 
-test('helfiguren står upprätt bakom bordskanten, med händernas rad strax över filtens höjd', () => {
-  const { frame, height: tall, handRow, handLift, behindEdge } = scene.figure;
-  const metre = tall / frame.height;
-  const corners = figureCorners(scene);
-  assert.equal(corners.length, 4);
-  // Medurs i bild från övre vänstra: en upprätt rektangel mitt för bordet, så bred som rutans sidförhållande säger.
-  const [topLeft, topRight, bottomRight, bottomLeft] = corners as [Vec3, Vec3, Vec3, Vec3];
-  for (const corner of corners) near(corner[2], scene.dealerEdge.z - behindEdge, 1e-12, 'ytans djup');
-  near(topLeft[0], -(tall * frame.width) / frame.height / 2, 1e-12, 'vänster kant');
-  near(topRight[0], -topLeft[0], 1e-12, 'höger kant');
-  assert.deepEqual([bottomLeft[0], bottomRight[0]], [topLeft[0], topRight[0]]);
-  // Rad r ligger handLift + (handRow − r) · meter per rad över filten: rutans överkant är rad 0, underkanten rad 1080.
-  near(topLeft[1], handLift + handRow * metre, 1e-12, 'överkantens höjd');
-  near(bottomLeft[1], handLift + (handRow - frame.height) * metre, 1e-12, 'underkantens höjd');
-  near(topLeft[1] - bottomLeft[1], tall, 1e-12, 'ytans höjd');
-  assert.deepEqual([topRight[1], bottomRight[1]], [topLeft[1], bottomLeft[1]]);
-  // Ytan lutar inte med bordet: den är densamma när bordet står olutat.
-  assert.deepEqual(figureCorners(level), corners);
-
-  // En bildpunkt i rutan: mitten av rutan ligger mitt för bordet, och händernas rad ligger handLift över filtens höjd.
-  near(onFigure(scene, { x: (frame.width - 1) / 2, y: handRow - 0.5 })[0], 0, 1e-12, 'rutans mitt');
-  near(onFigure(scene, { x: 0, y: handRow - 0.5 })[1], handLift, 1e-12, 'händernas rad');
-  near(onFigure(scene, { x: 100, y: 200 })[1] - onFigure(scene, { x: 100, y: 201 })[1], metre, 1e-12, 'en rad är så många meter');
-
-  // Livs händer i VILA, mätta i bilden (792–868 och 1056–1128 i sidled, underkant 568): de hamnar bakom bordskanten,
-  // inom bordets bredd, och spelaren ser dem strax ovanför kantens rad.
-  const edgeRow = see(player, dealerEdge(scene))!.y;
-  for (const x of [792, 868, 1056, 1128]) {
-    const hand = onFigure(scene, { x, y: 567 });
-    assert.ok(Math.abs(hand[0]) < 0.3 && hand[2] < scene.dealerEdge.z, `handen vid x ${x}`);
-    const seen = see(player, hand)!;
-    assert.ok(inFrame(seen) && seen.y < edgeRow && edgeRow - seen.y < 0.03 * height, `handen vid x ${x} ses ${edgeRow - seen.y} bildpunkter över kanten`);
-  }
-  // Hjässan (rad 45) ryms i spelarens ruta, och figurens underkant ligger över golvet: bordet döljer den, inte golvet.
-  assert.ok(inFrame(see(player, onFigure(scene, { x: 960, y: 45 }))), 'hjässan syns');
-  assert.ok(bottomLeft[1] > floorY(scene) && bottomLeft[1] < -0.5, `underkanten ${bottomLeft[1]} m`);
-});
-
 test('en vy har sitt öga, och samma öga i förlagans ruta visar hela vyns ruta', () => {
   assert.deepEqual(viewEye(scene, { kind: 'spelaren' }), player);
-  assert.deepEqual(viewEye(scene, { kind: 'filmkameran' }), eye);
   assert.deepEqual(viewEye(scene, { kind: 'plats', seat: 7 }), seatEye(scene, 7));
   assert.deepEqual(viewEye(scene, { kind: 'plats', seat: scene.camera.seat }), player);
 
@@ -413,7 +372,7 @@ test('en vy har sitt öga, och samma öga i förlagans ruta visar hela vyns ruta
   near(fovYDeg(wide), fovYDeg(player), 1e-9, 'samma lodräta bildvinkel');
   near(wide.focalPx, scene.forlaga.frame.height / 2 / Math.tan((scene.player.fovDeg * Math.PI) / 360), 1e-9, 'brännvidden i förlagans bildpunkter');
   // En punkt ligger lika långt ned i båda rutorna, och lika långt från mitten räknat i rutans höjd.
-  for (const point of [dealerEdge(scene), placeOnTable(scene, cardsOf(1)[0]!), onFigure(scene, { x: 960, y: 45 })]) {
+  for (const point of [dealerEdge(scene), placeOnTable(scene, cardsOf(1)[0]!), onFold(scene, CROWN)!]) {
     const before = see(player, point)!;
     const after = see(wide, point)!;
     near((after.y + 0.5) / wide.frame.height, (before.y + 0.5) / height, 1e-9, 'andel ned i rutan');
@@ -448,12 +407,6 @@ test('ett öga som förs runt en punkt ser den på samma ställe', () => {
     assert.equal(Math.sign(moved.position[0]), Math.sign(angle), 'en positiv vinkel för ögat åt höger');
   }
   assert.equal(onUpright(eye, { x: 100, y: 100 }, 5), null, 'ett plan bakom kameran möts aldrig');
-});
-
-test('konturen är den minsta konvexa månghörningen, medurs i bild', () => {
-  const points = [{ x: 0, y: 0 }, { x: 4, y: 0 }, { x: 4, y: 3 }, { x: 0, y: 3 }, { x: 2, y: 1 }, { x: 1, y: 2 }, { x: 2, y: 0 }];
-  assert.deepEqual(hull(points), [{ x: 0, y: 0 }, { x: 4, y: 0 }, { x: 4, y: 3 }, { x: 0, y: 3 }]);
-  assert.deepEqual(hull([{ x: 1, y: 1 }, { x: 0, y: 0 }]), [{ x: 0, y: 0 }, { x: 1, y: 1 }]);
 });
 
 test('närbilden står i vyns öga och rymmer dealerns arbetsyta med luft mot rutans kant', () => {
@@ -508,5 +461,4 @@ test('en vy har ett namn i ett ord', () => {
   assert.equal(viewName({ kind: 'spelaren', close: true }), 'spelaren-nara');
   assert.equal(viewName({ kind: 'plats', seat: 7 }), 'plats-7');
   assert.equal(viewName({ kind: 'plats', seat: 7, close: true }), 'plats-7-nara');
-  assert.equal(viewName({ kind: 'filmkameran' }), 'filmkameran');
 });

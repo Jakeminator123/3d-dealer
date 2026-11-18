@@ -1,7 +1,8 @@
 // Dockan ritad med three.js: en vit, matt provdocka av klot och stavar, med ledade fingrar, som gör en rörelse i scenen.
 // Var varje led är räknas i dollPose.ts ur content/doll.json och rörelsen i content/moves/; här får punkterna bara form.
 // Dockan visar rörelsen i en förlaga, innan den riktiga filmen görs. Kortet hon delar är ett märkkort: helt gult på
-// baksidan och helt blått på framsidan, så att vändningen syns. Ett gult kort till står kvar i skons mynning.
+// baksidan och helt blått på framsidan, så att vändningen syns. Ett gult kort till står kvar i skons mynning. I en cykel
+// ligger det lagda kortet kvar på platsen när handen går tillbaka och nyper nästa.
 //
 // Förd över ur gamla Dealer (C:/Users/jakem/dev/super-feature-sg/dealer, commit e6c07124c16a9b8d00ab3435895f94e982516ce9):
 //   dealer3d/src/stage.ts  utseendet 'plain': bålen som ett ägg, lemmarna som koner, handen ritad ur sina 21 punkter
@@ -32,8 +33,9 @@ const WHITE = 0xf3f1ec;
 // Händerna har hudfärg. En bildmodell som ska sätta en dealer i dockans ställning läser då händerna som händer i rätt
 // storlek, och gör dem inte större: mätt 2026-11-18 ritade den händerna 1,4 gånger för stora när de var vita stavar.
 const HAND = 0xdfae98;
-const BACK = 0xf4d21c;
-const FACE = 0x1e8be0;
+/** Märkkortets färger: den gula baksidan och den blå framsidan. Samma färger målas i ankarna (src/pipeline/cykel.ts). */
+export const MARK_BACK = 0xf4d21c;
+export const MARK_FACE = 0x1e8be0;
 // Hur länge sista ställningen står kvar innan slingan börjar om, i sekunder.
 const HOLD = 0.6;
 // En stav mellan två leder är något smalare än den smalaste leden, så att lederna syns som leder.
@@ -158,8 +160,8 @@ export function createDoll(scene: SceneDescription, doll: DollDescription, move:
   // Sidorna lyser en aning i sin egen färg, så att gult och blått går att läsa vart kortet än vetter mot ljuset.
   const side = (color: number, which: THREE.Side): THREE.MeshStandardMaterial =>
     new THREE.MeshStandardMaterial({ color, roughness: 0.62, metalness: 0, emissive: color, emissiveIntensity: 0.3, side: which });
-  const backSide = side(BACK, THREE.FrontSide);
-  const faceSide = side(FACE, THREE.BackSide);
+  const backSide = side(MARK_BACK, THREE.FrontSide);
+  const faceSide = side(MARK_FACE, THREE.BackSide);
   shapes.push(cardShape);
   materials.push(backSide, faceSide);
   // Bordets normal: ett kort som ligger ritas en aning över filten, som dealerfilmens liggande del, så att det inte flimrar mot bordet.
@@ -189,6 +191,8 @@ export function createDoll(scene: SceneDescription, doll: DollDescription, move:
   };
   const dealt = card(scene.film.lift);
   const next = card(0);
+  // I en cykel: kortet som handen har lagt och släppt.
+  const laid = card(scene.film.lift);
 
   const across = new THREE.Vector3();
   const tall = new THREE.Vector3();
@@ -223,6 +227,8 @@ export function createDoll(scene: SceneDescription, doll: DollDescription, move:
     for (const hand of hands) hand.set(pose.hands[hand.side]);
     dealt.both.visible = pose.card !== null;
     if (pose.card) dealt.set(pose.card);
+    laid.both.visible = pose.laid !== null;
+    if (pose.laid) laid.set(pose.laid);
     next.set(pose.shoeCard);
   }
 

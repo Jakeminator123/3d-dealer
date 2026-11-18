@@ -12,13 +12,16 @@ import {
   handSkeleton,
   inShoe,
   moveFor,
+  isCycle,
   pickUpCard,
   poseAt,
+  readCycle,
   readDoll,
   readMove,
   restPose,
   throughShoe,
   type CardPose,
+  type DollCycle,
   type DollDescription,
   type DollMove,
   type DollPose,
@@ -30,6 +33,7 @@ const read = (file: string): unknown => JSON.parse(readFileSync(join(root, 'cont
 const scene: SceneDescription = readScene(read('scene.json'));
 const doll: DollDescription = readDoll(read('doll.json'));
 const base: DollMove = readMove(read('moves/giv-nyp-plats-4.json'));
+const cycle: DollCycle = readCycle(read('moves/cykel-nyp.json'));
 
 const sub = (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 const dot = (a: Vec3, b: Vec3): number => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
@@ -422,4 +426,164 @@ test('grundrörelsen till plats 4 är låst: samma punkter som när bilderna bes
   near(far(rest.hands.right[12]!, [-0.07277933295977736, 0.006924682485274586, -1.7428121850296872]), 0, SAME, 'höger långfingerspets i VILA');
   // Grundrörelsen går fri från allt som den är: den behöver varken båge eller vridning.
   assert.deepEqual(armHits(scene, doll, base), { shoe: [], restingHand: [], torso: [], table: [] });
+});
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Cykeln: REDO → kortet lagt på en kortplats → REDO (content/moves/cykel-nyp.json), till varje plats och kortplats.
+
+const placeOf = (seat: number, index: number) => scene.places.seats.find((entry) => entry.seat === seat)!.cards[index]!;
+const cycles = new Map<string, DollMove>();
+const cycleTo = (seat: number, index: number): DollMove => {
+  const key = `${seat}:${index}`;
+  if (!cycles.has(key)) cycles.set(key, moveFor(scene, doll, base, seat, { index, cycle }));
+  return cycles.get(key)!;
+};
+/** Sista ställningen i en rörelse. */
+const last = (move: DollMove): DollPose => poseAt(scene, doll, move, move.seconds);
+/** Varje plats med sina två första kortplatser: 14 cykler. */
+const CYCLES = seatsOf(scene).flatMap((seat) => [0, 1].map((index) => [seat, index] as const));
+// Dockans hand från handleden till långfingrets yttersta spets (content/doll.json, hand.source).
+const HAND = 0.175;
+
+/** Handens längd i en ställning: handled till långfingrets knoge, långfingrets tre ben och spetsens radie. */
+const handLength = (hand: Vec3[]): number => far(hand[0]!, hand[9]!) + far(hand[9]!, hand[10]!) + far(hand[10]!, hand[11]!) + far(hand[11]!, hand[12]!) + doll.hand.radius.tip;
+
+/** Två ställningar är samma ställning: kropp, armar, händer, blick, kortet i handen och kortet i skon, punkt för punkt. */
+function samePose(a: DollPose, b: DollPose, what: string): void {
+  const pairs: [Vec3, Vec3, string][] = [
+    [a.hip, b.hip, 'höften'],
+    [a.torso, b.torso, 'bålen'],
+    [a.neck, b.neck, 'nacken'],
+    [a.head, b.head, 'huvudet'],
+    [a.gaze, b.gaze, 'blicken'],
+    ...(['left', 'right'] as const).flatMap((side): [Vec3, Vec3, string][] => [
+      [a.arms[side].shoulder, b.arms[side].shoulder, `${side} axel`],
+      [a.arms[side].elbow, b.arms[side].elbow, `${side} armbåge`],
+      ...a.hands[side].map((point, k): [Vec3, Vec3, string] => [point, b.hands[side][k]!, `${side} hand punkt ${k}`]),
+    ]),
+    ...a.card!.corners.map((corner, k): [Vec3, Vec3, string] => [corner, b.card!.corners[k]!, `kortets hörn ${k}`]),
+    ...a.shoeCard.corners.map((corner, k): [Vec3, Vec3, string] => [corner, b.shoeCard.corners[k]!, `skokortets hörn ${k}`]),
+  ];
+  for (const [p, q, part] of pairs) near(far(p, q), 0, SAME, `${what}: ${part}`);
+  assert.equal(a.card!.up, b.card!.up, `${what}: kortets sida`);
+}
+
+test('cykeln läses, och fel i den sägs på svenska', () => {
+  const whole = read('moves/cykel-nyp.json') as DollCycle;
+  assert.ok(isCycle(whole), 'cykeln känns igen');
+  assert.ok(!isCycle(read('moves/giv-nyp-plats-4.json')), 'given är ingen cykel');
+  assert.equal(cycle.give, base.id);
+  assert.equal(cycle.from, 'REDO');
+  assert.throws(() => readCycle({ ...whole, seconds: 3.5 }), /Cykeln går inte att använda: seconds ska vara summan av parts/);
+  assert.throws(() => readCycle({ ...whole, to: 'LAGT 4' }), /from och to ska vara samma/);
+  assert.throws(() => readCycle({ ...whole, back: { ...whole.back, look: 0 } }), /back:/);
+  assert.throws(() => readCycle({ ...whole, basis: 'gissat' }), /basis och source/);
+});
+
+test('cykelns takt: 4,0 s, given ungefär dubbelt så fort som den lästa, vila på kortet, tillbaka och stilla i REDO', () => {
+  const move = cycleTo(4, 0);
+  const frame = 1 / move.fps;
+  near(move.seconds, 4, 1e-9, 'cykelns längd');
+  near(cycle.seconds, 4, 1e-9, 'cykelns längd i filen');
+  assert.equal(move.frameCount, 4 * move.fps + 1);
+  const { letsGo, home, pace } = move.back!;
+  const { ready, deal, onCard, still } = cycle.parts;
+  near(move.moments.rests / move.fps, ready + deal, frame / 2, 'kortet ligger när given är slut');
+  near(letsGo / move.fps, ready + deal + onCard, frame / 2, 'handen lämnar kortet');
+  near(home / move.fps, cycle.seconds - still, frame / 2, 'handen är tillbaka i skon');
+  // En förlaga tar varje ruta mitt i sin tid: den första och den sista rutan ligger där hon står stilla i REDO.
+  assert.ok(ready >= frame / 2 && still >= frame / 2, 'stilla i REDO minst en halv ruta i början och slutet');
+  // Den lästa given tar 3,2 s från REDO tills kortet ligger; cykelns giv går ungefär dubbelt så fort.
+  near(pace, base.moments.rests / (deal * move.fps), 1e-9, 'takten');
+  assert.ok(pace >= 1.6 && pace <= 2.1, `given går ${pace.toFixed(2)} gånger så fort som den lästa`);
+  assert.equal(move.id, 'cykel-nyp-plats-4-kort-0');
+  assert.equal(move.to, 'REDO');
+});
+
+test('cykelns giv är den hängda given i cykelns takt: samma kod och samma väg', () => {
+  for (const seat of [4, 1, 7]) {
+    const move = cycleTo(seat, 0);
+    const give = moveTo(seat);
+    assert.equal(move.swingDeg, give.swingDeg, `plats ${seat}: svängen`);
+    assert.equal(move.bow, give.bow, `plats ${seat}: bågen`);
+    const ready = Math.round(cycle.parts.ready * move.fps);
+    for (let frame = 0; frame <= move.moments.rests; frame += 3) {
+      const a = poseAt(scene, doll, move, frame / move.fps);
+      const b = poseAt(scene, doll, give, (Math.max(0, frame - ready) * move.back!.pace) / give.fps);
+      near(far(a.card!.centre, b.card!.centre), 0, SAME, `plats ${seat}: kortet i ruta ${frame}`);
+      // Medan kortet fälls sänks handen mot filten. Ögonblicken är hela rutor i cykelns takt, så där skiljer det en bråkdel
+      // av en ruta i när handen sänks: högst en millimeter.
+      const folding = frame >= move.moments.folds - 1 && frame <= move.moments.rests;
+      a.hands.left.forEach((point, k) => near(far(point, b.hands.left[k]!), 0, folding ? 0.001 : SAME, `plats ${seat}: vänster hand punkt ${k} i ruta ${frame}`));
+    }
+  }
+});
+
+for (const [seat, index] of CYCLES) {
+  test(`cykel till plats ${seat}, kort ${index}: börjar och slutar i REDO, med kortet i kortplatsens hörn`, () => {
+    const move = cycleTo(seat, index);
+    const first = poseAt(scene, doll, move, 0);
+    const last = poseAt(scene, doll, move, move.seconds);
+    // Samma REDO i början och slutet, och samma som given börjar i: vilken cykel som helst kan följa på vilken som helst.
+    const redo = poseAt(scene, doll, base, 0);
+    samePose(first, redo, 'första rutan');
+    samePose(last, redo, 'sista rutan');
+    // Bortsett från det lagda kortet: det ligger med den blå framsidan upp i kortplatsens hörn.
+    assert.equal(first.laid, null);
+    assert.ok(last.laid, 'kortet ligger kvar');
+    assert.equal(last.laid.up, 'framsida');
+    cardCorners(scene, placeOf(seat, index)).forEach((corner, k) => near(far(last.laid!.corners[k]!, corner), 0, 0.001, `kortets hörn ${k}`));
+    for (const corner of last.laid.corners) near(over(corner), scene.card.thickness / 2, 0.0005, 'kortets hörn över filten');
+    // Ett nytt gult kort står i skons mynning där det delade stod, med handen på det.
+    assert.equal(last.card!.up, 'baksida');
+    pickUpCard(scene, doll).corners.forEach((corner, k) => near(far(last.card!.corners[k]!, corner), 0, EXACT, `nästa korts hörn ${k} mot hämtstället`));
+    assert.ok(nearestTip(last) <= TOUCH, 'handen på nästa kort');
+  });
+
+  test(`cykel till plats ${seat}, kort ${index}: armen går fri, handen håller sin storlek, och kortet släpps en gång`, () => {
+    const move = cycleTo(seat, index);
+    assert.deepEqual(throughShoe(scene, doll, move), []);
+    assert.deepEqual(armHits(scene, doll, move), { shoe: [], restingHand: [], torso: [], table: [] });
+    const { letsGo, home } = move.back!;
+    for (let frame = 0; frame < move.frameCount; frame++) {
+      const pose = poseAt(scene, doll, move, frame / move.fps);
+      checkPose(pose, `ruta ${frame}`);
+      near(handLength(pose.hands.left), HAND, 0.001, `ruta ${frame}: givhandens längd`);
+      near(handLength(pose.hands.right), HAND, 0.001, `ruta ${frame}: den vilande handens längd`);
+      // Fingrarna ligger på kortet tills handen släpper det; sedan ligger det kvar och blicken går tillbaka till skon.
+      assert.equal(pose.laid === null, frame <= letsGo, `ruta ${frame}: kortet är ${pose.laid ? 'släppt' : 'i handen'}`);
+      if (frame >= move.moments.rests && frame <= letsGo) {
+        assert.ok(nearestTip(pose) <= TOUCH, `ruta ${frame}: fingrarna på det lagda kortet`);
+        near(far(pose.gaze, pose.card!.centre), 0, SAME, `ruta ${frame}: blicken på kortet`);
+      }
+      if (frame > letsGo) near(far(pose.laid!.centre, last(move).laid!.centre), 0, SAME, `ruta ${frame}: kortet ligger kvar`);
+      if (frame >= home) near(far(pose.gaze, pose.card!.centre), 0, SAME, `ruta ${frame}: blicken på nästa kort`);
+    }
+  });
+}
+
+test('en cykel som har sparats och lästs igen spelas som den var', () => {
+  const kept = cycleTo(7, 1);
+  const again = readMove(JSON.parse(JSON.stringify(kept)));
+  assert.equal(again.index, 1);
+  for (const time of [0, 1, 2, 2.5, 3, kept.seconds]) {
+    const a = poseAt(scene, doll, kept, time);
+    const b = poseAt(scene, doll, again, time);
+    a.hands.left.forEach((point, k) => near(far(point, b.hands.left[k]!), 0, 1e-6, `punkt ${k} vid ${time} s`));
+    near(far(a.arms.left.elbow, b.arms.left.elbow), 0, 1e-6, `armbågen vid ${time} s`);
+    near(far((a.laid ?? a.card)!.centre, (b.laid ?? b.card)!.centre), 0, 1e-6, `kortet vid ${time} s`);
+  }
+});
+
+test('given utan cykel lägger kortet på platsens andra kortplats när den sägs, och går fri', () => {
+  for (const seat of [1, 4, 7]) {
+    const move = moveFor(scene, doll, base, seat, { index: 1 });
+    assert.equal(move.index, 1);
+    assert.equal(move.id, `${base.id}-till-plats-${seat}-kort-1`);
+    const end = last(move);
+    assert.equal(end.laid, null);
+    cardCorners(scene, placeOf(seat, 1)).forEach((corner, k) => near(far(end.card!.corners[k]!, corner), 0, 0.001, `plats ${seat}: kortets hörn ${k}`));
+    assert.deepEqual(throughShoe(scene, doll, move), []);
+    assert.deepEqual(armHits(scene, doll, move), { shoe: [], restingHand: [], torso: [], table: [] });
+  }
 });

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { backdropItems, backdropKind, dealerChoices, PLAIN, sameLook, standIn, startLook } from './backdrops.ts';
+import { backdropItems, backdropKind, dealerChoices, PLAIN, sameLook, startLook } from './backdrops.ts';
 import type { Asset, Registry } from './registry.ts';
 
 const asset = (file: string, group: string, more: Record<string, unknown> = {}): Asset => ({
@@ -58,46 +58,7 @@ test('bakgrunderna har samma nummer som i Granska: registrets ordning inom grupp
   assert.deepEqual(backdropItems(registryOf([])), []);
 });
 
-test('dealerns stå-in är ankaret i vila: ett godkänt före ett som väntar, aldrig ett som utgår eller saknar fil', () => {
-  const anchor = (file: string, more: Record<string, unknown>) => asset(file, 'anchors', { dealer: 'paulina', pose: 'vila', ...more });
-  const waiting = anchor('vila-1.png', {});
-  const approved = anchor('vila-2.png', { status: 'godkänd' });
-  const others = [
-    anchor('redo.png', { pose: 'redo', status: 'godkänd' }),
-    anchor('annan.png', { dealer: 'pamela', status: 'godkänd' }),
-    anchor('borta.png', { status: 'godkänd', present: false }),
-    anchor('nej.png', { status: 'utgår' }),
-  ];
-  assert.equal(standIn(registryOf([...others, waiting, approved]), 'paulina')?.file, 'vila-2.png');
-  assert.equal(standIn(registryOf([...others, waiting]), 'paulina')?.file, 'vila-1.png');
-  assert.equal(standIn(registryOf(others), 'paulina'), null);
-  // En helfigur har inget bord i bilden och hör inte hemma på den vikta ytan, också när den är ett godkänt ankare i vila.
-  const figure = anchor('vila-helfigur.png', { status: 'godkänd', use: 'helfigur' });
-  assert.equal(standIn(registryOf([figure, waiting]), 'paulina')?.file, 'vila-1.png');
-});
-
-test('dealerna att välja mellan är registrets helfigurer, filmerna först, och sist det gamla ankaret', () => {
-  const registry = registryOf([
-    asset('dealers/paulina/anchors/vila.png', 'anchors', { dealer: 'paulina', pose: 'vila', status: 'godkänd', title: 'VILA' }),
-    asset('dealers/paulina/anchors/vila-helfigur.png', 'anchors', { dealer: 'paulina', pose: 'vila', use: 'helfigur', title: 'VILA i helfigur' }),
-    asset('reference/liv-vila.png', 'reference', { use: 'helfigur', title: 'Liv: VILA' }),
-    asset('reference/films/liv-vila-andas.mp4', 'reference', { use: 'helfigur', title: 'Liv: Andas lugnt' }),
-    asset('reference/films/giv.mp4', 'reference', { title: 'En giv med bord i bilden' }),
-    asset('reference/films/borta.mp4', 'reference', { use: 'helfigur', present: false }),
-    asset('reference/films/nej.mp4', 'reference', { use: 'helfigur', status: 'utgår' }),
-  ]);
-  assert.deepEqual(dealerChoices(registry, 'paulina'), [
-    { dealer: { kind: 'helfigur', file: 'reference/films/liv-vila-andas.mp4' }, label: 'Liv: Andas lugnt', film: true },
-    { dealer: { kind: 'helfigur', file: 'dealers/paulina/anchors/vila-helfigur.png' }, label: 'VILA i helfigur', film: false },
-    { dealer: { kind: 'helfigur', file: 'reference/liv-vila.png' }, label: 'Liv: VILA', film: false },
-    { dealer: { kind: 'ankare', file: 'dealers/paulina/anchors/vila.png' }, label: 'Gamla ankaret: VILA', film: false },
-  ]);
-  // Utan ankare i vila för den dealern finns bara helfigurerna, och ett tomt register ger inget val.
-  assert.equal(dealerChoices(registry, 'pamela').length, 3);
-  assert.deepEqual(dealerChoices(registryOf([]), 'paulina'), []);
-});
-
-test('dealerns egna dealerfilmer står först bland valen, med vyn de är gjorda i', () => {
+test('dealerna att välja mellan är dealerns egna dealerfilmer, filmerna först, med vyn de är gjorda i', () => {
   const made = (file: string, group: string, more: Record<string, unknown>) => asset(file, group, { dealer: 'paulina', use: 'dealerfilm', ...more });
   const registry = registryOf([
     asset('dealers/paulina/anchors/vila.png', 'anchors', { dealer: 'paulina', pose: 'vila', status: 'godkänd', title: 'VILA' }),
@@ -111,8 +72,7 @@ test('dealerns egna dealerfilmer står först bland valen, med vyn de är gjorda
   assert.deepEqual(dealerChoices(registry, 'paulina'), [
     { dealer: { kind: 'film', file: 'dealers/paulina/clips/giv-4_plats-7.mp4', view: { kind: 'plats', seat: 7 } }, label: 'Giv 4 ur Plats 7', film: true, lands: { seat: 4, index: 0, at: 3 } },
     { dealer: { kind: 'film', file: 'dealers/paulina/anchors/spelaren-vila.png', view: { kind: 'spelaren' } }, label: 'VILA ur Spelaren', film: false },
-    { dealer: { kind: 'helfigur', file: 'reference/liv-vila.png' }, label: 'Liv: VILA', film: false },
-    // Det gamla ankaret är fortfarande det i gamla rutan: en dealerfilm i vila tar inte dess plats.
-    { dealer: { kind: 'ankare', file: 'dealers/paulina/anchors/vila.png' }, label: 'Gamla ankaret: VILA', film: false },
   ]);
+  // Ett gammalt ankare och en helfigur är inga dealerfilmer, och ett tomt register ger inget val.
+  assert.deepEqual(dealerChoices(registryOf([]), 'paulina'), []);
 });

@@ -1,6 +1,5 @@
 // Scenbygget: av beskrivningen och adresserna till tillgångarna byggs three-scenen med bord, sko, dealer och rum med golv.
-// Dealern är en dealerfilm eller ett gammalt ankare på den vikta ytan, en helfigur på en upprätt yta bakom bordet,
-// eller dockan som visar en rörelse.
+// Dealern är en dealerfilm på den vikta ytan, eller dockan som visar en rörelse.
 // Det som kommer tillbaka styr scenen: bakgrund, ateljé, vy, storlek, dealerns film, förlagans rutor och städning.
 // Labbet och Casinot visar samma scen genom den.
 // Här står inga mått: allt som har en plats i scenen läses ur beskrivningen.
@@ -15,41 +14,36 @@ import type { CardNote, Rgb, Studio } from './dealer.ts';
 import type { Frame, SceneDescription } from './description.ts';
 import { createDoll } from './doll.ts';
 import type { DollDescription, DollMove } from './dollPose.ts';
-import { createFigure, type Clip } from './figure.ts';
 import { createFilm } from './film.ts';
 import {
   cardCorners,
   dealerEdge,
   fovYDeg,
   framed,
-  hull,
   onUpright,
   playerEye,
   roomFoot,
-  sceneEye,
-  see,
   tableFootprint,
   tablePosition,
   tableTilt,
   viewEye,
   viewFovDeg,
   type Eye,
-  type Pixel,
   type SeatView,
   type View,
 } from './geometry.ts';
+import type { Clip } from './picture.ts';
 
 export type { Background } from './backdrop.ts';
 export type { CardNote, DealerNote, Rgb, Studio } from './dealer.ts';
-export type { Clip } from './figure.ts';
 export type { Eye, SeatView, View } from './geometry.ts';
+export type { Clip } from './picture.ts';
 
 /**
- * Dealern i scenen: det som pekas ut i scene/dealer.ts, med bilderna som registrets `file`, och dockan med sina mått
+ * Dealern i scenen: det som pekas ut i scene/dealer.ts, med dealerfilmen som registrets `file`, och dockan med sina mått
  * och sin rörelse redan lästa (dollPose.ts: readDoll, readMove och moveFor).
  */
 export type Dealer =
-  | { kind: 'helfigur' | 'ankare'; file: string }
   | { kind: 'film'; file: string; view: SeatView }
   | { kind: 'docka'; doll: DollDescription; move: DollMove; pose: 'giv' | 'vila' };
 
@@ -91,7 +85,7 @@ export type SceneHandle = {
   setStudio(studio: Studio | null): void;
   /** Ställer vyn i en av de fasta. Med musen vrider och zoomar man sedan fritt därifrån. */
   setView(view: View): void;
-  /** Visar eller döljer skon. Dealerns bild har ingen sko i något av fallen. */
+  /** Visar eller döljer scenens sko. Dealerfilmen bär sin egen sko i bilden, där scenens står; den döljs inte här. */
   setShoe(shown: boolean): void;
   /** Visar eller döljer kortplatserna: konturen av ett kort på var och en av beskrivningens platser, på filten. */
   setPlaces(shown: boolean): void;
@@ -128,24 +122,6 @@ function disposeModel(model: THREE.Object3D): void {
   });
 }
 
-/** Den del av ögats ruta som ett föremål täcker: den minsta konvexa månghörningen kring alla dess punkter. */
-function outlineOf(object: THREE.Object3D, eye: Eye): Pixel[] {
-  object.updateMatrixWorld(true);
-  const seen: Pixel[] = [];
-  const point = new THREE.Vector3();
-  object.traverse((node) => {
-    const mesh = node as THREE.Mesh;
-    if (!mesh.isMesh) return;
-    const positions = mesh.geometry.getAttribute('position');
-    for (let index = 0; index < positions.count; index++) {
-      point.fromBufferAttribute(positions, index).applyMatrix4(mesh.matrixWorld);
-      const pixel = see(eye, [point.x, point.y, point.z]);
-      if (pixel) seen.push(pixel);
-    }
-  });
-  return hull(seen);
-}
-
 /** Ställer en kamera där ögat står, vänd dit ögat ser. */
 function stand(camera: THREE.PerspectiveCamera, eye: Eye): void {
   camera.position.set(...eye.position);
@@ -156,7 +132,6 @@ function stand(camera: THREE.PerspectiveCamera, eye: Eye): void {
 /** Bygger scenen i `host` och börjar läsa dess tillgångar. Ytan får sin storlek med `resize`. */
 export function buildScene(host: HTMLElement, scene: SceneDescription, options: SceneOptions): SceneHandle {
   const problem = options.onProblem ?? (() => {});
-  const filmEye = sceneEye(scene);
   const player = playerEye(scene);
 
   const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -231,16 +206,13 @@ export function buildScene(host: HTMLElement, scene: SceneDescription, options: 
   );
   world.add(backdrop.mesh, backdrop.shadow);
 
-  // Dealern: helfiguren står upprätt bakom bordet; ankaret ligger på den vikta ytan, vars liggande del lutar med bordet.
+  // Dealerfilmen ligger på den vikta ytan, lagd genom närbilden av vyn den är gjord i. Ytans liggande del lutar med bordet.
   const anisotropy = renderer.capabilities.getMaxAnisotropy();
   const chosen = options.dealer ?? null;
-  const figure = chosen?.kind === 'helfigur' ? createFigure(scene, options.urlOf(chosen.file), anisotropy, changed, problem) : null;
   const film =
-    chosen?.kind === 'ankare'
-      ? createFilm(scene, { eye: filmEye, level: true }, options.urlOf(chosen.file), anisotropy, changed, problem)
-      : chosen?.kind === 'film'
-        ? createFilm(scene, { eye: viewEye(scene, { ...chosen.view, close: true }), level: false }, options.urlOf(chosen.file), anisotropy, changed, problem)
-        : null;
+    chosen?.kind === 'film'
+      ? createFilm(scene, viewEye(scene, { ...chosen.view, close: true }), options.urlOf(chosen.file), anisotropy, changed, problem)
+      : null;
   // Dockans punkter står redan i scenens mått med bordets lutning inräknad: hon läggs olutad i världen.
   const doll = chosen?.kind === 'docka' ? createDoll(scene, chosen.doll, chosen.move, changed) : null;
   if (doll && chosen?.kind === 'docka') {
@@ -248,7 +220,6 @@ export function buildScene(host: HTMLElement, scene: SceneDescription, options: 
     doll.show(chosen.pose);
     if (chosen.pose === 'giv') doll.clip.play();
   }
-  if (figure) world.add(figure.mesh);
   if (film) {
     world.add(film.upright);
     table.add(film.lying);
@@ -284,23 +255,25 @@ export function buildScene(host: HTMLElement, scene: SceneDescription, options: 
   let flat: THREE.MeshBasicMaterial | null = null;
   const colourOf = (rgb: Rgb): THREE.Color => new THREE.Color().setRGB(rgb[0] / 255, rgb[1] / 255, rgb[2] / 255, THREE.SRGBColorSpace);
 
-  // Ateljéns rutnät på filten: smala remsor var tionde centimeter, från dealerns bordskant och en meter mot spelaren,
-  // en millimeter över filten. Det ligger bland det som lutar med bordet.
+  // Ateljéns rutnät på filten (`studio.grid`): smala remsor från dealerns bordskant mot spelaren, strax över filten.
+  // Det ligger bland det som lutar med bordet.
   const gridLines = new THREE.MeshBasicMaterial({ toneMapped: false, side: THREE.DoubleSide });
   const grid = new THREE.Mesh(new THREE.BufferGeometry(), gridLines);
   {
-    const STEP = 0.1;
-    const HALF = 0.003;
+    const { step, line, halfWidth, reach, lift } = scene.studio.grid;
+    const half = line / 2;
     const edge = scene.dealerEdge.z;
     const corners: number[] = [];
     const index: number[] = [];
     const strip = (x0: number, z0: number, x1: number, z1: number): void => {
       const at = corners.length / 3;
-      corners.push(x0, 0.001, z0, x1, 0.001, z0, x1, 0.001, z1, x0, 0.001, z1);
+      corners.push(x0, lift, z0, x1, lift, z0, x1, lift, z1, x0, lift, z1);
       index.push(at, at + 2, at + 1, at, at + 3, at + 2);
     };
-    for (let k = -9; k <= 9; k++) strip(k * STEP - HALF, edge, k * STEP + HALF, edge + 1);
-    for (let k = 0; k <= 10; k++) strip(-0.9, edge + k * STEP - HALF, 0.9, edge + k * STEP + HALF);
+    const across = Math.round(halfWidth / step);
+    const along = Math.round(reach / step);
+    for (let k = -across; k <= across; k++) strip(k * step - half, edge, k * step + half, edge + reach);
+    for (let k = 0; k <= along; k++) strip(-halfWidth, edge + k * step - half, halfWidth, edge + k * step + half);
     grid.geometry.setAttribute('position', new THREE.Float32BufferAttribute(corners, 3));
     grid.geometry.setIndex(index);
   }
@@ -362,15 +335,11 @@ export function buildScene(host: HTMLElement, scene: SceneDescription, options: 
     shoeStand.rotation.y = THREE.MathUtils.degToRad(scene.shoe.yawDeg);
     shoeStand.scale.setScalar(scene.shoe.length / length);
     shoeStand.visible = shoeShown;
-    // Ankarets bild har en egen sko, där filmkameran såg den på ett olutat bord. Den tas bort där scenens sko står,
-    // så att skon inte syns dubbelt. Konturen läses därför innan skon ställs på det lutade bordet.
-    // Helfiguren och dealerfilmen har ingen sko i bilden.
-    if (chosen?.kind === 'ankare') film?.cover(outlineOf(shoeStand, filmEye));
     table.add(shoeStand);
     changed();
   });
 
-  const dealer = figure?.ready ?? film?.ready ?? Promise.resolve();
+  const dealer = film?.ready ?? Promise.resolve();
 
   aim(standing);
   renderer.setAnimationLoop(() => {
@@ -382,7 +351,7 @@ export function buildScene(host: HTMLElement, scene: SceneDescription, options: 
   /** Ställer kortet och märkkortet efter filmens tid. Görs före varje ritad ruta. */
   function settle(): void {
     if (!laid) return;
-    const playing = figure?.clip ?? film?.clip ?? null;
+    const playing = film?.clip ?? null;
     const down = !playing || playing.time() >= laid.note.from;
     laid.card.mesh.visible = down;
     film?.setMarker(down);
@@ -397,7 +366,7 @@ export function buildScene(host: HTMLElement, scene: SceneDescription, options: 
   return {
     canvas: renderer.domElement,
     ready: Promise.all([board, shoe, dealer]).then(() => undefined),
-    clip: figure?.clip ?? film?.clip ?? (chosen?.kind === 'docka' && chosen.pose === 'giv' ? doll!.clip : null),
+    clip: film?.clip ?? (chosen?.kind === 'docka' && chosen.pose === 'giv' ? doll!.clip : null),
     setBackground(background) {
       return backdrop.show(background);
     },
@@ -481,7 +450,6 @@ export function buildScene(host: HTMLElement, scene: SceneDescription, options: 
       renderer.setAnimationLoop(null);
       orbit.dispose();
       backdrop.dispose();
-      figure?.dispose();
       film?.dispose();
       doll?.dispose();
       laid?.card.dispose();

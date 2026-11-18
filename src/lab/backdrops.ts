@@ -1,4 +1,4 @@
-// Det steget Scen läser ur registret: bakgrunderna med sina startvärden, och dealerna att välja mellan.
+// Det steget Scen läser ur registret: bakgrunderna med sina startvärden, och dealerfilmerna att välja mellan.
 
 import type { DealerNote, SeatView } from '../scene/build.ts';
 import { kindOf, sectionsOf, type Asset, type Item, type Registry } from './registry.ts';
@@ -11,7 +11,7 @@ import { kindOf, sectionsOf, type Asset, type Item, type Registry } from './regi
 export type Look = { turn: number; blur: number; exposure: number; mirror: boolean; lift: number; height: number; radius: number };
 
 /** Scenens startvärden för det som är dess eget i en bakgrunds visning. */
-export type RoomStart = { lift: number; height: number; radius: number };
+type RoomStart = { lift: number; height: number; radius: number };
 
 /** En bakgrund utan värden från gamla projektet visas som den är. */
 export const PLAIN = { turn: 0, blur: 0, exposure: 1, mirror: false };
@@ -51,30 +51,12 @@ export const backdropItems = (registry: Registry): Item[] =>
 export const backdropKind = (asset: Asset): '360' | 'platt' => (asset.kind === 'platt' ? 'platt' : '360');
 
 /**
- * Bilden som står in för dealern på den vikta ytan: registrets ankare i vila för den dealern, i gamla projektets ruta.
- * Ett godkänt går före ett som väntar på omdöme. Ett som utgår, vars fil saknas eller som är en helfigur används inte.
- */
-export function standIn(registry: Registry, dealer: string): Asset | null {
-  const resting = registry.assets.filter(
-    (asset) =>
-      asset.group === 'anchors' &&
-      asset.dealer === dealer &&
-      asset.pose === 'vila' &&
-      asset.use !== 'helfigur' &&
-      asset.use !== 'dealerfilm' &&
-      asset.present &&
-      asset.status !== 'utgår',
-  );
-  return resting.find((asset) => asset.status === 'godkänd') ?? resting[0] ?? null;
-}
-
-/**
- * En dealer att välja i steget Scen: en bild eller film ur registret, och vad valet heter. Dockan väljs inte här.
+ * En dealer att välja i steget Scen: en dealerfilm ur registret, och vad valet heter. Dockan väljs inte här.
  * `lands` är var och när ett klipp lägger sitt kort (postens `lands`): platsen, vilket av platsens kort, och tiden i
  * filmen då det ligger. Från den tiden visar scenen sitt eget kort där.
  */
-export type Landing = { seat: number; index: number; at: number };
-export type DealerChoice = { dealer: Exclude<DealerNote, { kind: 'docka' }>; label: string; film: boolean; lands?: Landing };
+type Landing = { seat: number; index: number; at: number };
+type DealerChoice = { dealer: Extract<DealerNote, { kind: 'film' }>; label: string; film: boolean; lands?: Landing };
 
 /** Vyn en dealerfilm är gjord i, så som posten bär den (`view`). Null när posten inte säger en vy som går att använda. */
 function madeIn(asset: Asset): SeatView | null {
@@ -94,25 +76,15 @@ function landing(asset: Asset): Landing | null {
 }
 
 /**
- * Dealerna att välja mellan: först `dealer`s egna dealerfilmer (`use: "dealerfilm"`, gjorda i närbilden av en vy och
- * lagda på den vikta ytan), sedan registrets helfigurer (`use: "helfigur"`), och sist det gamla ankaret för `dealer`.
- * Inom varje slag står filmerna före stillbilderna. Det som utgår eller saknar fil är inte med.
+ * Dealerna att välja mellan: `dealer`s dealerfilmer (`use: "dealerfilm"`, gjorda i närbilden av en vy och lagda på den
+ * vikta ytan), filmerna före stillbilderna. Det som utgår eller saknar fil är inte med.
  */
 export function dealerChoices(registry: Registry, dealer: string): DealerChoice[] {
-  const usable = registry.assets.filter((asset) => asset.present && asset.status !== 'utgår');
-  const filmsFirst = (choices: DealerChoice[]): DealerChoice[] => [...choices.filter((choice) => choice.film), ...choices.filter((choice) => !choice.film)];
-  const made = usable.flatMap((asset): DealerChoice[] => {
+  const made = registry.assets.flatMap((asset): DealerChoice[] => {
+    if (!asset.present || asset.status === 'utgår') return [];
     const view = asset.use === 'dealerfilm' && asset.dealer === dealer ? madeIn(asset) : null;
     const lands = landing(asset);
     return view ? [{ dealer: { kind: 'film', file: asset.file, view }, label: asset.title, film: kindOf(asset.file) === 'film', ...(lands ? { lands } : {}) }] : [];
   });
-  const figures = usable
-    .filter((asset) => asset.use === 'helfigur')
-    .map((asset): DealerChoice => ({ dealer: { kind: 'helfigur', file: asset.file }, label: asset.title, film: kindOf(asset.file) === 'film' }));
-  const anchor = standIn(registry, dealer);
-  return [
-    ...filmsFirst(made),
-    ...filmsFirst(figures),
-    ...(anchor ? [{ dealer: { kind: 'ankare' as const, file: anchor.file }, label: `Gamla ankaret: ${anchor.title}`, film: false }] : []),
-  ];
+  return [...made.filter((choice) => choice.film), ...made.filter((choice) => !choice.film)];
 }

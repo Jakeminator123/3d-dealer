@@ -1,5 +1,5 @@
-// Nyckeln: materialet som tar bort den gröna skärmen ur dealerns bild. En väg för alla dealerbilder: den vikta ytan
-// (film.ts) och helfiguren (figure.ts) ritas med samma skuggprogram. Det som skiljer dem är var på ytan bilden ligger.
+// Nyckeln: materialet som tar bort den gröna skärmen ur dealerfilmen på den vikta ytan (film.ts) och, när kortet ligger,
+// märkkortets blå.
 //
 // Nyckeln är förd över ur gamla Dealer (src/scene3d-film.ts, FRAGMENT, commit 1198340774d8ee78be218506a169faeaa781fa22):
 // skärmens andel av en bildpunkt, konturen indragen en bildpunkt, det gröna spillet och den rena kanten (edgeClean, där
@@ -17,26 +17,13 @@ const ERODE = 0.6;
 // Steget mellan nyckelns prov, i rutans bildpunkter. Kanten letas två och fyra steg ut och färgen hämtas fem steg in.
 const STEP = 1.4;
 
-// Bilden på en vikt yta hämtas där en kamera såg ytans punkt. För en bild gjord över ett olutat bord är det ytans egna
-// lägen, inte där punkten står i världen: då sitter händerna fast på filten och följer med när bordet lutas. För en bild
-// gjord i scenen som den står (FILM_WORLD) är det punktens plats i världen.
+// Bilden på den vikta ytan hämtas där kameran som gjorde den såg punkten: punktens plats i världen, genom kamerans
+// projektion. Bilden är gjord i scenen som den står, med bordet lutat.
 const PROJECTED = /* glsl */ `
 uniform mat4 film;
 varying vec4 vFilm;
 void main() {
-  #ifdef FILM_WORLD
   vFilm = film * modelMatrix * vec4(position, 1.0);
-  #else
-  vFilm = film * vec4(position, 1.0);
-  #endif
-  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-}`;
-
-// Bilden på en plan yta ligger där ytans egna koordinater säger: hela rutan över hela ytan.
-const PLAIN = /* glsl */ `
-varying vec4 vFilm;
-void main() {
-  vFilm = vec4(uv * 2.0 - 1.0, 0.0, 1.0);
   gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
 }`;
 
@@ -148,22 +135,20 @@ export function prepareKeyTexture(texture: THREE.Texture, anisotropy: number): v
 }
 
 /**
- * Nyckelns material för en bild i rutan `frame`. Med `projection` ligger bilden där den kameran (projektion gånger vy)
- * såg ytans punkter: ytans egna lägen, eller med `world` punkternas plats i världen. Utan `projection` ligger hela rutan
- * över ytans egna koordinater, med rutans överkant där v är 1.
+ * Nyckelns material för en bild i rutan `frame`, gjord genom kameran `projection` (projektion gånger vy): bilden ligger
+ * där den kameran såg ytans punkter.
  */
-export function createKey(map: THREE.Texture, frame: Frame, projection: THREE.Matrix4 | null = null, world = false): Key {
+export function createKey(map: THREE.Texture, frame: Frame, projection: THREE.Matrix4): Key {
   const uniforms = {
     map: { value: map },
-    film: { value: projection ?? new THREE.Matrix4() },
+    film: { value: projection },
     key: { value: new THREE.Vector3(0, 1, 0) },
     texel: { value: new THREE.Vector2(STEP / frame.width, STEP / frame.height) },
     marker: { value: 0 },
   };
   const material = new THREE.ShaderMaterial({
     uniforms,
-    defines: projection && world ? { FILM_WORLD: '' } : {},
-    vertexShader: projection ? PROJECTED : PLAIN,
+    vertexShader: PROJECTED,
     fragmentShader: FRAGMENT,
     side: THREE.DoubleSide,
     transparent: true,

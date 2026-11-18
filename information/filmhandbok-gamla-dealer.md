@@ -1,5 +1,7 @@
 # Handbok: så komponeras en filmbeställning
 
+> Kopia av `tools/film-prompting.md` ur gamla Dealer vid commit `2d303b57`, gjord 2026-11-18. Länkarna nedan pekar in i gamla Dealer och fungerar inte här.
+
 En av fyra: [dealer-line.md](dealer-line.md) är ingången (stationerna från en bild till en färdig dealer, alla format
 och namn), [order-clerk.md](order-clerk.md) säger hur en beställning läggs, [film-review.md](film-review.md) hur filmen
 granskas, och den här hur beställningen sätts ihop (bilder, referensfilm, text, modell, längd, tagningar) och **vad som

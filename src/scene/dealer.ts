@@ -4,19 +4,18 @@
 import type { SeatView } from './geometry.ts';
 
 /**
- * Dealern i scenen. Bilder pekas ut som registrets `file`.
- * - `film`: en film eller stillbild av dealern på grön skärm, gjord i närbilden av vyn `view` med scenens bord framför
- *   sig, projicerad därifrån på den vikta ytan.
- * - `ankare`: en stillbild ur gamla projektets ruta, med bordskant och sko inbakade, projicerad från filmkameran.
- * - `helfigur`: en film eller stillbild av en sittande dealer på grön skärm, utan bord, ställd upprätt bakom bordet.
+ * Dealern i scenen.
+ * - `film`: en dealerfilm, film eller stillbild av dealern på grön skärm, gjord i närbilden av vyn `view` med scenens
+ *   bord framför sig och projicerad därifrån på den vikta ytan. Filen pekas ut som registrets `file`.
  * - `docka`: den vita dockan. `move` är rörelsens namn (content/moves/<namn>.json), och `pose` säger om den gör
  *   rörelsen (`giv`) eller sitter i vila med händerna på filten (`vila`). Med `seat` ställs rörelsen om till den
- *   platsen: kortet hämtas på samma ställe i skon och läggs på den platsens första kortplats.
+ *   platsen: kortet hämtas på samma ställe i skon och läggs på den platsens första kortplats, eller på kortplatsen
+ *   `index` (0 är den första). `move` kan också vara en cykel (content/moves/cykel-*.json): given i cykelns takt,
+ *   och handen tillbaka till REDO.
  */
 export type DealerNote =
-  | { kind: 'helfigur' | 'ankare'; file: string }
   | { kind: 'film'; file: string; view: SeatView }
-  | { kind: 'docka'; move: string; pose: 'giv' | 'vila'; seat?: number };
+  | { kind: 'docka'; move: string; pose: 'giv' | 'vila'; seat?: number; index?: number };
 
 /**
  * Ett kort som scenen visar på en kortplats: platsen (1–7) och vilket av platsens kort (0 är det första), vad kortet är

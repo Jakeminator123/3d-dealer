@@ -2,6 +2,24 @@
 
 Nyast överst. Ett beslut som ersätts stryks inte: skriv det nya överst och peka på det gamla.
 
+## 2026-11-18, en produktionslinje, och det som inte används tas bort
+
+Citat är Jakobs ord samma förmiddag (cirka 09:35–09:45), dikterade.
+
+| Beslut | Skäl |
+| --- | --- |
+| Målet är så många bra filmer av Paulina att hon kan dela ut kort till alla sju platser och komma tillbaka, med minst två kort per plats. | "skapa så många bra videos till Pau att vi får ihop tillräckligt med sekvenser för att hon kan dela ut kort och återkomma till alla positioner med minst två kort per plats." |
+| En produktionslinje: dockan i scenen, ankare på grön skärm i vyns närbild, film med Kling 4, och filmen nycklad i scenen genom samma öga ([production.md](production.md)). Det som inte används tas bort, och det som är bra samlas på ett ställe. | "Vi ska utesluta ineffektiva metoder och automatiskt avlägsna de som inte används. Rensa gammalt material men behåll det som är bra och samla det i en enda källa." "Om vi hittar en effektiv metod, ta bort de andra. Ta bort keystones eller ankare som inte används. Om något är för komplicerat, ta bort det. Jag vill inte ha onödiga beslut; agera inom logiska ramar och skapa best practices." |
+| Borttaget ur koden samma dag, eftersom linjen inte använder det: helfiguren i scenen (`src/scene/figure.ts`, gruppen `figure` i `content/scene.json`), dess recept (`src/pipeline/helfigur.ts`, `content/figure-frame.json`), det gamla ankaret på den vikta ytan och vyn Filmkameran. Gamla linsen finns kvar i `content/scene.json` som det scenens mått är mätta genom. Ersätter helfiguren och Filmkameran under "scenen med golv och helfigur" och "det Jakob lämnade över" längre ned. Registrets poster för helfigurerna och de gamla ankarna står kvar tills de tas bort. | Jakobs ord ovan. Helfiguren var inte längre förlagan sedan morgonen, och de gamla ankarna är gjorda i gamla rutan med skon inbakad. Koden finns i Git-historiken (commit `70755fe`). |
+| "Ta bort" betyder radera: filen finns inte kvar. "Arkivera" betyder flytta: filen finns kvar på ett annat ställe, i dag `output/work/struket/`. | "Se till att 'ta bort' ÄR radera och att 'arkivera' är 'flytta'" (cirka 09:38). |
+| Generering går genom Runways MCP-server, aldrig genom API-nycklar. Ersätter "Du får hög budget på runway/openai_api_key" (06:30). | "se till att vi använder allt från NCP-servern och inte API-et". NCP läses som MCP. |
+| Generering får kosta 1 000 krediter i timmen. Ersätter riktmärket 300 i timmen och nattens ram om 250 per beställning och 2 000 för natten, längre ned. Saldot läses före och efter, och modell, indata och kostnad redovisas. En enskild beställning över 100 krediter visas för Jakob först; den gränsen är agentens tills han säger annat. | "Du får ha tusen krediter per timme i genereringar" (cirka 09:45). |
+| Dokumentationen byggs nedifrån: fakta står i data (`content/` och registret), och dokumenten säger kort vad som gäller och länkar dit. Filmproduktionen har en metod, i [production.md](production.md). Överlämningarna i `information/` är borttagna; det som gällde i dem står nu i `docs/` och [AGENTS.md](../AGENTS.md). | "Vi ska ha en bottom-up-logik för dokumentation som klargör vad som gäller och standardiserade metoder för filmproduktion." |
+| En film som inte fungerar ska gå att granska och felet gå att peka ut: varje tagning bär sin beställning, sina indata och sitt omdöme. | "Om vissa filmer inte fungerar, ska vi kunna granska materialet och identifiera problem." |
+| Registret och arbetsdatan (beställningar, uppladdningar, kostnader, mätningar) flyttas från stora JSON-filer till SQLite (`node:sqlite`). | "Överväg att använda SQL-databaser istället för stora JSON-filträd som ignoreras." Valt av huvudagenten. |
+| Underagenter körs som standard med Opus 5.5 på extra hög ansträngning. | "underagenter får du med fördel använda Opus 5.5 extra hög som standardval!" |
+| Arbetet sker i `3d-dealer` på skrivbordet. Gamla Dealer är Codex arbetsyta: dess grenar, arbetsträd och `D:\dealer-scratch` rörs inte. En gren eller ett arbetsträd med opushade commits tas aldrig bort utan Jakobs ja för just den grenen, och aldrig i ett annat repo än `3d-dealer`. | Jakobs besked samma förmiddag. Regeln om grenar lades till efter en händelse samma dag. |
+
 ## 2026-11-18, dealern på grönt ur scenens kamera, och dockan som standard
 
 Citat är Jakobs ord samma morgon (07:19–08:35), när han lämnade över till agenten för natten.
@@ -39,7 +57,7 @@ Citat är Jakobs ord samma morgon (07:19–08:35), när han lämnade över till 
 | `granska igen` är en kö till agenten. Jakob kan skriva varför i Labbet; en granskare rättar eller svarar, och svaret syns i Labbet. | "Om jag klickar Granska igen ska jag kunna motivera och samma andragranskande AI ska kunna rapportera till dig eller själv ändra så saker blir rätt" |
 | Agenten avgör det som går att avgöra och frågar inte. | "du borde kunna avgöra det själv eller låta en annan agent göra det. Jag vill inte behöva ta manuella beslut hela tiden." |
 | Betald generering beställs utan fråga, tills Jakob säger annat, inom riktmärket 300 krediter i timmen. Gränsen på 100 krediter per beställning, över vilken han får se den först, är agentens tillägg. Ersätter "först efter Jakobs ja per beställning" längre ned. | "Just nu får du ganska fria tyglar när det gäller genereringar om det kan hjälpa oss att förbättra saker." |
-| Scenen ska ses ur en och samma sorts vinkel: dealern framifrån, rummet bakom henne och en stor del av bordsytan. Bordets vinkel får justeras något för att nå dit. Skon får tas bort om den stör, och att den hänger utanför bordskanten rättas sist. | "Vi måste ha en och samma typ av vinkel. Vi kan justera bordsvinkeln något för att se bakåt i bilden, dealen framifrån och en stor del av bordsytan." "Allt måste dock sitta med koordinater och hur allt delas ut." |
+| Scenen ska ses ur en och samma sorts vinkel: dealern framifrån, rummet bakom henne och en stor del av bordsytan. Bordets vinkel får justeras något för att nå dit. Skon får tas bort om den stör, och att den hänger utanför bordskanten rättas sist. | "Vi måste ha en och samma typ av vinkel. Vi kan justera bordsvinkeln något för att se bakåt i bilden, dealen framifrån och en stor del av bordsytan", gärna som en "optisk illusion, som jag har löst bättre i till exempel Dealer". "Allt måste dock sitta med koordinater och hur allt delas ut." |
 
 ## 2026-11-18, Jakobs besked under granskningen
 

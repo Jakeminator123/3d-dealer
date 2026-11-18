@@ -25,7 +25,7 @@ const order = (more: Partial<ForlagaOrder> = {}): ForlagaOrder => ({
   frame: FRAME,
   view: { kind: 'spelaren' },
   eye: { position: [0, 0.6, 0.5562], forward: [0, -0.2756, -0.9613], focalPx: 43.5 },
-  dealer: { kind: 'helfigur', file: 'reference/films/liv-vila-redo.mp4' },
+  dealer: { kind: 'film', file: 'dealers/paulina/clips/giv-4-t1.mp4', view: { kind: 'spelaren' } },
   background: { file: 'scene/backgrounds/balsal.jpg', kind: '360', turn: 0, lift: 0, blur: 6, exposure: 0.42, mirror: false, height: 1.6, radius: 8 },
   studio: null,
   shoe: true,
@@ -38,19 +38,19 @@ const picture = (colour: string, size = FRAME): Promise<Buffer> =>
 const hasFfmpeg = spawnSync('ffmpeg', ['-version']).status === 0;
 
 test('förlagans namn byggs av dealerns filnamn, vyn och bakgrunden', () => {
-  assert.equal(forlagaName(order()), 'liv-vila-redo_spelaren_balsal');
-  assert.equal(forlagaName(order({ view: { kind: 'plats', seat: 7 }, still: true })), 'liv-vila-redo_plats-7_balsal_bild');
-  assert.equal(forlagaName(order({ view: { kind: 'filmkameran' }, dealer: null, background: null })), 'utan-dealer_filmkameran_utan-rum');
+  assert.equal(forlagaName(order()), 'giv-4-t1_spelaren_balsal');
+  assert.equal(forlagaName(order({ view: { kind: 'plats', seat: 7 }, still: true })), 'giv-4-t1_plats-7_balsal_bild');
+  assert.equal(forlagaName(order({ view: { kind: 'plats', seat: 2 }, dealer: null, background: null })), 'utan-dealer_plats-2_utan-rum');
   // Namnet städas: bara små bokstäver, siffror, bindestreck och understrecken mellan delarna, vad filerna än heter.
   const odd = forlagaName(
     order({
-      dealer: { kind: 'ankare', file: '../../Hemlig Mapp/VILA (ny) åäö.PNG' },
+      dealer: { kind: 'film', file: '../../Hemlig Mapp/VILA (ny) åäö.PNG', view: { kind: 'spelaren' } },
       background: { ...order().background!, file: 'scene\\backgrounds\\..\\..\\rum.v2.jpg' },
     }),
   );
   assert.equal(odd, 'vila-ny-aao_spelaren_rum-v2');
-  assert.equal(forlagaName(order({ dealer: { kind: 'helfigur', file: '.../' } })), 'utan-dealer_spelaren_balsal');
-  assert.ok(forlagaName(order({ dealer: { kind: 'helfigur', file: `${'x'.repeat(300)}.mp4` } })).length <= 120);
+  assert.equal(forlagaName(order({ dealer: { kind: 'film', file: '.../', view: { kind: 'spelaren' } } })), 'utan-dealer_spelaren_balsal');
+  assert.ok(forlagaName(order({ dealer: { kind: 'film', file: `${'x'.repeat(300)}.mp4`, view: { kind: 'spelaren' } } })).length <= 120);
 });
 
 test('dockan, närbilden, ateljén och ett eget ord syns i förlagans namn', () => {
@@ -76,10 +76,17 @@ test('dockan, närbilden, ateljén och ett eget ord syns i förlagans namn', () 
   assert.equal(readOrder(laid).places, true);
   assert.equal('card' in readOrder(film) || 'places' in readOrder(film), false);
   assert.equal(forlagaName({ ...doll, dealer: { kind: 'docka', move: 'giv-nyp-plats-4', pose: 'giv', seat: 7 } }), 'docka-giv-nyp-plats-4-till-7_spelaren-nara_atelje');
+  // En cykel till en annan kortplats: kortplatsen följer med i beställningen och syns i namnet.
+  const cycle = { ...doll, dealer: { kind: 'docka', move: 'cykel-nyp', pose: 'giv', seat: 7, index: 1 } } as const;
+  assert.equal(forlagaName(cycle), 'docka-cykel-nyp-till-7-kort-1_spelaren-nara_atelje');
+  assert.deepEqual(readOrder(cycle).dealer, cycle.dealer);
   for (const [what, broken] of [
+    ['dealer', { ...doll, dealer: { kind: 'docka', move: 'cykel-nyp', pose: 'giv', seat: 7, index: -1 } }],
     ['dealer', { ...doll, dealer: { kind: 'docka', move: '../hemligt', pose: 'giv' } }],
     ['dealer', { ...doll, dealer: { kind: 'docka', move: 'giv-nyp-plats-4' } }],
     ['dealer', { ...film, dealer: { kind: 'film', file: 'a.mp4', view: { kind: 'filmkameran' } } }],
+    ['dealer', { ...film, dealer: { kind: 'helfigur', file: 'a.mp4' } }],
+    ['view', { ...film, view: { kind: 'filmkameran' } }],
     ['studio', { ...doll, studio: { screen: [2, 182, 480], table: null } }],
     ['view', { ...doll, view: { kind: 'spelaren', close: 'ja' } }],
     ['card', { ...film, card: { seat: 4, index: 0, face: 'A♠' } }],
@@ -132,7 +139,7 @@ test('en beställning med hål i tas inte emot, och bara förlagans egna fält f
 
 test('en stillbild sparas som en bild med beskrivningen bredvid', async () => {
   const started = startForlaga(root, order({ still: true, frames: 1, view: { kind: 'plats', seat: 7 }, dealer: { ...order().dealer!, time: 1.25 } }));
-  assert.deepEqual(started, { name: 'liv-vila-redo_plats-7_balsal_bild', frames: 1 });
+  assert.deepEqual(started, { name: 'giv-4-t1_plats-7_balsal_bild', frames: 1 });
   const saved = await saveFrame(root, started.name, 0, await picture('#225577'), '2026-11-18 07:00');
   assert.deepEqual(saved, {
     name: started.name,
@@ -147,7 +154,7 @@ test('en stillbild sparas som en bild med beskrivningen bredvid', async () => {
   assert.equal(record.savedAt, '2026-11-18 07:00');
   assert.deepEqual(record.view, { kind: 'plats', seat: 7 });
   assert.deepEqual(record.eye, order().eye);
-  assert.deepEqual(record.dealer, { kind: 'helfigur', file: 'reference/films/liv-vila-redo.mp4', time: 1.25 });
+  assert.deepEqual(record.dealer, { ...order().dealer, time: 1.25 });
   assert.deepEqual(record.background, order().background);
   assert.deepEqual([record.frame, record.frames, record.seconds, record.file], [FRAME, 1, 0, saved!.file]);
   // Mappen med den enda rutan behövs inte efteråt.
@@ -155,7 +162,7 @@ test('en stillbild sparas som en bild med beskrivningen bredvid', async () => {
 });
 
 test('en ruta som inte hör till förlagan tas inte emot', async () => {
-  const { name } = startForlaga(root, order({ dealer: { kind: 'helfigur', file: 'fel.mp4' } }));
+  const { name } = startForlaga(root, order({ dealer: { kind: 'film', file: 'fel.mp4', view: { kind: 'spelaren' } } }));
   const good = await picture('#113355');
   await assert.rejects(saveFrame(root, 'inte-borjad', 0, good, ''), /inte påbörjad/);
   await assert.rejects(saveFrame(root, '../x', 0, good, ''), /Ogiltigt namn/);
@@ -167,13 +174,13 @@ test('en ruta som inte hör till förlagan tas inte emot', async () => {
   await assert.rejects(saveFrame(root, name, 2, good, ''), /saknar 2 av 3 rutor, först ruta 1/);
   assert.deepEqual(readdirSync(forlagaPaths(root, name).dir).sort(), ['bestallning.json', 'ruta-0003.png']);
   // En ny sparning med samma namn börjar om från en tom mapp.
-  startForlaga(root, order({ dealer: { kind: 'helfigur', file: 'fel.mp4' } }));
+  startForlaga(root, order({ dealer: { kind: 'film', file: 'fel.mp4', view: { kind: 'spelaren' } } }));
   assert.deepEqual(readdirSync(forlagaPaths(root, name).dir), ['bestallning.json']);
 });
 
 test('ett klipp sätts ihop av rutorna när den sista är inne', { skip: hasFfmpeg ? false : 'ffmpeg finns inte på den här datorn' }, async () => {
   const { name } = startForlaga(root, order());
-  assert.equal(name, 'liv-vila-redo_spelaren_balsal');
+  assert.equal(name, 'giv-4-t1_spelaren_balsal');
   assert.equal(await saveFrame(root, name, 0, await picture('#102030'), '2026-11-18 07:10'), null);
   assert.equal(await saveFrame(root, name, 1, await picture('#405060'), '2026-11-18 07:10'), null);
   const saved = await saveFrame(root, name, 2, await picture('#708090'), '2026-11-18 07:10');

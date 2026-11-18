@@ -59,20 +59,17 @@
     "basis": "antaget",
     "source": "Valt 2026-11-18. En 360-bild visas som ett rum med golv: bilden antas vara tagen captureHeight meter över golvet, rakt över eller under spelarens öga, och rummets väggar ligger radius meter från den punkten. 1,6 m är en vanlig stativhöjd för 360-bilder; ingen av bilderna bär uppgift om sin höjd, och 8 m är valt som ett rum där väggarna står klart bakom dealern. Båda är startvärden för reglagen Höjd och Radie, per bakgrund. Golvets egen höjd är inte antagen: den räknas ur bordsmodellen (geometry.ts, floorY). Skuggan under bordet är en mörk fläck på golvet, stor som bordets fotavtryck, som tonar ut shadowReach meter utanför det och som mest tar bort andelen shadowStrength av ljuset; båda valda i bild."
   },
-  "figure": {
-    "frame": { "width": 1920, "height": 1080 },
-    "height": 1.65,
-    "handRow": 568,
-    "handLift": 0.005,
-    "behindEdge": 0.06,
+  "studio": {
+    "colours": { "screen": [2, 182, 48], "table": [20, 215, 60], "grid": [0, 165, 30] },
+    "grid": { "step": 0.1, "line": 0.006, "halfWidth": 0.9, "reach": 1, "lift": 0.001 },
     "basis": "antaget",
-    "source": "Helfiguren: en film eller stillbild av en sittande dealer på grön skärm, utan bord, ställd upprätt bakom bordet. Talen är local-studios placering av dealern Liv (planeHeight 1,65 m för hela rutans höjd, fingertipSourceY 0,523, händerna 6 mm över filten), förda hit 2026-11-18. frame är rutan bilderna är gjorda i. handRow är raden för händernas underkant i Livs VILA, mätt i bilden skalad till rutan (output/work/helfigur/measure.mjs: 568 av 1080); den raden ställs handLift meter över filtens höjd. behindEdge är hur långt bakom dealerns bordskant ytan står: bordsskivan börjar 26 mm bakom filtens kant (table.model), så 60 mm ställer ytan strax bakom skivan. Passningen mot det här bordet är sedd i bild, inte mätt."
+    "source": "Ateljén som ankarnas underlag sparas i, valt 2026-11-18 för ankarna ur Spelaren (beställningarna skrevs av output/work/giv-4/gor-bestallning.mjs). colours är färgerna 0–255 per kanal: skärmen är gamla projektets gröna, bordet målas ljusare grönt och rutnätet mörkare, så att allt blir en grön när ankaret plattas. grid är rutnätet på filten, i meter: en linje var step, line bred, ut till halfWidth åt sidorna och reach från dealerns bordskant mot spelaren, lift över filten. Det visar filtens plan och lutning för bildmodellen."
   },
   "forlaga": {
     "frame": { "width": 1920, "height": 1080 },
     "fps": 30,
     "basis": "antaget",
-    "source": "Valt 2026-11-18: en förlaga sparas i helfigurens ruta och takt (Livs filmer är 1920 × 1080 med 30 rutor per sekund), så att en ruta i förlagan svarar mot en ruta i filmen. Vyns hela ruta ryms i förlagans: den passas in på höjden, och förlagan visar mer åt sidorna."
+    "source": "Valt 2026-11-18: en förlaga sparas i 1920 × 1080 med 30 rutor per sekund, samma ruta som filmmodellens (film.frame) och samma takt som local-studios filmer, som förlagorna först gjordes efter. Kling 4 lämnar sina filmer i 24 rutor per sekund. Vyns hela ruta ryms i förlagans: den passas in på höjden, och förlagan visar mer åt sidorna."
   },
   "film": {
     "lift": 0.0015,
@@ -87,8 +84,9 @@
     "height": 0.088,
     "thickness": 0.0003,
     "corner": 0.0035,
+    "lift": 0.0006,
     "basis": "antaget",
-    "source": "Standardmått för pokerkort, 63 × 88 mm, som i gamla kontraktet (cardMillimetres). Tjocklek och hörnradie ur gamla linsens CARD. Inget kort är mätt."
+    "source": "Standardmått för pokerkort, 63 × 88 mm, som i gamla kontraktet (cardMillimetres). Tjocklek och hörnradie ur gamla linsens CARD. Inget kort är mätt. lift är hur högt över filten scenens kort ritas: under dealerfilmens liggande del (film.lift), så att handen ritas över kortet."
   },
   "places": {
     "dealer": [

@@ -11,8 +11,6 @@ export type CardFace = { place: FeltPoint; face: string };
 
 // Kortets bild ritas så här många bildpunkter per meter: 63 × 88 mm blir 252 × 352.
 const PER_METRE = 4000;
-// Kortet ligger strax över filten och under dealerfilmens liggande del (film.lift), så att handen ritas över det.
-const LIFT = 0.0006;
 
 /** Kortets framsida som bild: vit med rundade hörn, valören och färgen i två hörn och färgen stor i mitten. */
 function faceImage(scene: SceneDescription, face: string): HTMLCanvasElement {
@@ -56,8 +54,9 @@ export type Card = { mesh: THREE.Mesh; dispose(): void };
 
 /** Ett kort liggande på sin plats, framsidan upp, med överkanten bort från spelaren. `anisotropy` håller bilden skarp sedd snett. */
 export function createCard(scene: SceneDescription, card: CardFace, anisotropy: number): Card {
-  // Hörnen: bortre vänstra, bortre högra, hitre högra, hitre vänstra, där bordets lutning lägger dem.
-  const corners = cardCorners(scene, card.place).map((corner) => [corner[0], corner[1] + LIFT, corner[2]]);
+  // Hörnen: bortre vänstra, bortre högra, hitre högra, hitre vänstra, där bordets lutning lägger dem, strax över filten
+  // och under dealerfilmens liggande del, så att handen ritas över kortet.
+  const corners = cardCorners(scene, card.place).map((corner) => [corner[0], corner[1] + scene.card.lift, corner[2]]);
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(corners.flat(), 3));
   geometry.setAttribute('uv', new THREE.Float32BufferAttribute([0, 1, 1, 1, 1, 0, 0, 0], 2));

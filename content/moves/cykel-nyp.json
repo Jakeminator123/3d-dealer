@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "about": "Cykel med nyp, REDO → kortet lagt → REDO: vänster hand tar det gula kortet i skons mynning, vänder det och lägger det med den blå framsidan upp på en kortplats (given giv-nyp-plats-4, i snabbare takt), vilar en stund på kortet, släpper det och går i en båge tillbaka till skon, där den nyper nästa kort. Huvud, blick och överkropp följer kortet ut och går tillbaka med handen. Cykeln börjar och slutar i REDO, så att vilken cykel som helst kan följa på vilken som helst; kortplatsen väljs när den spelas (plats och kortnummer). Hur den räknas står i src/scene/dollPose.ts (moveFor, cycled, poseAt). parts är takten i sekunder: ready stilla i REDO, deal från REDO tills kortet ligger, onCard med handen kvar på kortet, back tillbaka till nästa kort i skon, still stilla i REDO. back är bågen tillbaka: lift är hur högt över den raka vägen greppet går som mest, i meter (halvvägs); release är andelen av vägen tillbaka då handen har lämnat filten, och look andelen då blicken har nått nästa kort i skon. Bågen ut mot spelarna är givens egen och räknas när cykeln hängs i scenen.",
+  "id": "cykel-nyp",
+  "from": "REDO",
+  "to": "REDO",
+  "give": "giv-nyp-plats-4",
+  "seconds": 4,
+  "parts": { "ready": 0.1, "deal": 1.8, "onCard": 0.3, "back": 1.5, "still": 0.3 },
+  "back": { "lift": 0.05, "release": 0.3, "look": 0.6 },
+  "basis": "antaget",
+  "source": "Valt 2026-11-18. seconds: Jakob vill ha givarna ungefär dubbelt så snabba som gamla provets 4 s enkel väg, och en hel cykel på 4,0 s, så att den ryms i en filmbeställning (Kling 4, 4 s). deal: den lästa given tar 3,2 s från REDO tills kortet ligger (ruta 0–96 i giv-nyp-plats-4); 1,8 s är 1,78 gånger så fort. onCard: fingrarna ligger kvar på kortet en kort stund innan de släpper, som när en dealer har lagt ett kort. back: med 1,7 s rörde sig handen knappt den första halvsekunden (output/work/cykel/prov-2-plats-7.jpg), så den fick 1,5 s. ready och still: resten av de 4,0 s, stilla i REDO i början och slutet. En förlaga tar varje ruta mitt i sin tid (första rutan vid 1/60 s), så ready är tre rutor: då är förlagans första och sista ruta båda REDO. Alla delar är hela rutor i 30 rutor per sekund. lift, release och look är valda i bild (output/work/cykel/), inte mätta mot en verklig dealer."
+}

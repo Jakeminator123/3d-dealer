@@ -2676,6 +2676,62 @@
         "measured": "Mätt med mat-ankare.ts och mat-bild.ts: blått kort 384,816–480,852 (dockans korthörn 382,815–483,853), givhandens hud 120 × 64 (dockans hand sedd genom närbilden 115 × 73; dockans hudfläck 112 × 88 med kortet i nypan), gult kort i mynningen 916,788–948,800, skon under rad 800 1056,800–1276,996 (REDO 1056,800–1276,992, dockans 1056,800–1268,992), hjässan rad 84 (REDO 103; dockan 145 mot 152), figurens bredd på rad 452 915–1142 (dockans 854–994).",
         "sha256": "d706e5e215b1a7af7b59f4f1934512dec40f1cd42aa2895085e5eae364eec632"
       }
+    },
+    {
+      "file": "dealers/paulina/clips/giv-4-nyp_plats-7_t1.mp4",
+      "group": "clips",
+      "dealer": "paulina",
+      "title": "Giv till plats 4 (nyp) ur Plats 7, tagning 1",
+      "status": "att granska",
+      "note": "Gjord 2026-11-18 med Kling 4. Samma giv som giv-4-nyp_spelaren_t1.mp4, sedd från sidan: Paulina på grön skärm i närbilden av vyn Plats 7 ger ett kort till plats 4, REDO → LAGT 4. Första bild plats-7-redo.png, sista bild plats-7-lagt-4.png, och dockans giv ur samma närbild som rörelsereferens. Ljudet, som alltid följer med ur Kling 4, är borttaget utan omkodning. Sett av den som beställde, inte dömt: hon drar kortet ur skons mynning, vrider huvud och bål från skon mot bordets mitt så att hon slutar i profil, och lägger kortet med den blå sidan upp; kortet ligger stilla från 3,29 s inom 4 bildpunkter från dockans korthörn. Skon står still (samma bildpunkter i första och sista rutan). Handens tatuering syns genom hela rörelsen. Märkkortet blinkar blått en gång för mycket på vägen (mätt: gult 1,17–1,5 s, blått 1,58–1,83 s, gult igen 1,92–2,33 s, på kant 2,42–2,58 s, blått från 2,67 s); en vändning ska ge gult, kant, blått en gång. Väntar på en oberoende granskare.",
+      "width": 1920,
+      "height": 1080,
+      "seconds": 4.04,
+      "fps": 24,
+      "bytes": 3953095,
+      "pose": "redo → lagt 4",
+      "grip": "nyp",
+      "seat": 4,
+      "take": 1,
+      "licence": "Ingen tredjepartslicens: genererad på Jakobs Runway-konto",
+      "use": "dealerfilm",
+      "view": {
+        "kind": "plats",
+        "seat": 7
+      },
+      "lands": {
+        "seat": 4,
+        "index": 0,
+        "at": 3.29
+      },
+      "source": {
+        "from": "runway",
+        "taskId": "23d68d7c-368b-4e7f-949f-9460cb8287c6",
+        "model": "kling-4",
+        "resolution": "1080p",
+        "ratio": "16:9",
+        "duration": 4,
+        "credits": 85,
+        "creditsNote": "Mätt med whoami och verktygets svar 2026-11-18 09:44: 4 413 → 4 328. Kontot delas med andra sessioner.",
+        "references": [
+          {
+            "role": "startFrame",
+            "what": "dealers/paulina/anchors/plats-7-redo.png"
+          },
+          {
+            "role": "endFrame",
+            "what": "dealers/paulina/anchors/plats-7-lagt-4.png"
+          },
+          {
+            "role": "referenceVideos[0]",
+            "what": "output/forlagor/docka-giv-nyp-plats-4_plats-7-nara_atelje.mp4: dockans giv (content/moves/giv-nyp-plats-4.json) ur Plats 7:s närbild i grå ateljé, 3,97 s i 30 rutor/s, sparad med src/pipeline/shoot.ts"
+          }
+        ],
+        "prompt": "Locked camera, one continuous shot. The woman in image 1 performs the movement of the white mannequin in video 1, with the same timing. Image 1 is the first frame of the clip and image 2 is the last frame. The camera sees her from her left side. Her left hand at the card shoe draws the yellow card up out of the opening, holding it by its short end between thumb and fingers, and carries it low over the table toward the middle of the table, to the left in the picture, where the last frame shows it. On the way her wrist rolls once and hand and card turn over together about the card's long side, like turning a key: the broad yellow side narrows to a thin edge, then the broad blue side opens upward. With the same hold she lays the card flat at its place, blue side up, and her fingertips come to rest on it, as in the last frame. She is alive and attentive: her eyes follow the card the whole way, and her head and upper body turn with it from the shoe to the middle of the table, so that she ends in profile as in the last frame; her shoulder and upper body lean with the reach, naturally, as a professional dealer moves. She blinks once. Her other hand rests on the table and does not move; at the end her reaching forearm hides it. Only one card moves: a small card, about half as long as her hand, which keeps the same size all the way. It is blank, solid yellow on one side and solid blue on the other. The next card in the shoe is the same blank yellow. Her hands stay small and slender, the same size as in the first frame, with the same tattoos. The black card shoe does not move. The background stays the same flat green everywhere: no table is visible, there are no shadows on the green, and nothing else appears. No sound.",
+        "promptNote": "Texten är Spelarens (giv-4-nyp_spelaren_t1.mp4) med det som sidovyn kräver: kameran ser henne från vänster, kortet bärs mot bordets mitt till vänster i bilden, huvud och bål vrids så att hon slutar i profil, och den vilande handen döljs till slut av underarmen.",
+        "measured": "Mätt i filmen med output/work/giv-4/kort-per-ruta.ts och mat-bild.ts: 97 rutor i 24 rutor/s, 4,04 s. Det blå kortet ligger stilla från ruta 79 (3,29 s) på 384,816–479,851 (dockans korthörn 382,815–483,853, ankaret 384,816–480,852). Skon under rad 800 på 1056,800–1276,992 i första rutan och 1056,800–1276,996 i sista. Givhandens hud 124 × 88 vid 2,0 s och 116 × 80 i sista rutan.",
+        "sha256": "4101e025b26e5b24c107a72434ecd750f0364a7ac36410a3cc6e686a43ab7dca"
+      }
     }
   ],
   "leftOut": [

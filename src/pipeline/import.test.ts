@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, beforeEach, test } from 'node:test';
 import sharp from 'sharp';
-import { ImportError, importAsset, strike } from './import.ts';
+import { ImportError, importAsset, readPosts, strike } from './import.ts';
 import { readRegistry, RegistryError } from './registry.ts';
 
 let root: string;
@@ -64,6 +64,15 @@ test('en fil förs in med mått, sha256 och status att granska, och posten står
   await assert.rejects(importAsset(root, post()), RegistryError);
 });
 
+test('måtten är alltid filens egna: en post med gamla tal får de mätta, och en bild får ingen längd', async () => {
+  const entry = await importAsset(root, post({ width: 1920, height: 1080, bytes: 5, seconds: 4, fps: 24 }));
+  const bytes = readFileSync(join(root, 'output/work/ny.png')).length;
+  assert.deepEqual([entry.width, entry.height, entry.bytes], [32, 18, bytes]);
+  assert.equal('seconds' in entry || 'fps' in entry, false);
+  assert.deepEqual(readRegistry(root).assets.at(-1), entry);
+  assert.deepEqual(Object.keys(entry), ['file', 'group', 'dealer', 'title', 'status', 'note', 'width', 'height', 'bytes', 'pose', 'use', 'view', 'source']);
+});
+
 test('en post med hål i, en okänd grupp eller en fil som pekar ut ur assets tas inte emot', async () => {
   for (const [what, broken] of [
     ['from', post({ from: undefined })],
@@ -102,4 +111,14 @@ test('att stryka flyttar filen ur assets och antecknar under leftOut vad som str
     why: 'Fel hand. Filen ligger i output/work/struket/dealers/p/anchors/gammal.png (sha256 abc123def456).',
   });
   assert.throws(() => strike(root, 'dealers/p/anchors/gammal.png', 'igen'), RegistryError);
+});
+
+test('posterna läses ur en fil som en post eller en lista, och en fil som saknas eller inte är JSON sägs med sitt namn', () => {
+  put('output/work/en.json', JSON.stringify(post()));
+  put('output/work/flera.json', JSON.stringify([post(), post({ file: 'dealers/p/anchors/lagt.png' })]));
+  put('output/work/trasig.json', '{ "file": ');
+  assert.deepEqual(readPosts(join(root, 'output/work/en.json')), [post()]);
+  assert.equal(readPosts(join(root, 'output/work/flera.json')).length, 2);
+  assert.throws(() => readPosts(join(root, 'output/work/finns-inte.json')), (error: Error) => error instanceof ImportError && /finns-inte\.json går inte att läsa/.test(error.message));
+  assert.throws(() => readPosts(join(root, 'output/work/trasig.json')), (error: Error) => error instanceof ImportError && /trasig\.json är inte giltig JSON/.test(error.message));
 });

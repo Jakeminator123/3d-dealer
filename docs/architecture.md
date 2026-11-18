@@ -38,7 +38,7 @@ server ───> engine, pipeline
 
 Pilarna är importer. Labbet och Casinot når servern över HTTP (`/api`, `/media`, `/thumb`), inte genom import. Gränserna prövas av `src/boundaries.test.ts`.
 
-Signalernas typer och den publika vyn bor i `src/engine/seats.ts`. Webbläsarens kod läser dem med `import type`, så att ingenting ur kärnan laddas där; kärnan själv körs i servern. En plats läses ur `seat` eller `target`. Fältet `family` bär gamla namn (`box<n>`) och används inte.
+Signalernas typer och den publika vyn bor i `src/engine/seats.ts`. Webbläsarens kod läser dem bara med `import type`, så att ingenting ur kärnan laddas där; kärnan själv ska köras i servern. Ingen kod utanför `src/engine` läser kärnan än. En plats läses ur `seat` eller `target`. Fältet `family` bär gamla namn (`box<n>`) och används inte.
 
 ## Tre platser som hålls isär
 
@@ -79,6 +79,8 @@ Att byta kamera ändrar aldrig kortets plats, rörelsen som spelas eller utfalle
 | Tagning | Ett försök att göra ett klipp. En tagning granskas och blir godkänd eller inte. |
 | Signal | Det spelkärnan säger har hänt: deal, reveal, turn, settle, idle. Kärnan säger också speak, dealerns repliker; den hoppas över tills ljudet tas i bruk. |
 | Veck | Linjen vid bordskanten där dealerfilmen viks från upprätt till liggande. |
+| Ta bort | Radera: filen finns inte kvar. |
+| Arkivera | Flytta: filen finns kvar på ett annat ställe, i dag `output/work/struket/`. `node src/pipeline/import.ts stryk` arkiverar. |
 
 Kartan över ankare och klipp ritas ur klippregistret. Den har ingen egen lista.
 
@@ -93,4 +95,5 @@ x åt höger i bild, y uppåt, z mot kameran, filten på y = 0, allt i meter. Sc
 | Spelaren | Spelarens öga mitt för bordet (`player` i `content/scene.json`): vyn man spelar i. |
 | Plats 1–7 | Samma sorts öga flyttat till platsen. Plats 4 är Spelaren. |
 | Närbilden av en vy | Samma öga, inzoomat på dealern (`film.reach`). Dealerns filmer görs här. |
-| Filmkameran | Gamla projektets lins. Bara de gamla ankarna är gjorda genom den. |
+
+Gamla projektets lins (`camera` i `content/scene.json`) är ingen vy. Bordskanten och kortplatserna är mätta genom den, och spelarens öga ritar dess ruta.

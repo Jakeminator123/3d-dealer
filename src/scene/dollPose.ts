@@ -5,8 +5,13 @@
 // content/doll.json och rörelserna i content/moves/. En rörelse är en koreografi: den är läst ur en film av en verklig
 // dealer och hängs upp i två punkter som scenen bestämmer när den spelas.
 //   Hämtstället: kortet som står i skons mynning. Ett läge och en riktning, lika för alla platser (pickUpCard).
-//   Läggstället: första kortplatsen på den plats kortet ska till (placeOnTable).
+//   Läggstället: en kortplats på den plats kortet ska till, den första om inget annat sägs (placeOnTable).
 // Däremellan bärs hand och kort som de lästes. Så gäller samma rörelse för varje dealer och varje plats (moveFor).
+//
+// En cykel (content/moves/cykel-*.json) är samma giv i snabbare takt, följd av vägen tillbaka: handen vilar en stund på
+// det lagda kortet, släpper det, går i en båge tillbaka till skon och nyper nästa kort. Den börjar och slutar i REDO,
+// så att vilken cykel som helst kan följa på vilken som helst. Given i en cykel är den hängda given, omtagen i cykelns
+// takt; bara vägen tillbaka räknas här (cycled). Takten och bågen står i cykelns fil.
 //
 // Förd över ur gamla Dealer (C:/Users/jakem/dev/super-feature-sg/dealer, commit e6c07124c16a9b8d00ab3435895f94e982516ce9):
 //   dealer3d/src/body.ts       arm (armen med två ben), solveBody (böjningen från höften), turned, standing
@@ -86,6 +91,8 @@ export type DollMove = Marked & {
   to: string;
   grip: string;
   seat: number;
+  /** Vilken av platsens kortplatser kortet läggs på: 0 är den första, och den gäller när inget annat sägs. */
+  index?: number;
   seconds: number;
   fps: number;
   frameCount: number;
@@ -94,6 +101,8 @@ export type DollMove = Marked & {
   swingDeg?: number;
   /** Hur långt bärningen bågar ut mot spelarna som mest, i meter, när rörelsen är flyttad till en annan plats. */
   bow?: number;
+  /** Finns när rörelsen är en cykel: efter given släpper handen kortet och går tillbaka till REDO. */
+  back?: Back;
   tracks: {
     card: { about: string; centre: Vec3[]; long: Vec3[]; face: Vec3[] };
     leftHand: { about: string; points: Vec3[][] };
@@ -102,6 +111,34 @@ export type DollMove = Marked & {
     /** Finns när en flyttad rörelse behöver det: hur vänster armbåge är vriden från sitt vanliga håll, grader per ruta. */
     leftArm?: { about: string; turnDeg: number[] };
   };
+};
+
+/**
+ * Vägen tillbaka i en cykel, så som den är räknad. Rutorna räknas i cykelns egen takt.
+ * - `letsGo`: rutan där handen lämnar det lagda kortet; `home`: rutan där den åter nyper nästa kort i skon, i REDO.
+ * - `pace`: hur många av den lästa rörelsens rutor en ruta i cykelns giv svarar mot.
+ * - `lift`, `bow`: hur högt över den raka vägen och hur långt ut mot spelarna handen bågar som mest, i meter.
+ * - `release`, `look`: andelen av vägen tillbaka då handen har lämnat filten, och då blicken har nått nästa kort.
+ */
+export type Back = { letsGo: number; home: number; pace: number; lift: number; bow: number; release: number; look: number };
+
+/**
+ * En cykel så som den står i content/moves/: given `give` (en rörelse i samma mapp) och vägen tillbaka till REDO.
+ * `parts` är takten i sekunder: stilla i REDO (`ready`), given från REDO tills kortet ligger (`deal`), handen kvar på
+ * kortet (`onCard`), vägen tillbaka till nästa kort i skon (`back`) och stilla i REDO (`still`). De ska tillsammans
+ * vara `seconds`.
+ * `back` är bågen tillbaka: `lift` meter över den raka vägen som mest, och andelarna `release` och `look` (se Back).
+ */
+export type DollCycle = Marked & {
+  schemaVersion: number;
+  about: string;
+  id: string;
+  from: string;
+  to: string;
+  give: string;
+  seconds: number;
+  parts: { ready: number; deal: number; onCard: number; back: number; still: number };
+  back: { lift: number; release: number; look: number };
 };
 
 /** En arm: axel, armbåge och handled. `reached` är falskt när handleden ligger längre bort än armen räcker. */
@@ -126,8 +163,13 @@ export type DollPose = {
   arms: { left: Arm; right: Arm };
   /** Händernas 21 punkter i MediaPipes ordning: handled, sedan tumme till lillfinger inifrån och ut. */
   hands: { left: Vec3[]; right: Vec3[] };
-  /** Kortet som delas. Null i VILA. */
+  /**
+   * Kortet i den givande handen. Null i VILA. I en cykel, när handen har släppt det delade kortet, är det i stället nästa
+   * kort i skons mynning, det som handen hämtar: då står det där kortet stod i REDO.
+   */
   card: CardPose | null;
+  /** Kortet som är givet och släppt, i en cykel från att handen lämnar det. Annars null. */
+  laid: CardPose | null;
   /** Nästa kort, som står kvar i skons mynning. */
   shoeCard: CardPose;
 };
@@ -327,9 +369,10 @@ function nextCard(scene: SceneDescription, doll: DollDescription): CardPose {
   return cardOnTable(scene, { ...standing, centre: add(standing.centre, mul(standing.face, doll.pickUp.nextBehind)) });
 }
 
-function firstPlace(scene: SceneDescription, seat: number): FeltPoint {
-  const place = scene.places.seats.find((entry) => entry.seat === seat)?.cards[0];
-  if (!place) throw new Error(`Scenen har ingen första kortplats för plats ${seat}`);
+/** Kortplatsen `index` på en plats, 0 för den första (content/scene.json, places.seats). */
+function cardPlace(scene: SceneDescription, seat: number, index = 0): FeltPoint {
+  const place = scene.places.seats.find((entry) => entry.seat === seat)?.cards[index];
+  if (!place) throw new Error(index === 0 ? `Scenen har ingen första kortplats för plats ${seat}` : `Scenen har ingen kortplats ${index} för plats ${seat}`);
   return place;
 }
 
@@ -417,7 +460,12 @@ function armTo(doll: DollDescription, shoulder: Vec3, wrist: Vec3, pole: Vec3): 
 // Ställningen
 
 type Moment = {
+  /** Kortet som delas. */
   card: Standing | null;
+  /** I en cykel, när handen har släppt kortet: nästa kort i skons mynning, som handen hämtar. Annars null. */
+  fetch: Standing | null;
+  /** Hur stor del av vägen blicken har gått från det lagda kortet till nästa kort i skon, när det finns ett sådant. */
+  lookBack: number;
   /** Händerna så som de är lästa, på ett olutat bord. */
   left: Vec3[];
   right: Vec3[];
@@ -440,17 +488,21 @@ function compose(scene: SceneDescription, doll: DollDescription, moment: Moment)
   // Den vilande handen ligger på filten hela tiden.
   const right = onTable(fitHand(skeleton, moment.right, 'right', RESTING), 1);
   const trunk = leaned(doll, shifted(doll, sittingTrunk(scene, doll), moment.body), left[0]!);
-  const card = moment.card && cardOnTable(scene, moment.card);
+  const dealt = moment.card && cardOnTable(scene, moment.card);
+  const fetched = moment.fetch && cardOnTable(scene, moment.fetch);
   const ahead: Vec3 = [trunk.head[0], trunk.head[1] - doll.gaze.down, trunk.head[2] + doll.gaze.ahead];
+  // Hon ser på kortet hon delar. När hon har släppt det går blicken tillbaka till nästa kort i skon.
+  const gaze = fetched && dealt ? mix(dealt.centre, fetched.centre, moment.lookBack) : dealt ? mix(dealt.centre, ahead, moment.lookUp) : ahead;
   return {
     hip: trunk.hip,
     torso: mix(trunk.hip, mix(trunk.left, trunk.right, 0.5), doll.shape.torso.centre),
     neck: trunk.neck,
     head: trunk.head,
-    gaze: card ? mix(card.centre, ahead, moment.lookUp) : ahead,
+    gaze,
     arms: { left: swung(armTo(doll, trunk.left, left[0]!, POLE.left), moment.elbowTurn), right: armTo(doll, trunk.right, right[0]!, POLE.right) },
     hands: { left, right },
-    card,
+    card: fetched ?? dealt,
+    laid: fetched ? dealt : null,
     shoeCard: nextCard(scene, doll),
   };
 }
@@ -479,7 +531,7 @@ function restingHand(scene: SceneDescription, doll: DollDescription): Vec3[] {
 export function restPose(scene: SceneDescription, doll: DollDescription): DollPose {
   const right = restingHand(scene, doll);
   const left = right.map((point): Vec3 => [2 * doll.body.centreX - point[0], point[1], point[2]]);
-  return compose(scene, doll, { card: null, left, right, body: STILL, elbowTurn: 0, settle: 1, lookUp: 1 });
+  return compose(scene, doll, { card: null, fetch: null, lookBack: 0, left, right, body: STILL, elbowTurn: 0, settle: 1, lookUp: 1 });
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -530,10 +582,11 @@ function armBalls(doll: DollDescription, arm: Arm): Ball[] {
   return [...strung(arm.elbow, arm.wrist, forearm, 0, 8), { at: arm.elbow, radius: elbow }, ...strung(arm.shoulder, arm.elbow, upperArm, 0.4, 5)];
 }
 
-/** Den givande handen som klot: lederna, handleden och kortets hörn och mitt. */
+/** Den givande handen som klot: lederna, handleden och kortets hörn och mitt, medan handen håller kortet. */
 function handBalls(doll: DollDescription, pose: DollPose): Ball[] {
   const radius = handSkeleton(doll).radius;
-  const card = pose.card ? [...pose.card.corners, pose.card.centre].map((at): Ball => ({ at, radius: 0 })) : [];
+  const held = pose.laid ? null : pose.card;
+  const card = held ? [...held.corners, held.centre].map((at): Ball => ({ at, radius: 0 })) : [];
   return [...pose.hands.left.map((at, k): Ball => ({ at, radius: radius[k]! })), { at: pose.arms.left.wrist, radius: doll.shape.wrist }, ...card];
 }
 
@@ -615,7 +668,147 @@ const AIR = 0.005;
 const LANDING = 8;
 
 type Tracks = DollMove['tracks'];
-type Placed = { scene: SceneDescription; doll: DollDescription; tracks: Tracks; swingDeg: number; bow: number };
+/** Det en cykel ändrar i rörelsen utöver spåren: längden och ögonblicken. */
+type Timing = Pick<DollMove, 'frameCount' | 'seconds' | 'moments' | 'back'>;
+type Placed = { scene: SceneDescription; doll: DollDescription; tracks: Tracks; swingDeg: number; bow: number; timing?: Timing };
+
+/**
+ * Om skon prövas i en ruta. Inte medan fingrarna är i skons mynning: från REDO tills kortet har lämnat skon och
+ * CLEAR_AFTER rutor till, och i en cykel lika många rutor före REDO på slutet, när nästa kort nyps. CLEAR_AFTER räknas i
+ * den lästa rörelsens rutor och förs över i cykelns takt.
+ */
+function shoeTested(move: DollMove, frame: number): boolean {
+  const clear = move.moments.leavesShoe + (move.back ? Math.ceil(CLEAR_AFTER / move.back.pace) : CLEAR_AFTER);
+  return frame > clear && (!move.back || frame < move.back.home - clear);
+}
+
+/** Minsta ryck: så rör sig en hand som sträcker sig efter något, från stilla till stilla. */
+const easeReach = (t: number): number => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * t * (10 - 15 * t + 6 * t * t));
+
+/** Ett spår vid en bråkdel av en ruta: mellan två rutor vägs de samman, en hel ruta tas som den är. */
+function sampled<T>(track: T[], at: number, blend: (a: T, b: T, share: number) => T): T {
+  const last = track.length - 1;
+  const position = Math.max(0, Math.min(last, at));
+  const frame = Math.floor(position);
+  const share = position - frame;
+  return share === 0 || frame >= last ? track[frame]! : blend(track[frame]!, track[frame + 1]!, share);
+}
+const mixPoints = (a: Vec3[], b: Vec3[], t: number): Vec3[] => a.map((point, k) => mix(point, b[k]!, t));
+
+/** En läst hand i sina egna axlar: greppet, axlarna (längs, handflatan, tvärs) och punkterna räknade från greppet längs dem. */
+type Held = { grip: Vec3; axes: Vec3[]; local: Vec3[] };
+
+function heldOf(points: Vec3[]): Held {
+  const grip = mean(points, GRIP);
+  const { forward, palm, across } = handAxes(points, 'left');
+  const local = points.map((point): Vec3 => {
+    const from = sub(point, grip);
+    return [dot(from, forward), dot(from, palm), dot(from, across)];
+  });
+  return { grip, axes: [forward, palm, across], local };
+}
+
+/** Vridningen som för tre axlar till tre andra, som en enhetsaxel och en vinkel i radianer. Båda trippletterna har samma handhet. */
+function rotationBetween(from: Vec3[], to: Vec3[]): { axis: Vec3; angle: number } {
+  // R = summan av to_k · from_kᵀ för axlarna k: den matris som för varje from_k till to_k.
+  const r = (i: number, j: number): number => from.reduce((sum, _, k) => sum + to[k]![i]! * from[k]![j]!, 0);
+  const angle = Math.acos(Math.max(-1, Math.min(1, (r(0, 0) + r(1, 1) + r(2, 2) - 1) / 2)));
+  if (angle < 1e-9) return { axis: UP, angle: 0 };
+  let axis: Vec3 = [r(2, 1) - r(1, 2), r(0, 2) - r(2, 0), r(1, 0) - r(0, 1)];
+  if (size(axis) < 1e-6) {
+    // Nära ett halvt varv: axeln är den längsta kolumnen i R + 1.
+    const columns = [0, 1, 2].map((j): Vec3 => [r(0, j) + (j === 0 ? 1 : 0), r(1, j) + (j === 1 ? 1 : 0), r(2, j) + (j === 2 ? 1 : 0)]);
+    axis = columns.reduce((best, column) => (size(column) > size(best) ? column : best));
+  }
+  return { axis: unit(axis), angle };
+}
+
+/**
+ * Given hängd i scenen gjord till en cykel, i cykelns takt. Spåren är på ett olutat bord, som rörelsens.
+ *
+ * Först står hon stilla i REDO (`ready`). Given och handens vila på kortet är den hängda given omtagen: cykelns ruta f
+ * är givens ruta (f − ready) · pace, där pace lägger givens ruta `rests` (kortet ligger) på slutet av cykelns giv. Vilan
+ * på kortet fortsätter givens rutor efter `rests`, där handen ligger kvar och kroppen rör sig som den lästes.
+ *
+ * Vägen tillbaka börjar där handen ligger på kortet och slutar i REDO, så som given började. Greppet (mitten mellan tummens
+ * och pekfingrets spetsar) går den raka vägen med minsta ryck, och bågar `lift` meter uppåt och `bow` meter ut mot
+ * spelarna, mest halvvägs; uppåt går bågen fortare i början än vägen framåt, så handen lyfter från kortet innan den går.
+ * Handen vrids under tiden, i samma takt som vägen, från hur den låg på kortet till hur den nyper i skon, och fingrarna
+ * formas om lika fort. Axlar, huvud och den vilande handen går samma takt tillbaka till sina lägen i REDO. Från rutan
+ * `home` är allt som i givens första ruta, så att cykeln slutar i samma ställning som den började.
+ */
+function cycled(move: DollMove, tracks: Tracks, cycle: DollCycle, bow: number): Timing & { tracks: Tracks } {
+  const frames = (seconds: number): number => Math.round(seconds * move.fps);
+  const ready = frames(cycle.parts.ready);
+  const deal = frames(cycle.parts.deal);
+  const letsGo = ready + deal + frames(cycle.parts.onCard);
+  const home = letsGo + frames(cycle.parts.back);
+  const count = home + frames(cycle.parts.still) + 1;
+  const pace = move.moments.rests / deal;
+  const { lift, release, look } = cycle.back;
+  const { card, leftHand, rightHand, body } = tracks;
+
+  // Cykelns ruta som en ruta i den hängda given, fram till att handen lämnar kortet.
+  const given = (frame: number): number => Math.max(0, Math.min(frame, letsGo) - ready) * pace;
+  const leaving = heldOf(sampled(leftHand.points, given(letsGo), mixPoints));
+  const reaching = heldOf(leftHand.points[0]!);
+  const turn = rotationBetween(leaving.axes, reaching.axes);
+
+  const out = {
+    centre: [] as Vec3[],
+    long: [] as Vec3[],
+    face: [] as Vec3[],
+    left: [] as Vec3[][],
+    right: [] as Vec3[][],
+    leftShoulder: [] as Vec3[],
+    rightShoulder: [] as Vec3[],
+    head: [] as Vec3[],
+  };
+  for (let frame = 0; frame < count; frame++) {
+    const at = given(frame);
+    // Kortet följer given och ligger sedan kvar där handen släppte det.
+    out.centre.push(sampled(card.centre, at, mix));
+    out.long.push(sampled(card.long, at, mix));
+    out.face.push(sampled(card.face, at, mix));
+    if (frame <= letsGo || frame >= home) {
+      const from = frame >= home ? 0 : at;
+      out.left.push(sampled(leftHand.points, from, mixPoints));
+      out.right.push(sampled(rightHand.points, from, mixPoints));
+      out.leftShoulder.push(sampled(body.leftShoulder, from, mix));
+      out.rightShoulder.push(sampled(body.rightShoulder, from, mix));
+      out.head.push(sampled(body.head, from, mix));
+      continue;
+    }
+    const share = (frame - letsGo) / (home - letsGo);
+    const way = easeReach(share);
+    const arc = Math.sin(Math.PI * share) ** 2;
+    const grip = add(mix(leaving.grip, reaching.grip, way), [0, lift * arc, bow * arc]);
+    const axes = leaving.axes.map((axis) => turned(axis, turn.axis, turn.angle * way));
+    out.left.push(leaving.local.map((point, k) => {
+      const shaped = mix(point, reaching.local[k]!, way);
+      return add(grip, add(add(mul(axes[0]!, shaped[0]), mul(axes[1]!, shaped[1])), mul(axes[2]!, shaped[2])));
+    }));
+    const back = <T>(track: T[], blend: (a: T, b: T, t: number) => T): T => blend(sampled(track, at, blend), track[0]!, way);
+    out.right.push(back(rightHand.points, mixPoints));
+    out.leftShoulder.push(back(body.leftShoulder, mix));
+    out.rightShoulder.push(back(body.rightShoulder, mix));
+    out.head.push(back(body.head, mix));
+  }
+  const { leavesShoe, edge, folds } = move.moments;
+  const retimed = (frame: number): number => ready + Math.round(frame / pace);
+  return {
+    frameCount: count,
+    seconds: (count - 1) / move.fps,
+    moments: { leavesShoe: retimed(leavesShoe), edge: [retimed(edge[0]), retimed(edge[1])], folds: retimed(folds), rests: ready + deal },
+    back: { letsGo, home, pace, lift, bow, release, look },
+    tracks: {
+      card: { ...card, centre: out.centre, long: out.long, face: out.face },
+      leftHand: { ...leftHand, points: out.left },
+      rightHand: { ...rightHand, points: out.right },
+      body: { ...body, leftShoulder: out.leftShoulder, rightShoulder: out.rightShoulder, head: out.head },
+    },
+  };
+}
 
 const yawOf = (long: Vec3): number => Math.atan2(-long[0], -long[2]);
 const within = (value: number): number => Math.atan2(Math.sin(value), Math.cos(value));
@@ -646,10 +839,10 @@ const arrival = (move: DollMove): number => Math.round(move.moments.edge[1] + (m
  * från axeln till handleden, så litet som räcker (`leftArm.turnDeg`). Rörelsen till platsen den lästes på får varken
  * båge eller vridning: den spelas som den lästes.
  */
-function place(scene: SceneDescription, doll: DollDescription, move: DollMove, seat: number): Placed {
+function place(scene: SceneDescription, doll: DollDescription, move: DollMove, seat: number, index = 0, cycle?: DollCycle): Placed {
   const { card, leftHand } = move.tracks;
   const count = move.frameCount;
-  const target = firstPlace(scene, seat);
+  const target = cardPlace(scene, seat, index);
   const start = pickUp(scene, doll);
   const startTurn = within(yawOf(start.long) - yawOf(card.long[0]!));
   const grip = (frame: number): Vec3 => mean(leftHand.points[frame]!, GRIP);
@@ -681,7 +874,8 @@ function place(scene: SceneDescription, doll: DollDescription, move: DollMove, s
     }
     return { ...move.tracks, card: { ...card, centre, long, face }, leftHand: { ...leftHand, points } };
   };
-  const poseOf = (tracks: Tracks, frame: number): DollPose => compose(scene, doll, momentOf(move, tracks, frame, frame, 0, 0));
+  const poseIn = (shape: DollMove, tracks: Tracks, frame: number): DollPose => compose(scene, doll, momentOf(shape, tracks, frame, frame, 0, 0));
+  const poseOf = (tracks: Tracks, frame: number): DollPose => poseIn(move, tracks, frame);
 
   // Vad en sväng kräver av den givande armen: handledens största böjning, halva underarmens vridning från ände till
   // ände, och ett högt pris för varje del armen måste sträckas utöver sin längd.
@@ -730,23 +924,23 @@ function place(scene: SceneDescription, doll: DollDescription, move: DollMove, s
   };
 
   const atPlace = reach(target);
-  if (Math.hypot(atPlace[0], atPlace[2]) <= SAME_PLACE) return { scene, doll, tracks: build(atPlace, 0, 0), swingDeg: 0, bow: 0 };
+  const same = Math.hypot(atPlace[0], atPlace[2]) <= SAME_PLACE;
+  if (same && !cycle) return { scene, doll, tracks: build(atPlace, 0, 0), swingDeg: 0, bow: 0 };
 
-  const taken = (frame: number): boolean => frame > leaves + CLEAR_AFTER;
   /** Hur djupt handen och kortet går in i skon eller den vilande handen. */
-  const handDepth = (pose: DollPose, frame: number): number => {
-    const depths = depthsOf(scene, doll, pose, handBalls(doll, pose), taken(frame), AIR);
+  const handDepth = (pose: DollPose, frame: number, shape: DollMove = move): number => {
+    const depths = depthsOf(scene, doll, pose, handBalls(doll, pose), shoeTested(shape, frame), AIR);
     return Math.max(depths.shoe, depths.restingHand);
   };
-  /** Hur djupt armen går in i något, med armbågen vriden `turn` grader. */
-  const armDepth = (pose: DollPose, frame: number, turn: number): number =>
-    deepest(depthsOf(scene, doll, pose, armBalls(doll, swung(pose.arms.left, radians(turn))), taken(frame), AIR));
+  /** Hur djupt armen går in i något, med armbågen vriden `turn` grader. `shape` är rörelsen rutan hör till. */
+  const armDepth = (pose: DollPose, frame: number, turn: number, shape: DollMove): number =>
+    deepest(depthsOf(scene, doll, pose, armBalls(doll, swung(pose.arms.left, radians(turn))), shoeTested(shape, frame), AIR));
   /** Den minsta vridning av armbågen åt ett håll som för armen fri, och den som går minst djupt om ingen gör det. */
-  const leastTurn = (pose: DollPose, frame: number, sign: number): { turn: number; free: boolean } => {
+  const leastTurn = (pose: DollPose, frame: number, sign: number, shape: DollMove = move): { turn: number; free: boolean } => {
     let best = 0;
     let least = Infinity;
     for (let turn = 0; turn <= TURN_MOST; turn += TURN_STEP) {
-      const depth = armDepth(pose, frame, sign * turn);
+      const depth = armDepth(pose, frame, sign * turn, shape);
       if (depth <= TOUCHING) return { turn: sign * turn, free: true };
       if (depth < least) {
         least = depth;
@@ -771,41 +965,79 @@ function place(scene: SceneDescription, doll: DollDescription, move: DollMove, s
       });
     });
   };
-  const wanted = easiest(atPlace) - easiest(reach(firstPlace(scene, move.seat)));
-  let swingDeg = wanted;
-  for (let off = 0; off <= 2 * SWING_MOST; off += SWING_STEP) {
-    const near = [wanted + off, wanted - off].find((swing) => Math.abs(swing) <= SWING_MOST && settledWell(swing));
-    if (near !== undefined) {
-      swingDeg = near;
-      break;
-    }
-  }
-
   // Bågen: den minsta som för handen och kortet fria från skon och den vilande handen i varje ruta efter att kortet är taget.
   const blocked = (tracks: Tracks): number => {
     let frames = 0;
     for (let frame = leaves + 1; frame < count; frame++) if (handDepth(poseOf(tracks, frame), frame) > TOUCHING) frames++;
     return frames;
   };
+
+  let swingDeg = 0;
   let bow = 0;
-  let tracks = build(atPlace, radians(swingDeg), 0);
-  let fewest = blocked(tracks);
-  for (let tried = BOW_STEP; fewest > 0 && tried <= BOW_MOST + 1e-9; tried += BOW_STEP) {
-    const bowed = build(atPlace, radians(swingDeg), tried);
-    const frames = blocked(bowed);
-    if (frames < fewest) {
-      fewest = frames;
-      bow = Math.round(tried * 100) / 100;
-      tracks = bowed;
+  let tracks = build(atPlace, 0, 0);
+  if (!same) {
+    const wanted = easiest(atPlace) - easiest(reach(cardPlace(scene, move.seat)));
+    swingDeg = wanted;
+    for (let off = 0; off <= 2 * SWING_MOST; off += SWING_STEP) {
+      const near = [wanted + off, wanted - off].find((swing) => Math.abs(swing) <= SWING_MOST && settledWell(swing));
+      if (near !== undefined) {
+        swingDeg = near;
+        break;
+      }
+    }
+    tracks = build(atPlace, radians(swingDeg), 0);
+    let fewest = blocked(tracks);
+    for (let tried = BOW_STEP; fewest > 0 && tried <= BOW_MOST + 1e-9; tried += BOW_STEP) {
+      const bowed = build(atPlace, radians(swingDeg), tried);
+      const frames = blocked(bowed);
+      if (frames < fewest) {
+        fewest = frames;
+        bow = Math.round(tried * 100) / 100;
+        tracks = bowed;
+      }
     }
   }
 
+  // En cykel: given i cykelns takt och vägen tillbaka. Handen går tillbaka i samma båge ut mot spelarna som den bar
+  // kortet, framför den vilande handen och runt skons nos; räcker inte den bågen för att handen ska gå fri från skon och
+  // den vilande handen, tas den minsta större som gör det. Armbågen räknas sedan för hela cykeln.
+  let timing: Timing | undefined;
+  if (cycle) {
+    const given = tracks;
+    const shaped = (backBow: number): DollMove => {
+      const { tracks: round, ...rest } = cycled(move, given, cycle, backBow);
+      return { ...move, ...rest, tracks: round };
+    };
+    const blockedBack = (shape: DollMove): number => {
+      let frames = 0;
+      for (let frame = shape.back!.letsGo + 1; frame < shape.back!.home; frame++) {
+        if (handDepth(poseIn(shape, shape.tracks, frame), frame, shape) > TOUCHING) frames++;
+      }
+      return frames;
+    };
+    let round = shaped(bow);
+    let fewest = blockedBack(round);
+    for (let tried = bow + BOW_STEP; fewest > 0 && tried <= BOW_MOST + 1e-9; tried += BOW_STEP) {
+      const bowed = shaped(Math.round(tried * 100) / 100);
+      const frames = blockedBack(bowed);
+      if (frames < fewest) {
+        fewest = frames;
+        round = bowed;
+      }
+    }
+    const { tracks: back, frameCount, seconds, moments } = round;
+    tracks = back;
+    timing = { frameCount, seconds, moments, back: round.back };
+  }
+  const shape: DollMove = timing ? { ...move, ...timing } : move;
+  const span = shape.frameCount;
+
   // Armbågen: per ruta den minsta vridning som för armen fri, åt det håll som kräver minst över hela rörelsen.
   const needed = (sign: number): { turns: number[]; stuck: number } => {
-    const turns = Array.from({ length: count }, () => 0);
+    const turns = Array.from({ length: span }, () => 0);
     let stuck = 0;
-    for (let frame = leaves + 1; frame < count; frame++) {
-      const { turn, free } = leastTurn(poseOf(tracks, frame), frame, sign);
+    for (let frame = shape.moments.leavesShoe + 1; frame < span; frame++) {
+      const { turn, free } = leastTurn(poseIn(shape, tracks, frame), frame, sign, shape);
       turns[frame] = turn;
       if (!free) stuck++;
     }
@@ -832,7 +1064,7 @@ function place(scene: SceneDescription, doll: DollDescription, move: DollMove, s
       },
     };
   }
-  return { scene, doll, tracks, swingDeg, bow };
+  return { scene, doll, tracks, swingDeg, bow, ...(timing ? { timing } : {}) };
 }
 
 const placements = new WeakMap<DollMove, Placed>();
@@ -841,22 +1073,29 @@ const placements = new WeakMap<DollMove, Placed>();
 function placed(scene: SceneDescription, doll: DollDescription, move: DollMove): Placed {
   const known = placements.get(move);
   if (known && known.scene === scene && known.doll === doll) return known;
-  const made = place(scene, doll, move, move.seat);
+  const made = place(scene, doll, move, move.seat, move.index ?? 0);
   placements.set(move, made);
   return made;
 }
 
 /**
- * Samma rörelse till en annan plats: hämtad vid scenens sko och lagd på platsens första kortplats. `base` är rörelsen
- * så som den lästes. Hand och kort är de lästa, burna i sidled och svängda; arm och kropp räknas om av dockan själv.
+ * Samma rörelse till en annan plats: hämtad vid scenens sko och lagd på platsens kortplats `index` (den första om inget
+ * annat sägs). `base` är rörelsen så som den lästes. Hand och kort är de lästa, burna i sidled och svängda; arm och kropp
+ * räknas om av dockan själv. Med `cycle` blir den en cykel: given i cykelns takt, och tillbaka till REDO (se cycled).
  */
-export function moveFor(scene: SceneDescription, doll: DollDescription, base: DollMove, seat: number): DollMove {
-  const made = place(scene, doll, base, seat);
+export function moveFor(scene: SceneDescription, doll: DollDescription, base: DollMove, seat: number, options: { index?: number; cycle?: DollCycle } = {}): DollMove {
+  const { index = 0, cycle } = options;
+  const made = place(scene, doll, base, seat, index, cycle);
+  const same = seat === base.seat && index === 0;
+  const card = index === 0 ? '' : `-kort-${index}`;
   const move: DollMove = {
     ...base,
-    id: seat === base.seat ? base.id : `${base.id}-till-plats-${seat}`,
-    to: seat === base.seat ? base.to : `LAGT ${seat}`,
+    ...made.timing,
+    ...(cycle
+      ? { about: cycle.about, id: `${cycle.id}-plats-${seat}-kort-${index}`, from: cycle.from, to: cycle.to }
+      : { id: same ? base.id : `${base.id}-till-plats-${seat}${card}`, to: same ? base.to : `LAGT ${seat}` }),
     seat,
+    ...(index === 0 ? {} : { index }),
     swingDeg: made.swingDeg,
     bow: made.bow,
     tracks: made.tracks,
@@ -871,29 +1110,39 @@ function momentOf(move: DollMove, tracks: Tracks, frame: number, next: number, s
   const hand = (track: Vec3[][]): Vec3[] => track[frame]!.map((point, k) => mix(point, track[next]![k]!, share));
   const from = (track: Vec3[]): Vec3 => sub(between(track), track[0]!);
   const { card, leftHand, rightHand, body, leftArm } = tracks;
+  const at = frame + share;
+  // I en cykel: hur stor del av vägen tillbaka handen har gått, från att den lämnar kortet.
+  const back = move.back;
+  const away = back && at > back.letsGo ? Math.min(1, (at - back.letsGo) / (back.home - back.letsGo)) : null;
   return {
     card: { centre: between(card.centre), long: between(card.long), face: between(card.face) },
+    // Nästa kort står där kortet stod i rörelsens första ruta.
+    fetch: away === null ? null : { centre: card.centre[0]!, long: card.long[0]!, face: card.face[0]! },
+    lookBack: away === null ? 0 : smooth(away / back!.look),
     left: hand(leftHand.points),
     right: hand(rightHand.points),
     body: { left: from(body.leftShoulder), right: from(body.rightShoulder), head: from(body.head) },
     elbowTurn: leftArm ? radians(leftArm.turnDeg[frame]! + (leftArm.turnDeg[next]! - leftArm.turnDeg[frame]!) * share) : 0,
-    // Handen sänks mot filten medan kortet fälls ned, och vilar på den när kortet ligger.
-    settle: smooth((frame + share - move.moments.folds) / (move.moments.rests - move.moments.folds)),
+    // Handen sänks mot filten medan kortet fälls ned, och vilar på den när kortet ligger. I en cykel lättar den när den
+    // lämnar kortet, så att bågen lyfter den.
+    settle: away === null ? smooth((at - move.moments.folds) / (move.moments.rests - move.moments.folds)) : 1 - smooth(away / back!.release),
     lookUp,
   };
 }
 
 /**
- * Dockans ställning `time` sekunder in i rörelsen, i scenen. Rörelsen hängs i scenens sko och i första kortplatsen på
- * rörelsens plats (`move.seat`). Tiden hålls inom rörelsen: före början gäller första rutan, efter slutet den sista.
+ * Dockans ställning `time` sekunder in i rörelsen, i scenen. Rörelsen hängs i scenens sko och i rörelsens kortplats
+ * (`move.seat`, `move.index`). Tiden hålls inom rörelsen: före början gäller första rutan, efter slutet den sista.
  */
 export function poseAt(scene: SceneDescription, doll: DollDescription, move: DollMove, time: number): DollPose {
   const { tracks } = placed(scene, doll, move);
   const at = Math.max(0, Math.min(move.seconds, time)) * move.fps;
   const frame = Math.min(move.frameCount - 2, Math.floor(at));
-  // Hon ser på kortet från skon tills det ligger, genom hela vändningen. Sedan lyfter hon blicken mot spelarna.
+  // Hon ser på kortet från skon tills det ligger, genom hela vändningen. Sedan lyfter hon blicken mot spelarna; i en
+  // cykel ser hon i stället på kortet tills handen lämnar det, och sedan på nästa kort i skon (momentOf).
   const since = (at - move.moments.rests) / move.fps;
-  return compose(scene, doll, momentOf(move, tracks, frame, frame + 1, Math.min(1, at - frame), doll.gaze.share * smooth(since / doll.gaze.seconds)));
+  const lookUp = move.back ? 0 : doll.gaze.share * smooth(since / doll.gaze.seconds);
+  return compose(scene, doll, momentOf(move, tracks, frame, frame + 1, Math.min(1, at - frame), lookUp));
 }
 
 // En punkt räknas som inne i skon först så här långt innanför höljet, i meter.
@@ -909,7 +1158,8 @@ export function throughShoe(scene: SceneDescription, doll: DollDescription, move
   const { tracks } = placed(scene, doll, move);
   const skeleton = handSkeleton(doll);
   const frames: number[] = [];
-  for (let frame = move.moments.leavesShoe + CLEAR_AFTER + 1; frame < move.frameCount; frame++) {
+  for (let frame = 0; frame < move.frameCount; frame++) {
+    if (!shoeTested(move, frame)) continue;
     const hand = onFelt(fitHand(skeleton, tracks.leftHand.points[frame]!, 'left', GRIP), skeleton.radius, 0);
     if ([tracks.card.centre[frame]!, ...hand].some((point) => intoShoe(scene, doll, point, -SHOE_MARGIN) > 0)) frames.push(frame);
   }
@@ -919,13 +1169,14 @@ export function throughShoe(scene: SceneDescription, doll: DollDescription, move
 /**
  * Rutorna där den givande armen, handen eller kortet går in i något, hinder för hinder: skon, den vilande handen med sin
  * handled och underarm, bålen, och bordet framför dealerns bordskant. Lemmarna prövas med sina radier, som de ritas.
- * Skon prövas från att kortet är taget; medan det tas är fingrarna i mynningen. Tomma listor betyder att armen går fri.
+ * Skon prövas från att kortet är taget, och i en cykel tills handen nyper nästa kort; medan kortet tas och nästa nyps är
+ * fingrarna i mynningen (shoeTested). Tomma listor betyder att armen går fri.
  */
 export function armHits(scene: SceneDescription, doll: DollDescription, move: DollMove): { shoe: number[]; restingHand: number[]; torso: number[]; table: number[] } {
   const found = { shoe: [] as number[], restingHand: [] as number[], torso: [] as number[], table: [] as number[] };
   for (let frame = 0; frame < move.frameCount; frame++) {
     const pose = poseAt(scene, doll, move, frame / move.fps);
-    const taken = frame > move.moments.leavesShoe + CLEAR_AFTER;
+    const taken = shoeTested(move, frame);
     const arm = depthsOf(scene, doll, pose, armBalls(doll, pose.arms.left), taken, 0);
     const hand = depthsOf(scene, doll, pose, handBalls(doll, pose), taken, 0);
     if (Math.max(arm.shoe, hand.shoe) > TOUCHING) found.shoe.push(frame);
@@ -1020,7 +1271,38 @@ export function readMove(value: unknown): DollMove {
   need(isTrack(body?.leftShoulder) && isTrack(body?.rightShoulder) && isTrack(body?.head), `tracks.body ska ha ${count} rutor`);
   need(leftArm === undefined || (Array.isArray(leftArm.turnDeg) && leftArm.turnDeg.length === count && leftArm.turnDeg.every(isNumber)), `tracks.leftArm ska ha ${count} rutor`);
   need([card?.about, leftHand?.about, rightHand?.about, body?.about, leftArm ? leftArm.about : '-'].every((text) => typeof text === 'string' && text !== ''), 'tracks: varje spår ska säga vad det är (about)');
+  need(move?.index === undefined || (Number.isInteger(move.index) && move.index >= 0), 'index ska vara ett heltal från 0');
+  const back = move?.back;
+  need(
+    back === undefined ||
+      ([back.letsGo, back.home].every(isFrame) && rests !== undefined && rests <= back.letsGo && back.letsGo < back.home &&
+        [back.pace, back.release, back.look].every((value) => isNumber(value) && value > 0) && [back.lift, back.bow].every(isNumber)),
+    'back: letsGo och home ska vara rutor efter rests, och pace, lift, bow, release och look tal',
+  );
 
   if (wrong.length > 0) throw new Error(`Rörelsen går inte att använda: ${wrong.join('; ')}`);
   return move as DollMove;
+}
+
+/** Om en fil ur content/moves/ är en cykel och inte en rörelse: en cykel pekar ut sin giv (`give`). */
+export const isCycle = (value: unknown): boolean => typeof (value as { give?: unknown } | null)?.give === 'string';
+
+/** Tar emot en cykel ur content/moves/ och säger på svenska vad som saknas eller inte går ihop. */
+export function readCycle(value: unknown): DollCycle {
+  const cycle = value as Partial<DollCycle> | null;
+  const wrong: string[] = [];
+  const need = (ok: boolean, what: string) => {
+    if (!ok) wrong.push(what);
+  };
+  need([cycle?.id, cycle?.from, cycle?.to, cycle?.give, cycle?.about].every((text) => typeof text === 'string' && text !== ''), 'id, from, to, give och about');
+  need(cycle?.from === cycle?.to, 'en cykel slutar där den börjar: from och to ska vara samma');
+  const parts = cycle?.parts;
+  const lengths = [parts?.ready, parts?.deal, parts?.onCard, parts?.back, parts?.still];
+  need(isNumber(parts?.deal) && isNumber(parts?.back) && parts.deal > 0 && parts.back > 0 && lengths.every((part) => isNumber(part) && part >= 0), 'parts: deal och back över 0, ready, onCard och still från 0');
+  need(isNumber(cycle?.seconds) && lengths.every(isNumber) && Math.abs(lengths.reduce((sum: number, part) => sum + part!, 0) - cycle.seconds) < 1e-6, 'seconds ska vara summan av parts');
+  const back = cycle?.back;
+  need(isNumber(back?.lift) && back.lift >= 0 && [back?.release, back?.look].every((share) => isNumber(share) && share > 0 && share <= 1), 'back: lift från 0, release och look andelar över 0 och högst 1');
+  need(isMarked(cycle ?? undefined), 'basis och source');
+  if (wrong.length > 0) throw new Error(`Cykeln går inte att använda: ${wrong.join('; ')}`);
+  return cycle as DollCycle;
 }
