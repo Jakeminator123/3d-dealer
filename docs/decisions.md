@@ -46,6 +46,7 @@ Valda av agenten när Jakob bad om ett lokalt labb att granska i ("börja bygga 
 | Scenens kamera är gamla linsen, och den är ögat för plats 4. Dealern är ankarbilden projicerad ur den kameran på en vikt yta. | Då ser dealern ur scenens kamera ut som i ankarbilden. Mätt: 99,7 % av hennes inre bildpunkter är identiska, och bordskanten hamnar på rad 831,49 mot standardens 831,5. |
 | Skon som är inbakad i ankarbilden målas över med grönt innan det gröna nycklas bort, så att bara 3D-skon syns. | Annars syns två skor. Brist: en hand som ligger över skon klipps, som i REDO-ankarna. |
 | 360-bilden ritas i ett eget pass runt scenen, oändligt långt bort. Den platta bilden visas som kuliss i kamerans ruta. | Vridning, oskärpa, ljusstyrka och spegling ska gå att ställa per bakgrund. |
+| Scenen ses först genom vyn Spelaren: ögat 0,60 m över filten, 2,40 m från dealerns bordskant, 16° nedåt, 45° bildvinkel. Bordet lutar 5° mot spelaren kring dealerns bordskant. Gamla linsen är kvar som vyn Filmkameran. Talen står i `content/scene.json`, märkta antagna. | Valda efter prov i bild. Närmare öga ger ingen vall i bild, vidare vinkel gör dealern liten, 0° och 3,6° lutning trycker ihop händerna, 7° syns som sluttning från sidan. Mätt från filmkameran: med 5° lutning hamnar fingertopparna 6 rader lägre än i ankarbilden; utan lutning stämmer bilden som förut. |
 
 ## 2026-11-18
 

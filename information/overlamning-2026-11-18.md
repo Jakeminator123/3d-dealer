@@ -45,7 +45,7 @@ Jakob pekade på `C:\Users\jakem\dev\super-feature-sg\local-studio`, och där fi
 
 | Vad | Var | När den är klar |
 | --- | --- | --- |
-| "Scenen, andra varvet" (punkt 1 nedan), startat 05:48. Reglaget Lyft, siktet för platsvyerna och motiveringsrutan i steget Scen är klara och sedda. | underagent i den gamla chatten, skriver i `src/scene`, `src/lab/SceneStep.tsx`, `content/scene.json` | Se efter i webbläsaren och i `output/scen-matning/`. Starta inte samma arbete en gång till. |
+| Scenens andra varv är klart 06:17 och sett: vyn Spelaren, zoom, bordets lutning, dölj skon. Ingen arbetar i scenens filer nu. | `src/scene`, `src/lab/SceneStep.tsx`, `content/scene.json`; skärmbilder i `output/scen-matning/spelaren-*.png` | Punkt 1 nedan är alltså gjord. Fortsätt med "tredje varvet" under den. |
 | Sidobilden med tatuerade händer är gjord (`identity/sida-kavaj-tatuerad.png`, 40 krediter). En granskare dömer den. | underagent i den gamla chatten | Omdömet och svaret står i registret när den är klar. |
 | Paulinas VILA i helfigur på grönt, i Livs ruta (betald, högst cirka 100 krediter) | underagent i den gamla chatten, skriver `assets/dealers/paulina/anchors/vila-helfigur.png` och dess post | Låt en oberoende granskare döma den. Sedan REDO i samma ruta, och ett första klipp med ett av Livs klipp som referensfilm. |
 
@@ -61,7 +61,10 @@ Kontrollera med filernas ändringstid om de är klara. Rör inte samma filer med
    - Lutas bordet några grader mot spelaren kring dealerns bordskant (filt, kort, filmens liggande del och sko tillsammans) syns mer filt och händerna trycks ihop mindre. Vinkeln ska stå i `content/scene.json`.
    - Samma sorts kamera för alla sju platser. Mushjulet ska zooma och musen vrida från vilken vy som helst.
    - Kontrollen från filmkameran (99,7 % samma bildpunkter som ankaret) ska fortsatt gå igenom när bordet inte lutas.
-2. **Döm bakgrunder, material och modeller i scenen** (29 poster med `att granska`). En granskare ser varje bakgrund i den nya vyn och sätter status med skäl.
+   - **Gjort 06:17.** Valt efter prov i bild: ögat 0,60 m över filten, 2,40 m från kanten, 16° nedåt, 45°; bordet lutar 5°; lyftet 5°. Det räknade utgångsläget ovan gav ingen vall i bild.
+   - **Tredje varvet, inte gjort:** ge rummen golv i rätt höjd och skala. Bakgrunden ligger oändligt långt bort, så stolar och vatten nära kameran i rummet hamnar i bordshöjd; Jakob: "nu sitter hon till hälften i havet", "bakgrunden är för inzoomad". local-studio använde `GroundedSkybox` för det. Sätt sedan lyftet till 0. Ögat står 0,9 m bakom vallen, mer kamera än sittande spelare; väg det mot local-studios uppställning.
+   - Elva bakgrunder har `granska igen` med Jakobs ord och agentens svar i registret. De ska dömas om när rummen har golv.
+2. **Döm bakgrunder, material och modeller i scenen** (13 poster med `att granska`, plus de elva ovan). En granskare ser varje bakgrund i vyn Spelaren och sätter status med skäl. Jakob har själv dömt sex bakgrunder.
 3. **Ny VILA ur scenen**: rendera bord och sko ur den nya kameran, låt en bildmodell sätta Paulina i bilden med identitetsbilderna som referens. Krav från Jakob, osäkert: lägre i bild, mer av armarna, magen in under bordskanten. Det är provet "Ankare ur scenen" i [docs/production.md](../docs/production.md).
 4. **Kedjan för plats 4**: se [overlamning-kedja-plats-4-2026-11-18.md](overlamning-kedja-plats-4-2026-11-18.md). Görs den med de gamla ankarna blir den i gamla rutan; avgör om den ska vänta på punkt 3.
 5. **Labbets steg Dealer, Klipp och Spela.** Jakob frågar efter dem. Dealer är närmast: identitet och ankare per dealer, ur registret. Spela kräver klipp och en spelsession i servern.

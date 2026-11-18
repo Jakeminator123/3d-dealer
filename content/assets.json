@@ -365,7 +365,7 @@
       "file": "scene/backgrounds/la.jpg",
       "group": "backgrounds",
       "title": "Skyline",
-      "status": "att granska",
+      "status": "utgår",
       "note": "En takvåning över staden i skymningen. Godkänd för spelet i gamla projektet.",
       "width": 1774,
       "height": 887,
@@ -383,13 +383,15 @@
         "from": "dealer",
         "path": "assets/scene/panorama-la.jpg",
         "sha256": "84d3a766369aec4129aef1d15d99098cac1e629b9868a61f01eea42339521920"
-      }
+      },
+      "statusBy": "Jakob i Labbet 2026-11-18",
+      "statusAt": "2026-11-18 06:13"
     },
     {
       "file": "scene/backgrounds/skog.jpg",
       "group": "backgrounds",
       "title": "Skogen",
-      "status": "att granska",
+      "status": "utgår",
       "note": "En glänta i skogen. Godkänd för spelet i gamla projektet.",
       "width": 4096,
       "height": 2048,
@@ -408,7 +410,9 @@
         "from": "dealer",
         "path": "assets/scene/panorama-skog.jpg",
         "sha256": "2829d314e6e6ad2536cc5ddc06fb12930c3aa37f00bc35fe13e849d72c3b5900"
-      }
+      },
+      "statusBy": "Jakob i Labbet 2026-11-18",
+      "statusAt": "2026-11-18 06:13"
     },
     {
       "file": "scene/backgrounds/vegas.jpg",
@@ -439,7 +443,7 @@
       "file": "scene/backgrounds/balsal.jpg",
       "group": "backgrounds",
       "title": "Balsalen",
-      "status": "att granska",
+      "status": "godkänd",
       "note": "En ljus sal med stuckatur, tavlor, flygel och höga fönster",
       "width": 4096,
       "height": 2048,
@@ -458,13 +462,17 @@
         "from": "dealer",
         "path": "assets/scene/rooms/balsal.jpg",
         "sha256": "829de7b7da97af8e5fc57bd58d99aa659c027e780161acc6d8d0a9e0041cc0c7"
-      }
+      },
+      "comment": "Jag vred lite på den och nu sitter den fortfarande ganska mycket ovanför marken.",
+      "commentAt": "2026-11-18 06:18",
+      "statusBy": "Jakob i Labbet 2026-11-18",
+      "statusAt": "2026-11-18 06:18"
     },
     {
       "file": "scene/backgrounds/bankett.jpg",
       "group": "backgrounds",
       "title": "Banketthallen",
-      "status": "att granska",
+      "status": "godkänd",
       "note": "En festlokal i tegel och trä med ljuskronor och dukade långbord",
       "width": 4096,
       "height": 2048,
@@ -483,13 +491,17 @@
         "from": "dealer",
         "path": "assets/scene/rooms/bankett.jpg",
         "sha256": "dc0142c5e33ce60fc0da358b15b1dc3e6f72ebc3a5573385bbbee44704f50a0f"
-      }
+      },
+      "statusBy": "Jakob i Labbet 2026-11-18",
+      "statusAt": "2026-11-18 06:13",
+      "comment": "Jag vred lite på den och nu sitter den fortfarande ganska mycket ovanför marken. Men ser ändå bättre än förut ut",
+      "commentAt": "2026-11-18 06:18"
     },
     {
       "file": "scene/backgrounds/dimskog.jpg",
       "group": "backgrounds",
       "title": "Dimskogen",
-      "status": "att granska",
+      "status": "godkänd",
       "note": "En tallskog i morgondimma",
       "width": 4096,
       "height": 2048,
@@ -508,13 +520,17 @@
         "from": "dealer",
         "path": "assets/scene/rooms/dimskog.jpg",
         "sha256": "a213e8aa3ecef026bae40c8c9df1152d8c6c198702f44a0e3a176bf5b5167463"
-      }
+      },
+      "comment": "Jag vred lite på den och nu sitter den fortfarande ganska mycket ovanför marken. Men ser ändå bättre än förut ut",
+      "commentAt": "2026-11-18 06:18",
+      "statusBy": "Jakob i Labbet 2026-11-18",
+      "statusAt": "2026-11-18 06:18"
     },
     {
       "file": "scene/backgrounds/entre.jpg",
       "group": "backgrounds",
       "title": "Entréhallen",
-      "status": "att granska",
+      "status": "granska igen",
       "note": "En gammal entréhall med valv, tavlor och dagsljus",
       "width": 4096,
       "height": 2048,
@@ -533,13 +549,19 @@
         "from": "dealer",
         "path": "assets/scene/rooms/entre.jpg",
         "sha256": "84971614fa57da0e0a21ec9de339dca1d2027ecc1abf6a7b58115bf917a6daa2"
-      }
+      },
+      "comment": "Här klipps hennes huvud av lite.",
+      "commentAt": "2026-11-18 06:14",
+      "statusBy": "Jakob i Labbet 2026-11-18",
+      "statusAt": "2026-11-18 06:14",
+      "reply": "Huvudet klipptes av vyn, inte av bakgrunden. Sedan 06:17 öppnar scenen i vyn Spelaren, där hela hon ryms med luft över huvudet. Ladda om sidan och döm bakgrunden igen.",
+      "replyAt": "2026-11-18 06:19"
     },
     {
       "file": "scene/backgrounds/foaje.jpg",
       "group": "backgrounds",
       "title": "Foajén",
-      "status": "att granska",
+      "status": "granska igen",
       "note": "En grön foajé i ett konserthus med ljuskronor och skinnsoffor",
       "width": 4096,
       "height": 2048,
@@ -558,13 +580,19 @@
         "from": "dealer",
         "path": "assets/scene/rooms/foaje.jpg",
         "sha256": "66e15242f71c982172242d5a82a71e80fd9de6e084f896bf21f57a9334753ea7"
-      }
+      },
+      "comment": "Här klipps hennes huvud av lite.",
+      "commentAt": "2026-11-18 06:14",
+      "statusBy": "Jakob i Labbet 2026-11-18",
+      "statusAt": "2026-11-18 06:14",
+      "reply": "Huvudet klipptes av vyn, inte av bakgrunden. Sedan 06:17 öppnar scenen i vyn Spelaren, där hela hon ryms med luft över huvudet. Ladda om sidan och döm bakgrunden igen.",
+      "replyAt": "2026-11-18 06:19"
     },
     {
       "file": "scene/backgrounds/lounge.jpg",
       "group": "backgrounds",
       "title": "Loungen",
-      "status": "att granska",
+      "status": "granska igen",
       "note": "En lounge på ett kryssningsfartyg i soluppgången",
       "width": 4096,
       "height": 2048,
@@ -583,13 +611,19 @@
         "from": "dealer",
         "path": "assets/scene/rooms/lounge.jpg",
         "sha256": "73582f25728933be063a0a525b777e139b98ce3006e51198cb8f764d2a4e6d21"
-      }
+      },
+      "comment": "Här klipps hennes huvud av lite.",
+      "commentAt": "2026-11-18 06:14",
+      "statusBy": "Jakob i Labbet 2026-11-18",
+      "statusAt": "2026-11-18 06:14",
+      "reply": "Huvudet klipptes av vyn, inte av bakgrunden. Sedan 06:17 öppnar scenen i vyn Spelaren, där hela hon ryms med luft över huvudet. Ladda om sidan och döm bakgrunden igen.",
+      "replyAt": "2026-11-18 06:19"
     },
     {
       "file": "scene/backgrounds/monaco.jpg",
       "group": "backgrounds",
       "title": "Monaco 1930",
-      "status": "att granska",
+      "status": "granska igen",
       "note": "En kasinosalong vid havet i 1930-talsstil en kväll, med gäster i frack och aftonklänning som samtalar vid korten",
       "width": 4096,
       "height": 2048,
@@ -607,13 +641,19 @@
         "from": "dealer",
         "path": "assets/scene/rooms/monaco.jpg",
         "sha256": "e2806a6c264fc15909c7050d21428229649896d50752ccc3773cb9640fd62fa9"
-      }
+      },
+      "comment": "Här klipps hennes huvud av lite.",
+      "commentAt": "2026-11-18 06:15",
+      "statusBy": "Jakob i Labbet 2026-11-18",
+      "statusAt": "2026-11-18 06:15",
+      "reply": "Huvudet klipptes av vyn, inte av bakgrunden. Sedan 06:17 öppnar scenen i vyn Spelaren, där hela hon ryms med luft över huvudet. Ladda om sidan och döm bakgrunden igen.",
+      "replyAt": "2026-11-18 06:19"
     },
     {
       "file": "scene/backgrounds/sallskap.jpg",
       "group": "backgrounds",
       "title": "Sällskapsrummet",
-      "status": "att granska",
+      "status": "granska igen",
       "note": "Ett sällskapsrum med tapeter, tavlor och dörr till nästa rum",
       "width": 4096,
       "height": 2048,
@@ -632,13 +672,17 @@
         "from": "dealer",
         "path": "assets/scene/rooms/sallskap.jpg",
         "sha256": "e2644dd50eb1bb050792e342d58795cb50653e2bca4eb4a4a1ab8187c62dde1c"
-      }
+      },
+      "statusBy": "Jakob i Labbet 2026-11-18",
+      "statusAt": "2026-11-18 06:15",
+      "reply": "Du skrev ingen motivering här. Gäller det samma sak som för grannarna, att huvudet klipptes, är det rättat i vyn Spelaren. Ladda om sidan och döm igen.",
+      "replyAt": "2026-11-18 06:19"
     },
     {
       "file": "scene/backgrounds/saloon.jpg",
       "group": "backgrounds",
       "title": "Saloonen",
-      "status": "att granska",
+      "status": "granska igen",
       "note": "En saloon i trä och tegel med varmt lampljus",
       "width": 4096,
       "height": 2048,
@@ -657,13 +701,19 @@
         "from": "dealer",
         "path": "assets/scene/rooms/saloon.jpg",
         "sha256": "1c71c4992c74aca2084e2b3efa5a605bbd1dd9c901fde38a01ef4d81f93104d3"
-      }
+      },
+      "comment": "Här klipps hennes huvud av lite.",
+      "commentAt": "2026-11-18 06:15",
+      "statusBy": "Jakob i Labbet 2026-11-18",
+      "statusAt": "2026-11-18 06:15",
+      "reply": "Huvudet klipptes av vyn, inte av bakgrunden. Sedan 06:17 öppnar scenen i vyn Spelaren, där hela hon ryms med luft över huvudet. Ladda om sidan och döm bakgrunden igen.",
+      "replyAt": "2026-11-18 06:19"
     },
     {
       "file": "scene/backgrounds/spelhalan.jpg",
       "group": "backgrounds",
       "title": "Spelhålan",
-      "status": "att granska",
+      "status": "granska igen",
       "note": "En mörk spelhåla på 1920-talet med träpanel, blekta väggmålningar och män i skärmmössa som spelar kort och röker",
       "width": 4096,
       "height": 2048,
@@ -681,13 +731,19 @@
         "from": "dealer",
         "path": "assets/scene/rooms/spelhalan.jpg",
         "sha256": "c7ac3850f147d63355a987b0ea7bad403f515228ee8f158b19fd67dda850f09a"
-      }
+      },
+      "comment": "Här klipps hennes huvud av lite.",
+      "commentAt": "2026-11-18 06:15",
+      "statusBy": "Jakob i Labbet 2026-11-18",
+      "statusAt": "2026-11-18 06:15",
+      "reply": "Huvudet klipptes av vyn, inte av bakgrunden. Sedan 06:17 öppnar scenen i vyn Spelaren, där hela hon ryms med luft över huvudet. Ladda om sidan och döm bakgrunden igen.",
+      "replyAt": "2026-11-18 06:19"
     },
     {
       "file": "scene/backgrounds/teater.jpg",
       "group": "backgrounds",
       "title": "Teatern",
-      "status": "att granska",
+      "status": "granska igen",
       "note": "En teatersalong med röd ridå, orkesterdike och röda stolsrader",
       "width": 4096,
       "height": 2048,
@@ -706,13 +762,19 @@
         "from": "dealer",
         "path": "assets/scene/rooms/teater.jpg",
         "sha256": "b16dcff5d20472ef5369a3d927a0e1265f8cc47a59a11ef1963bab084a432eec"
-      }
+      },
+      "comment": "Här sitter hon mitt bland många stolar, vilket är konstigt. Förmodligen är hon för inzoomad, eller rättare sagt, bakgrunden är mer inzoomad.",
+      "commentAt": "2026-11-18 06:15",
+      "statusBy": "Jakob i Labbet 2026-11-18",
+      "statusAt": "2026-11-18 06:15",
+      "reply": "Det stämmer. Bakgrunden ligger i dag oändligt långt bort och saknar golv, så det som står nära kameran i rummet hamnar i bordshöjd och ser för stort ut. Rättningen är att ge rummet ett golv i rätt höjd och skala. Den är inte gjord än, så bakgrunden väntar på den.",
+      "replyAt": "2026-11-18 06:19"
     },
     {
       "file": "scene/backgrounds/tradgard.jpg",
       "group": "backgrounds",
       "title": "Trädgården",
-      "status": "att granska",
+      "status": "granska igen",
       "note": "En trädgård en kväll, med lyktor och ett upplyst hus",
       "width": 4096,
       "height": 2048,
@@ -731,13 +793,19 @@
         "from": "dealer",
         "path": "assets/scene/rooms/tradgard.jpg",
         "sha256": "2ed902ae83f81ba3b870b031d70b64bbacdec4ab0a1744cee16e59f951ac8d39"
-      }
+      },
+      "comment": "Bakgrunden är för inzoomad.",
+      "commentAt": "2026-11-18 06:16",
+      "statusBy": "Jakob i Labbet 2026-11-18",
+      "statusAt": "2026-11-18 06:16",
+      "reply": "Det stämmer. Bakgrunden ligger i dag oändligt långt bort och saknar golv, så det som står nära kameran i rummet hamnar i bordshöjd och ser för stort ut. Rättningen är att ge rummet ett golv i rätt höjd och skala. Den är inte gjord än, så bakgrunden väntar på den.",
+      "replyAt": "2026-11-18 06:19"
     },
     {
       "file": "scene/backgrounds/venedig.jpg",
       "group": "backgrounds",
       "title": "Venedig",
-      "status": "att granska",
+      "status": "granska igen",
       "note": "En kaj vid lagunen i Venedig i solnedgången",
       "width": 4096,
       "height": 2048,
@@ -756,13 +824,19 @@
         "from": "dealer",
         "path": "assets/scene/rooms/venedig.jpg",
         "sha256": "ee42c1a0b4628643595d8bd490521a96472aa1b2ad42acc110cd3c531b78de77"
-      }
+      },
+      "comment": "Återigen är bakgrunden för inzoomad, nu sitter hon till hälften i havet.",
+      "commentAt": "2026-11-18 06:16",
+      "statusBy": "Jakob i Labbet 2026-11-18",
+      "statusAt": "2026-11-18 06:16",
+      "reply": "Det stämmer. Bakgrunden ligger i dag oändligt långt bort och saknar golv, så det som står nära kameran i rummet hamnar i bordshöjd och ser för stort ut. Rättningen är att ge rummet ett golv i rätt höjd och skala. Den är inte gjord än, så bakgrunden väntar på den.",
+      "replyAt": "2026-11-18 06:19"
     },
     {
       "file": "scene/backgrounds/v6-rum.png",
       "group": "backgrounds",
       "title": "Rummet ur V6, platt bild",
-      "status": "att granska",
+      "status": "granska igen",
       "note": "Ingen 360-bild. Rumslagret i V6.",
       "width": 1536,
       "height": 1024,
@@ -772,7 +846,13 @@
         "from": "dealer",
         "path": "assets/scene/room.png",
         "sha256": "e1ae8b78b17beb8c133cb664544cd9b4c72cb97dbc17320db9e15ba838d318b4"
-      }
+      },
+      "comment": "Det kanske skulle fungera, men här blandas ny teknik med 2D och 3D. Jag vet faktiskt inte.",
+      "commentAt": "2026-11-18 06:16",
+      "statusBy": "Jakob i Labbet 2026-11-18",
+      "statusAt": "2026-11-18 06:16",
+      "reply": "Jag delar tvekan. En platt bild kan inte vridas med vyn, så den hör inte ihop med ett 3D-bord. Den får vänta tills rummen har fått golv; då föreslår jag att den utgår.",
+      "replyAt": "2026-11-18 06:19"
     },
     {
       "file": "scene/materials/runway_felt-diffuse.webp",
@@ -1069,8 +1149,12 @@
         "path": "assets/proofs/paow-fran-sidan/1-idag-fran-sidan.png",
         "sha256": "5cb6d47d0b49ffa1b19b4c82808135f47ce5e4f7e149a80331099a13baba7b8d"
       },
-      "statusBy": "Agent 2026-11-18: behålls som referens. Underlag för sidoprovet: den platta filmen sedd från sidan. Bedömd efter vad den visar, inte granskad i full storlek.",
-      "statusAt": "2026-11-18 05:26"
+      "comment": "dealern är 2d",
+      "commentAt": "2026-11-18 06:09",
+      "reply": "Ja, och det är just det bilden är till för att visa: den platta filmen sedd från sidan. Den ska aldrig användas i spelet. Den ligger kvar som jämförelse för sidoprovet. Vägen bort från det platta är egna filmer för sidokamerorna, gjorda med helfiguren i 3D-scenen som förlaga.",
+      "replyAt": "2026-11-18 06:10",
+      "statusBy": "Agent 2026-11-18: behålls som jämförelsebild som visar problemet med platt film från sidan, efter Jakobs ord om den. Används inte i spelet.",
+      "statusAt": "2026-11-18 06:10"
     },
     {
       "file": "reference/sida-nyckelbild-i-scenen.png",
@@ -1086,8 +1170,10 @@
         "path": "assets/proofs/paow-fran-sidan/2-nyckelbilden-i-scenen.png",
         "sha256": "4bfc3bc75a53c6d64e7f3f024126bd8852d49e2d51edd73e277094f56c81b1b5"
       },
-      "statusBy": "Agent 2026-11-18: behålls som referens. Underlag för sidoprovet: bilden gjord för sidokameran, i scenen. Bedömd efter vad den visar, inte granskad i full storlek.",
-      "statusAt": "2026-11-18 05:26"
+      "comment": "Ja, detta ser bättre ut. Dealern har lite grönt hår och ser något plastig ut. Men det är ytterst marginellt och väldigt småsaker, så det här ser faktiskt bra ut.",
+      "commentAt": "2026-11-18 06:09",
+      "statusBy": "Jakob i Labbet 2026-11-18",
+      "statusAt": "2026-11-18 06:09"
     },
     {
       "file": "reference/sida-nyckelbild-40.png",
@@ -1103,14 +1189,14 @@
         "path": "assets/proofs/paow-fran-sidan/3-nyckelbild-40.png",
         "sha256": "2cf21eab14634031fc485a6b5494f9ab2ce809f4d3f9a66a3001367440d7b2a6"
       },
-      "statusBy": "Agent 2026-11-18: behålls som referens. Underlag för sidoprovet: nyckelbilden på grönt. Bedömd efter vad den visar, inte granskad i full storlek.",
-      "statusAt": "2026-11-18 05:26"
+      "statusBy": "Jakob i Labbet 2026-11-18",
+      "statusAt": "2026-11-18 06:09"
     },
     {
       "file": "reference/docka-fran-stol-4-och-7.png",
       "group": "reference",
       "title": "3D-dockan sedd från stol 4 och 7",
-      "status": "godkänd",
+      "status": "utgår",
       "note": "Meshy-kroppen som docka när kortet läggs.",
       "width": 1920,
       "height": 640,
@@ -1120,14 +1206,16 @@
         "path": "assets/proofs/dealer-3d-paow-modell-vid-bordet/10-kortet-laggs-fran-stol-4-och-7.png",
         "sha256": "146ad31d325e7b75df5d9c17ded90728830c6b73eae7eb02fcb1844f5ce8cf48"
       },
-      "statusBy": "Agent 2026-11-18: behålls som referens. Visar dockan från två platser; underlag för förlagor. Bedömd efter vad den visar, inte granskad i full storlek.",
-      "statusAt": "2026-11-18 05:26"
+      "comment": "Här ser allt helt knäppt ut, hennes arm viks konstigt.",
+      "commentAt": "2026-11-18 06:10",
+      "statusBy": "Jakob i Labbet 2026-11-18",
+      "statusAt": "2026-11-18 06:10"
     },
     {
       "file": "reference/docka-handerna.png",
       "group": "reference",
       "title": "3D-dockans händer",
-      "status": "godkänd",
+      "status": "utgår",
       "note": "Dockans händer nära, när kortet läggs.",
       "width": 1500,
       "height": 900,
@@ -1137,8 +1225,8 @@
         "path": "assets/proofs/dealer-3d-paow-modell-vid-bordet/8-handerna-jamforda.png",
         "sha256": "71851e68a3207c7cb7037ac3ccf57d65bf3883f3adcd3d3a5e975b4fe05089ff"
       },
-      "statusBy": "Agent 2026-11-18: behålls som referens. Visar dockans händer; underlag för förlagor. Bedömd efter vad den visar, inte granskad i full storlek.",
-      "statusAt": "2026-11-18 05:26"
+      "statusBy": "Jakob i Labbet 2026-11-18",
+      "statusAt": "2026-11-18 06:10"
     },
     {
       "file": "reference/docka-mot-ankare.jpg",
@@ -1155,7 +1243,9 @@
         "sha256": "4c08b19f6c6223df22ce63899d819d78ad90a8d7d085daeb905154d6616cf319"
       },
       "statusBy": "Agent 2026-11-18: behålls som referens. Visar dockan bredvid ankaret som gjordes ur den. Bedömd efter vad den visar, inte granskad i full storlek.",
-      "statusAt": "2026-11-18 05:26"
+      "statusAt": "2026-11-18 05:26",
+      "comment": "Ja, det här är okej.",
+      "commentAt": "2026-11-18 06:10"
     },
     {
       "file": "reference/hander-fore-efter.jpg",
@@ -1275,8 +1365,8 @@
         "sha256": "b332b7cc9c93864e999f9e38bf491f5ee826cd383d42c72d0ad9dc16d9561d87"
       },
       "statusBy": "Jakob i Labbet 2026-11-18",
-      "comment": "Också bra, givet att den faktiskt är välgjord.",
-      "commentAt": "2026-11-18 04:28"
+      "comment": "Också bra, givet att den faktiskt är välgjord. Flippen av kortet är konstig då ingen naturlag gör att kortet från fingrar får kortet att flippas runt 180 grader. men aknsek duger.. Kortet borde om något ridas runt sin egna axel",
+      "commentAt": "2026-11-18 06:12"
     },
     {
       "file": "reference/films/giv-p4-nyp-docka-1-tagning.mp4",
@@ -1316,7 +1406,9 @@
         "path": "assets/proofs/giv-forlagefilm-2/c3-referens-dockan-2.mp4",
         "sha256": "695ec3c0bc388829b5909cdb274e7ea6a5ab8954c176266be4e6545c75dfccb1"
       },
-      "statusBy": "Jakob i Labbet 2026-11-18"
+      "statusBy": "Jakob i Labbet 2026-11-18",
+      "comment": "Kortet gör en onödig rundflip och vrids inte över sin egen axel, utan ändrar sida och riktning på vad som är under och över. Detta kanske behövs för att en AI-videogenerator ska förstå vilken sida som kommer upp.",
+      "commentAt": "2026-11-18 06:13"
     },
     {
       "file": "reference/films/giv-p4-nyp-docka-2-tagning.mp4",

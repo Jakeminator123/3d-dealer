@@ -1,5 +1,6 @@
-// Dealern som bild på den vikta ytan. Bilden projiceras från scenens kamera: upprätt på dealerns bordskant ovanför vecket,
-// liggande på filten nedanför. Sedd från scenens kamera är den därför bilden som den är; från andra håll följer händerna bordet.
+// Dealern som bild på den vikta ytan. Bilden projiceras från filmkameran: upprätt på dealerns bordskant ovanför vecket,
+// liggande på filten nedanför. Sedd från filmkameran, med olutat bord, är den därför bilden som den är; från andra håll
+// följer händerna bordet.
 // Bildens gröna skärm nycklas bort.
 //
 // Än så länge visas en stillbild: ett ankare ur gamla projektets ruta som står in för dealern tills scenen har egna.
@@ -70,7 +71,7 @@ float screenAt(vec2 uv, float range) {
 
 void main() {
   if (vFilm.w <= 0.0) discard;
-  // Punkten i scenkamerans ruta: bilden ligger där kameran såg den.
+  // Punkten i filmkamerans ruta: bilden ligger där kameran såg den.
   vec2 uv = vFilm.xy / vFilm.w * 0.5 + 0.5;
   if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) discard;
   vec3 c = texture2D(map, uv).rgb;
@@ -122,7 +123,7 @@ export function createFilm(scene: SceneDescription, anisotropy: number, changed:
   const eye = sceneEye(scene);
   const { width, height } = eye.frame;
 
-  // Scenkamerans egen projektion, oberoende av varifrån scenen betraktas.
+  // Filmkamerans egen projektion, oberoende av varifrån scenen betraktas.
   const projector = new THREE.PerspectiveCamera(fovYDeg(eye), width / height, 0.1, 100);
   projector.position.set(...eye.position);
   projector.lookAt(eye.position[0] + eye.forward[0], eye.position[1] + eye.forward[1], eye.position[2] + eye.forward[2]);

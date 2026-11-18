@@ -1,6 +1,6 @@
-// Rummet bakom scenen. En 360-bild (likformig cylinderprojektion) omger kameran på oändligt avstånd: den vrids rätt när
-// kameran vrids, men förskjuts inte när kameran flyttas. En platt bild visas som en kuliss som fyller scenkamerans ruta,
-// också den oändligt långt bort; utanför den är det svart.
+// Rummet bakom scenen. En 360-bild (likformig cylinderprojektion) omger ögat på oändligt avstånd: den vrids rätt när
+// ögat vrids, men förskjuts inte när ögat flyttas. En platt bild visas som en kuliss som fyller rutan för det öga rummet
+// är tänkt att ses från (spelarens), också den oändligt långt bort; utanför den är det svart.
 //
 // Gamla Dealer ritade rummet till en egen yta i halv storlek och lade oskärpa på den i två pass (src/scene3d-view.ts).
 // Här görs oskärpan i samma pass som rummet ritas, i rummets egna vinklar, så att scenen inte behöver egna ritytor.
@@ -12,14 +12,15 @@ import type { Eye } from './geometry.ts';
 
 /**
  * En bakgrund och hur den visas. `turn`: grader kring lodlinjen; 0 ställer bildens mitt rakt bakom dealern, och ett positivt
- * värde för dit det som stod till höger i bilden. `blur`: oskärpans standardavvikelse i bildpunkter av scenkamerans ruta.
- * `exposure`: ljusstyrkan, en faktor på ljuset. `mirror`: bilden spegelvänd. Samma mening som gamla projektets värden.
+ * värde för dit det som stod till höger i bilden. `blur`: oskärpans standardavvikelse i bildpunkter av rutan för det öga
+ * rummet är tänkt att ses från. `exposure`: ljusstyrkan, en faktor på ljuset. `mirror`: bilden spegelvänd.
+ * Samma mening som gamla projektets värden.
  *
- * `lift`: grader som bilden lyfts. Scenens kamera ser nedåt, så olyft visar en 360-bild sitt golv bakom dealern; lyft visar
- * den i varje riktning det som låg så många grader högre upp, och horisonten kommer in i rutan. Lyftet hör till rummet och
- * är detsamma åt alla håll: lodräta linjer står kvar lodräta och horisonten ligger vågrätt från varje plats. Priset är att
- * horisonten blir en svagt böjd linje i bilden. Det andra sättet, att luta hela bilden kring en vågrät axel, ger en rak
- * horisont från scenens kamera men en sned från platserna vid sidan av den.
+ * `lift`: grader som bilden lyfts. Ett öga som ser nedåt har rummets golv bakom dealern; lyft visar bilden i varje riktning
+ * det som låg så många grader högre upp, så att mer av väggarna syns. Lyftet hör till rummet och är detsamma åt alla håll:
+ * lodräta linjer står kvar lodräta och horisonten ligger vågrätt från varje plats. Priset är att horisonten blir en svagt
+ * böjd linje i bilden. Det andra sättet, att luta hela bilden kring en vågrät axel, ger en rak horisont från ett öga men
+ * en sned från platserna vid sidan av det.
  */
 export type Background = {
   url: string;
@@ -69,7 +70,7 @@ vec3 room(vec3 d, float lod) {
   d = vec3(heading.x * cos(height), sin(height), heading.y * cos(height));
   vec2 uv;
   if (flatPlate > 0.5) {
-    // Kulissen: riktningen sedd genom scenens kamera, som en punkt i dess ruta.
+    // Kulissen: riktningen sedd genom ögat rummet är tänkt för, som en punkt i dess ruta.
     vec3 v = plateView * d;
     if (v.z <= 0.0) return vec3(0.0);
     uv = v.xy / v.z / plateHalf * 0.5 + 0.5;
@@ -111,9 +112,12 @@ void main() {
   #include <colorspace_fragment>
 }`;
 
-/** Rummet för en scen vars kamera är `eye`. `changed` anropas när bilden har bytts, `problem` när en bild inte gick att läsa. */
+/**
+ * Rummet för en scen som är tänkt att ses från `eye`: oskärpan räknas i det ögats ruta, och en platt bild fyller den.
+ * `changed` anropas när bilden har bytts, `problem` när en bild inte gick att läsa.
+ */
 export function createBackdrop(eye: Eye, changed: () => void, problem: (text: string) => void): Backdrop {
-  // Scenkamerans axlar som rader: höger, upp, framåt. Med dem läggs en riktning i världen in i kamerans ruta.
+  // Ögats axlar som rader: höger, upp, framåt. Med dem läggs en riktning i världen in i ögats ruta.
   const forward = new THREE.Vector3(...eye.forward).normalize();
   const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
   const up = new THREE.Vector3().crossVectors(right, forward);
