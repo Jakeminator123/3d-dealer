@@ -21,7 +21,8 @@ Ett beslut per rad, med datum och skälet i korthet; citat är Jakobs ord. Ett b
 - 2026-11-18. Bakgrunderna bedöms i scenen, med bord och dealer på plats. ("omöjligt att säga något om utan att först kunna se bord och dealer i den")
 - 2026-11-18. "Böjt" betyder kortets böjning, en egenskap hos det ritade kortet liksom glans. Vecket är något annat. ("böjt är väl hur mycket kortet böjs, såsom ordet glans")
 - 2026-11-18. En uppspelning: en följd av klipp, där ett ensamt klipp är en följd med ett. Scenens kort ligger kvar tills given är slut, och mellan klippen hålls filmens sista ruta, inte ankarets bild (granskaren mätte ett skärpesprång mot bilden).
-- 2026-11-18. Märkkortet målas som ett spelkort medan det är i luften: röd baksida med vit kant och vit framsida, tills scenens kort tar över. Kortet i skons mynning ritas över skons ram. (Färgerna är agentens val; Jakob har inte sett dem.)
+- 2026-11-18. Märkkortet målas som ett spelkort medan det är i luften: röd baksida med vit kant och vit framsida, tills scenens kort tar över. (Färgerna är agentens val; Jakob har inte sett dem.)
+- 2026-11-18. Sedd från platsen där dealerfilmen är gjord ritas inte scenens 3D-sko: filmens egen sko gäller, så att arm och kort vid platserna intill skon syns framför den. Från andra vyer står 3D-skon kvar. Ersätter att kortet i mynningen ritades över skons ram. (Att skilja armen från skon ruta för ruta gick inte: svart ärm mot svart sko lämnade hål, mätt.)
 
 ## Dealern och filmen
 

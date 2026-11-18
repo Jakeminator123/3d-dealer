@@ -28,7 +28,7 @@ Varje vy som ska visa dealern går igenom Förlaga, Ankare och Film för sig. Do
 - Dealern sitter intill bordet: underarmarna över filten och händerna en bit in på den.
 - Händerna ska ha dockans storlek (`hand` i `content/doll.json`). Bildmodellerna ritar dem större; de krymps i efterarbetet.
 - Kortet som syns i spelet är scenens 3D-kort. Filmen bär bara ett enfärgat märkkort: gult på baksidan, blått på framsidan. I luften målar scenen det som ett spelkort.
-- Allt som inte är dealer, sko eller kort är en och samma gröna (`studio.colours.screen` i `content/scene.json`). Inga skuggor på det gröna. Skon finns alltså både i filmen och i scenen; sedda ur filmens öga sammanfaller de när bilden är inpassad.
+- Allt som inte är dealer, sko eller kort är en och samma gröna (`studio.colours.screen` i `content/scene.json`). Inga skuggor på det gröna. Skon finns alltså både i filmen och i scenen: sedd från platsen där filmen är gjord visas filmens sko, från andra vyer scenens.
 - Kroppens egen skuggning stannar i filmen. Skuggan på bordet läggs av scenen. Aldrig båda.
 - Filmen har inget ljud. Kling 4 lägger alltid på ljud; `ta-emot` tar bort det utan omkodning.
 - Identiteten avgör vad som ska synas på dealern. För Paulina: tatueringar på hals, bröst och båda händerna.
@@ -68,7 +68,8 @@ Med cykeln behövs ett ankare per vy: REDO. Sista bilden är REDO med märkkorte
 3. `node src/pipeline/tagning.ts ta-emot <id> <film> --task <taskId> --krediter <n> --saldo-fore <n> --saldo-efter <n>` tar bort ljudet, mäter klippet, gör ark och bevis i scenen, och för in klippet (`att granska`), beställningen och måtten i registret.
 
 - Texten, gränsvärdena, vyernas ankare och bildfrekvensen står i `content/tagning.json`. Gränsvärdena är den oberoende granskarens, satta efter piloten.
-- `ta-emot` mäter bland annat takten, skarven (klippet två gånger i rad), när och var kortet ligger (`lands`), handens bredd mot ankarets, skons rörelse och det gröna. Ett mått utanför sin gräns underkänner inte klippet, men det syns direkt.
+- `ta-emot` mäter bland annat takten, skarven (klippet två gånger i rad), när och var kortet ligger (`lands`), handen utan handled mot dockans, skons rörelse och det gröna. Ett mått utanför sin gräns underkänner inte klippet, men det syns direkt.
+- `node src/pipeline/tagning.ts mät-om <id>` mäter om ett mottaget klipp och gör om beviset i scenen, utan att röra filen, beställningen eller omdömet. Används när mätningen eller scenen har ändrats.
 - En serie beställs i omgångar: ytterlägena först, och en oberoende granskare dömer dem innan resten beställs.
 
 ## Spela
