@@ -157,7 +157,14 @@ test('en följd blandar aldrig klipp ur olika REDO-ankare: ankaret med flest god
     fresh('ny-4-0.mp4', { seat: 4, index: 0, lands: { at: 1.7 } }),
     fresh('ny-4-1.mp4', { seat: 4, index: 1, lands: { at: 1.7 } }),
     fresh('ny-d-hole.mp4', { seat: 'D', index: 1, action: 'hole', lands: { at: 2 } }),
-    fresh('ny-d-flip.mp4', { seat: 'D', index: 1, action: 'flip', lands: { at: 1.5 } }),
+    // Vändningen börjar i ankaret med hålkortet målat, och dess rad säger det i ord (tagning.ts): samma ankare.
+    clip('ny-d-flip.mp4', {
+      source: { references: [{ role: 'startFrame', what: 'output/tagningar/prov-flip/forsta.png: dealers/paulina/anchors/prov-redo-ny.png med hålkortet målat gult där det ligger (src/pipeline/cykel.ts, paintedPicture)' }] },
+      seat: 'D',
+      index: 1,
+      action: 'flip',
+      lands: { at: 1.5 },
+    }),
     fresh('ny-4-2.mp4', { seat: 4, index: 2, status: 'att granska', lands: { at: 1.7 } }),
     old('gammal-4-2.mp4', { seat: 4, index: 2, status: 'att granska', lands: { at: 1.7 } }),
   ];

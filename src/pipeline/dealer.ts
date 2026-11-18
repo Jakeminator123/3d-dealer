@@ -12,6 +12,7 @@
 
 import { existsSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { anchorOf } from '../scene/round.ts';
 import { studioRoot, viewRegistry, type RegistryEntry } from './registry.ts';
 
 export class DealerError extends Error {}
@@ -260,12 +261,8 @@ const viewWord = (view: unknown): string | null => {
   return null;
 };
 const shown = (entry: Entry): Shown => ({ file: entry.file, status: entry.status, present: entry.present !== false, title: String(entry.title ?? '') });
-/** REDO-ankaret ett klipp är gjort ur: registernamnet i dess första bilds referens (source.references, startFrame). */
-function clipAnchor(entry: Entry): string | null {
-  const references = (entry.source as { references?: { role?: unknown; what?: unknown }[] } | undefined)?.references;
-  const what = Array.isArray(references) ? references.find((reference) => reference?.role === 'startFrame')?.what : undefined;
-  return typeof what === 'string' ? (/dealers\/[a-z0-9-]+\/anchors\/[a-z0-9_.-]+\.png/.exec(what)?.[0] ?? null) : null;
-}
+/** REDO-ankaret ett klipp är gjort ur, som rundan läser det (src/scene/round.ts, anchorOf). */
+const clipAnchor = (entry: Entry): string | null => anchorOf(entry);
 
 /** Paketen i output/ för dealern: identitet, ankare och tagningar, och om de väntar på att tas emot. */
 function packagesOf(root: string, id: string): DealerState['packages'] {

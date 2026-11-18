@@ -193,15 +193,21 @@ function takeOf(entry: RoundEntry): Take | string {
   return { file: entry.file, status: entry.status, seat: seat as number | 'D', index: index as number, action: action as CardAction, at: lands.at, seconds: isNumber(entry.seconds) ? entry.seconds : null, ...madeWith(entry) };
 }
 
+/** Ett ankares registernamn inne i en text: dealers/<dealer>/anchors/<namn>.png. */
+const ANCHOR_NAME = /dealers\/[a-z0-9-]+\/anchors\/[a-z0-9_.-]+\.png/;
+
 /**
  * REDO-ankaret ett klipp är gjort ur: första bilden i dess beställning (registrets `source.references`, rollen
- * `startFrame`). Klipp ur olika ankare börjar och slutar i olika REDO-bilder och kedjas inte. Null när posten inte säger.
+ * `startFrame`). En vändning börjar i ankaret med hålkortet målat där det ligger, och dess rad säger det i ord: ankarets
+ * registernamn tas ur raden, så att vändningen hör till samma ankare som klippen den kedjas med. Klipp ur olika ankare
+ * börjar och slutar i olika REDO-bilder och kedjas inte. Null när posten inte säger.
  */
 export function anchorOf(entry: RoundEntry): string | null {
   const references = (entry.source as { references?: unknown } | undefined)?.references;
   const start = Array.isArray(references) ? references.find((reference) => (reference as { role?: unknown })?.role === 'startFrame') : undefined;
   const what = (start as { what?: unknown } | undefined)?.what;
-  return typeof what === 'string' && what !== '' ? what : null;
+  if (typeof what !== 'string' || what === '') return null;
+  return ANCHOR_NAME.exec(what)?.[0] ?? what;
 }
 
 /** Det som spelas: följden, och för varje kort klippet som lägger det, eller null när kortet går självt. */
