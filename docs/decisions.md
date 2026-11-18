@@ -20,6 +20,8 @@ Ett beslut per rad, med datum och skälet i korthet; citat är Jakobs ord. Ett b
 - 2026-11-18. Rummet har golv: 360-bilden skärs mot en sfär och mot golvplanet, och lyfts inte. En platt bakgrund visas som kuliss i vyns ruta. Ersätter lyftet. ("Jag tror att det här är fel", om att lyfta bakgrunden.)
 - 2026-11-18. Bakgrunderna bedöms i scenen, med bord och dealer på plats. ("omöjligt att säga något om utan att först kunna se bord och dealer i den")
 - 2026-11-18. "Böjt" betyder kortets böjning, en egenskap hos det ritade kortet liksom glans. Vecket är något annat. ("böjt är väl hur mycket kortet böjs, såsom ordet glans")
+- 2026-11-18. En uppspelning: en följd av klipp, där ett ensamt klipp är en följd med ett. Scenens kort ligger kvar tills given är slut, och mellan klippen hålls filmens sista ruta, inte ankarets bild (granskaren mätte ett skärpesprång mot bilden).
+- 2026-11-18. Märkkortet målas som ett spelkort medan det är i luften: röd baksida med vit kant och vit framsida, tills scenens kort tar över. Kortet i skons mynning ritas över skons ram. (Färgerna är agentens val; Jakob har inte sett dem.)
 
 ## Dealern och filmen
 
@@ -27,8 +29,10 @@ Ett beslut per rad, med datum och skälet i korthet; citat är Jakobs ord. Ett b
 - 2026-11-18. Samma giv ses ur flera vinklar: en film per vy, alla efter samma rörelse. Att byta vy ändrar aldrig var kortet läggs. ("utan att hon för den delen dealar till olika positioner")
 - 2026-11-18. Dockan är standarden för rörelsen, lika för alla dealers: hon bär Pamelas nyp-giv ur gamla Dealer, hämtar kortet i scenens sko och lägger det på platsens första kortplats. Ersätter helfiguren som förlaga. ("Det måste finnas en standard.")
 - 2026-11-18. En giv är hela rörelsen: blick, huvud och överkropp följer kortet. ("hon rör bara handen, helt fel")
-- 2026-11-18. Ett kort och en handling per klipp, gjort med första bild, sista bild och dockans film som referens. En hel runda i en tagning görs inte (i gamla projektet gav det 0 användbara av 7 för cirka 3 500 krediter).
-- 2026-11-18. Ett ankare är en gjord stillbild, aldrig en ruta ur en film: VILA, REDO och LAGT 1–7 och D. Klipp skrivs från→till. Keystone slopas; Identitet ersätter det. ("VILA - REDO är ju A1 och A2.")
+- 2026-11-18. Ett kort per klipp, och klippet är en cykel: REDO → kortet läggs → REDO, gjort med första bild, sista bild och dockans film som referens. Alla klipp börjar och slutar i samma ställning, så de kedjas fritt och bara REDO behövs som ankare per vy. Ersätter klipp från→till med ett eget slutankare per kortplats, som kostade det dubbla. En hel runda i en tagning görs inte (i gamla projektet gav det 0 användbara av 7 för cirka 3 500 krediter).
+- 2026-11-18. Ett ankare är en gjord stillbild, aldrig en ruta ur en film. Sista bilden i en cykel är REDO med märkkortet målat på kortplatsen. Keystone slopas; Identitet ersätter det. ("VILA - REDO är ju A1 och A2.")
+- 2026-11-18. Varje tagning går genom `tagning.ts`: paketet före beställningen, mätning mot gränsvärden och registrering efter. En serie beställs i omgångar, och en oberoende granskare dömer varje omgång. ("standardiserade metoder för filmproduktion")
+- 2026-11-18. Dockans film sparas i 24 rutor/s, samma som Kling svarar i. (Piloten med 30 hade ett ryck i takten; orsaken är antagen.)
 - 2026-11-18. Dockans händer har sitt mått i `content/doll.json`, och ankarnas händer hålls vid det. ("Hennes händer är för stora på allt jag ser.")
 - 2026-11-18. Ett ankare görs i två steg: en bildmodell som håller underlagets geometri, sedan en som träffar likheten. Filmen görs med Kling 4. Modellerna och stegen står i [production.md](production.md).
 - 2026-11-18. Paulina har alltid tatueringar på hals, bröst och båda händerna, och handtatueringarna ritas som i identitetsbilderna. ("hon alltid ska ha tatueringar, även på händerna")

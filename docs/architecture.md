@@ -70,12 +70,15 @@ Att byta kamera ändrar aldrig kortets plats, rörelsen som spelas eller utfalle
 | Scen | Bord, sko, kortplatser och kameror i meter. En beskrivning. |
 | Identitet | De godkända bilderna som bär en dealers likhet: ansikte, kläder, händer. Spelas aldrig. Ersätter keystone. |
 | Ankare | En gjord stillbild som klipp börjar och slutar på, aldrig en ruta ur en film. Tre slag: VILA (båda händerna på filten), REDO (handen på kortet i skon) och LAGT n (handen vid plats n med kortet just lagt; n är 1–7 eller D för dealern). VILA och REDO hette A1 och A2 i gamla projektet. Ett ankare är gjort för en vy: dealern på grön skärm i vyns närbild, i dockans ställning. |
-| Klipp | En film mellan två ankare som gör en sak. Det skrivs från→till: REDO→LAGT 4 är ett kort till plats 4, LAGT 4→REDO vägen tillbaka. Nyp eller släp är en egenskap hos klippet. Ett klipp finns i en tagning per vy. |
-| Docka | Den vita provdockan som gör dealerns rörelser i scenen, lika för alla dealers. Hennes mått står i `content/doll.json` och rörelserna i `content/moves/`. Kortet hämtas där det står i skons mynning och läggs på platsens första kortplats: det är standarden för var kort hämtas och läggs. |
+| Klipp | En film som gör en sak med ett kort. Produktionen gör cykler. Nyp eller släp är en egenskap hos klippet. Ett klipp finns i en tagning per vy. |
+| Cykel | REDO → kortet läggs på platsens kortplats (kort 0 eller 1) → REDO. Börjar och slutar i samma ställning, så cykler kan följa på varandra i vilken ordning som helst. Takten står i `content/moves/cykel-nyp.json`. |
+| Följd | Klipp som spelas efter varandra på dealerytan, med scenens kort kvar på bordet. Ett ensamt klipp är en följd med ett klipp. Den enda uppspelningen (`src/scene/reel.ts`). |
+| Runda | En hel giv som följd: första kortet till plats 1–7, sedan andra kortet. Ordningen står i `content/runda.json`. |
+| Docka | Den vita provdockan som gör dealerns rörelser i scenen, lika för alla dealers. Hennes mått står i `content/doll.json` och rörelserna i `content/moves/`. Kortet hämtas där det står i skons mynning och läggs på platsens kortplats: det är standarden för var kort hämtas och läggs. |
 | Förlaga | En bild eller film som scenen sparar ur en vy, för att visa ställningen eller rörelsen innan den riktiga filmen görs. Förlagan för ett klipp är dockan som gör rörelsen. |
 | Närbild | Samma öga som en vy, riktat mot dealern och inzoomat på hennes arbetsyta. Rutan en dealerfilm görs i, och ögat den läggs tillbaka genom. |
 | Ateljé | Scenen utan rum mot enfärgad skärm, med bordet enfärgat och ett rutnät på filten: så sparas underlagen för ankare. |
-| Märkkort | Kortet i filmen: enfärgat gult på baksidan och blått på framsidan, utan valör. Kortet som syns i spelet är scenens. |
+| Märkkort | Kortet i filmen: enfärgat gult på baksidan och blått på framsidan, utan valör. I luften målar scenen det som ett spelkort; när det har landat tar scenens kort över. |
 | Tagning | Ett försök att göra ett klipp. En tagning granskas och blir godkänd eller inte. |
 | Signal | Det spelkärnan säger har hänt: deal, reveal, turn, settle, idle. Kärnan säger också speak, dealerns repliker; den hoppas över tills ljudet tas i bruk. |
 | Veck | Linjen vid bordskanten där dealerfilmen viks från upprätt till liggande. |
