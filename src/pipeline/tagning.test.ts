@@ -17,6 +17,8 @@ import { viewEye } from '../scene/geometry.ts';
 const root = resolve(import.meta.dirname, '..', '..');
 const scene = readScene(JSON.parse(readFileSync(join(root, 'content', 'scene.json'), 'utf8')));
 const content = readTagning(root);
+// Vyns REDO-ankare står i content/tagning.json; provet följer det som står där i stället för ett eget namn.
+const redoAnchor = content.redo.anchors.paulina!.spelaren!;
 const quiet = () => {};
 
 test('texten är pilotens med granskarens två fraser och rättelsen, och samma för varje plats', () => {
@@ -93,7 +95,7 @@ before(async () => {
   mkdirSync(join(project, 'content', 'moves'), { recursive: true });
   for (const file of ['scene.json', 'doll.json', 'tagning.json']) copyFileSync(join(root, 'content', file), join(project, 'content', file));
   for (const file of readdirSync(join(root, 'content', 'moves'))) copyFileSync(join(root, 'content', 'moves', file), join(project, 'content', 'moves', file));
-  const anchor = join(project, 'assets', 'dealers', 'paulina', 'anchors', 'spelaren-redo.png');
+  const anchor = join(project, 'assets', ...redoAnchor.split('/'));
   mkdirSync(join(anchor, '..'), { recursive: true });
   await sharp({ create: { width: 1920, height: 1080, channels: 3, background: { r: 2, g: 182, b: 48 } } }).png().toFile(anchor);
   film(join(project, 'docka.mp4'), '0x767c80', 0.5, false);
@@ -112,7 +114,7 @@ test('forbered: paketet har bilderna, dockans film, texten och allt beställning
   const order = JSON.parse(readFileSync(at('bestallning.json'), 'utf8'));
   assert.deepEqual([order.model, order.resolution, order.duration, order.ratio], ['kling-4', '1080p', 4, '16:9']);
   assert.deepEqual(Object.keys(order.inputs), ['startFrame', 'endFrame', 'referenceVideos']);
-  assert.equal(order.inputs.startFrame.asset, 'dealers/paulina/anchors/spelaren-redo.png');
+  assert.equal(order.inputs.startFrame.asset, redoAnchor);
   assert.equal(order.inputs.referenceVideos[0].durationSeconds, 0.5);
   assert.equal(order.inputs.referenceVideos[0].fps, 24);
   assert.equal(order.clip, 'dealers/paulina/clips/cykel-nyp-4-1_spelaren_t1.mp4');
@@ -175,7 +177,7 @@ test('ta-emot: ljudet tas bort, måtten prövas, och posten bär allt registret 
   assert.deepEqual(post.lands, { seat: 4, index: 1, at: null });
   assert.equal((post.source as { taskId: string }).taskId, 'task-1');
   assert.deepEqual([order.model, order.kind, order.credits, order.balanceBefore, order.balanceAfter, order.basis, order.result], ['kling-4', 'film', 85, 1000, 915, 'mätt', post.file]);
-  assert.ok(order.inputs!.includes('dealers/paulina/anchors/spelaren-redo.png'), 'indata nämner ankaret');
+  assert.ok(order.inputs!.includes(redoAnchor), 'indata nämner ankaret');
   // Varje mått med gräns, de som bara visas, och skons läge som klippet är gjort och mätt med.
   assert.equal(measurements.length, result.judged.length + measurements.filter((entry) => entry.note === 'utan gräns').length + 1);
   assert.deepEqual(measurements.find((entry) => entry.what.startsWith('skonsLage:'))?.value, { at: scene.shoe.at, yawDeg: scene.shoe.yawDeg, length: scene.shoe.length });
