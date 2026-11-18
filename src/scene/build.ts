@@ -13,7 +13,7 @@ import { createCard, type Card } from './cards.ts';
 import type { FilmNote, Rgb, Studio } from './dealer.ts';
 import type { Frame, SceneDescription } from './description.ts';
 import { createDoll } from './doll.ts';
-import type { DollDescription, DollMove } from './dollPose.ts';
+import { pickUpCard, type DollDescription, type DollMove } from './dollPose.ts';
 import { createFilm } from './film.ts';
 import { lyingAt, markerDown } from './reel.ts';
 import {
@@ -52,6 +52,11 @@ export type SceneOptions = {
   urlOf: (file: string) => string;
   /** Dealern. Utan den visas ingen. */
   dealer?: Dealer | null;
+  /**
+   * Dockans mått (content/doll.json, readDoll): där kortet står i skons mynning (pickUpCard). Med dem ritar dealerfilmens
+   * nyckel märkkortets kant bara där kortets egen kant syns, inte där en ärm täcker kortet i mynningen (marker.ts).
+   */
+  doll?: DollDescription | null;
   /** Sägs till när något inte gick att läsa. */
   onProblem?: (text: string) => void;
   /** Sägs till när musen har tagit över vyn: man har vridit eller zoomat bort från den valda. */
@@ -86,11 +91,15 @@ export type SceneHandle = {
   setBackground(background: Background | null): Promise<void>;
   /** Ställer scenen i ateljén, eller tar den ur den med null. Rummet släcks av den som ställer dit den. */
   setStudio(studio: Studio | null): void;
-  /** Ställer vyn i en av de fasta. Med musen vrider och zoomar man sedan fritt därifrån. */
+  /**
+   * Ställer vyn i en av de fasta. Med musen vrider och flyttar man sedan fritt därifrån, och hjulet zoomar som en närbild:
+   * ögat står kvar och bildvinkeln smalnar.
+   */
   setView(view: View): void;
   /**
    * Visar eller döljer scenens sko. Dealerfilmen bär sin egen sko i bilden, där scenens står; den döljs inte här. Sedd
-   * från platsen där dealerfilmen är gjord ritas scenens sko aldrig: där gäller filmens egen (se placeShoe).
+   * från platsen där dealerfilmen är gjord, eller nästan, ritas scenens sko inte: där gäller filmens egen, och längre bort
+   * tonar scenens in (se placeShoe).
    */
   setShoe(shown: boolean): void;
   /** Visar eller döljer kortplatserna: konturen av ett kort på var och en av beskrivningens platser, på filten. */
@@ -108,8 +117,15 @@ export type SceneHandle = {
 const NEAR = 0.1;
 const FAR = 100;
 const EMPTY = 0x0a0b0d;
-// Två ögon närmare än så här, i meter, står på samma plats.
-const SAME_PLACE = 1e-6;
+// Vinkeln vid skon, i grader, mellan ögat och platsen där dealerfilmen är gjord: inom den första gäller filmens egen sko,
+// och därifrån tonar scenens sko in tills den är helt framme vid den andra. Filmen är platt, så filmens sko glider mot
+// bordet ju längre bort man vrider; valt av agenten 2026-11-18 efter prov i Labbet (output/work/scen-sist/labb-*).
+const FILM_SHOE_DEG = [3, 8] as const;
+// Scenens sko ritas efter dealerfilmens båda delar medan den tonar in, så att filmen syns genom den.
+const FADING_ORDER = 3;
+// Hjulets zoom: faktorn för ett hjulsteg (deltaY 100), och hur långt in och ut den går mot vyns egen bildvinkel.
+const ZOOM_STEP = 1.15;
+const ZOOM_RANGE = [0.5, 12] as const;
 
 function disposeModel(model: THREE.Object3D): void {
   model.traverse((node) => {
@@ -171,11 +187,29 @@ export function buildScene(host: HTMLElement, scene: SceneDescription, options: 
   const camera = new THREE.PerspectiveCamera(viewFovDeg(standing, size.width / size.height), size.width / size.height, NEAR, FAR);
   const orbit = new OrbitControls(camera, renderer.domElement);
   orbit.enableDamping = true;
-  orbit.addEventListener('start', () => {
+  // Hjulet zoomar med bildvinkeln, inte genom att flytta ögat: sedd ur vyn den är gjord i är dealerfilmen då bilden som
+  // den är också inzoomad, som i vyns närbild.
+  orbit.enableZoom = false;
+  const release = (): void => {
     if (free) return;
     free = true;
     options.onMoved?.();
-  });
+  };
+  orbit.addEventListener('start', release);
+  function zoomTo(zoom: number): void {
+    camera.zoom = THREE.MathUtils.clamp(zoom, ZOOM_RANGE[0], ZOOM_RANGE[1]);
+    camera.updateProjectionMatrix();
+    // Musen vrider och flyttar lika mycket i bilden hur långt in man än har zoomat.
+    orbit.rotateSpeed = orbit.panSpeed = 1 / camera.zoom;
+    changed();
+  }
+  const wheel = (event: WheelEvent): void => {
+    event.preventDefault();
+    if (shooting) return;
+    release();
+    zoomTo(camera.zoom * Math.pow(ZOOM_STEP, -event.deltaY / 100));
+  };
+  renderer.domElement.addEventListener('wheel', wheel, { passive: false });
 
   function fit(): void {
     camera.aspect = size.width / size.height;
@@ -196,6 +230,7 @@ export function buildScene(host: HTMLElement, scene: SceneDescription, options: 
     const centre = { x: (from.frame.width - 1) / 2, y: (from.frame.height - 1) / 2 };
     orbit.target.set(...(onUpright(from, centre, scene.dealerEdge.z) ?? dealerEdge(scene)));
     orbit.update();
+    zoomTo(1);
     fit();
   }
 
@@ -225,6 +260,7 @@ export function buildScene(host: HTMLElement, scene: SceneDescription, options: 
           anisotropy,
           changed,
           problem,
+          options.doll ? pickUpCard(scene, options.doll).corners : null,
         )
       : null;
   // Dockans punkter står redan i scenens mått med bordets lutning inräknad: hon läggs olutad i världen.
@@ -349,6 +385,11 @@ export function buildScene(host: HTMLElement, scene: SceneDescription, options: 
 
   let shoeShown = true;
   let shoeStand: THREE.Group | null = null;
+  // Skons delar och hur deras material ritas när skon är helt framme, så att det går att sätta tillbaka efter en toning.
+  const shoeParts: THREE.Mesh[] = [];
+  const shoeLooks = new Map<THREE.Material, { transparent: boolean; opacity: number; depthWrite: boolean }>();
+  const shoeFoot = new THREE.Vector3();
+  let shoeFaded = 1;
   const shoe = load(scene.shoe.file).then((model) => {
     if (!model) return;
     const box = new THREE.Box3().setFromObject(model);
@@ -363,6 +404,16 @@ export function buildScene(host: HTMLElement, scene: SceneDescription, options: 
     shoeStand.scale.setScalar(scene.shoe.length / length);
     shoeStand.visible = shoeShown;
     table.add(shoeStand);
+    shoeStand.updateWorldMatrix(true, false);
+    shoeStand.getWorldPosition(shoeFoot);
+    model.traverse((node) => {
+      const mesh = node as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      shoeParts.push(mesh);
+      for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
+        shoeLooks.set(material, { transparent: material.transparent, opacity: material.opacity, depthWrite: material.depthWrite });
+      }
+    });
     changed();
   });
 
@@ -389,13 +440,43 @@ export function buildScene(host: HTMLElement, scene: SceneDescription, options: 
    * Scenens sko, om den inte är dold med setShoe. Sedd från platsen där dealerfilmen är gjord är filmen bilden som den är,
    * med hennes egen sko på samma ställe som scenens: där ritas scenens sko inte, så att det som i filmen rör sig framför
    * skon (arm, hand, kort) syns framför den. Scenens sko står framför den vikta ytan och skulle annars dölja det; en
-   * svart ärm över en svart sko går inte att skilja från skon i bilden. Sedd från något annat håll är filmen platt, och
-   * scenens sko står där. Görs före varje ritad ruta.
+   * svart ärm över en svart sko går inte att skilja från skon i bilden. Hjulet zoomar utan att flytta ögat, så där gäller
+   * filmens sko också inzoomad. Vrider eller flyttar man bort från platsen gäller filmens sko inom FILM_SHOE_DEG[0]
+   * grader sedda från skon, och sedan tonar scenens sko in över filmen, så att bytet inte hoppar. Längre bort är filmen
+   * platt, och scenens sko står där. Görs före varje ritad ruta.
    */
   function placeShoe(from: THREE.Camera): void {
     if (!shoeStand) return;
-    const filmsOwn = film !== null && film.upright.visible && filmPlace !== null && from.position.distanceTo(filmPlace) < SAME_PLACE;
-    shoeStand.visible = shoeShown && !filmsOwn;
+    let share = 1;
+    if (film !== null && film.upright.visible && filmPlace !== null) {
+      const away = THREE.MathUtils.radToDeg(from.position.clone().sub(shoeFoot).angleTo(filmPlace.clone().sub(shoeFoot)));
+      share = THREE.MathUtils.smoothstep(away, FILM_SHOE_DEG[0], FILM_SHOE_DEG[1]);
+    }
+    if (!shoeShown) share = 0;
+    shoeStand.visible = share > 0;
+    fadeShoe(share);
+  }
+
+  /** Skons täckning: 1 är skon som den är, mellan 0 och 1 genomskinlig och ritad efter dealerfilmen. */
+  function fadeShoe(share: number): void {
+    const fading = share > 0 && share < 1;
+    const wasFading = shoeFaded > 0 && shoeFaded < 1;
+    shoeFaded = share;
+    // Helt framme eller helt borta, före och efter: materialen är som de är, och synligheten sätts av placeShoe.
+    if (!fading && !wasFading) return;
+    for (const mesh of shoeParts) {
+      mesh.renderOrder = fading ? FADING_ORDER : 0;
+      for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
+        const own = shoeLooks.get(material);
+        if (!own) continue;
+        if (fading !== wasFading) {
+          material.transparent = fading || own.transparent;
+          material.depthWrite = fading ? false : own.depthWrite;
+          material.needsUpdate = true;
+        }
+        material.opacity = fading ? own.opacity * share : own.opacity;
+      }
+    }
   }
 
   function draw(): void {
@@ -420,8 +501,8 @@ export function buildScene(host: HTMLElement, scene: SceneDescription, options: 
       aim(viewEye(scene, view));
     },
     setShoe(shown) {
+      // Synligheten och toningen sätts av placeShoe före nästa ritade ruta.
       shoeShown = shown;
-      if (shoeStand) shoeStand.visible = shown;
       changed();
     },
     setPlaces(shown) {
@@ -476,6 +557,7 @@ export function buildScene(host: HTMLElement, scene: SceneDescription, options: 
     dispose() {
       closed = true;
       renderer.setAnimationLoop(null);
+      renderer.domElement.removeEventListener('wheel', wheel);
       orbit.dispose();
       backdrop.dispose();
       film?.dispose();

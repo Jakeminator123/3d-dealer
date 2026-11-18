@@ -75,7 +75,8 @@ Med cykeln behövs ett ankare per vy: REDO. Sista bilden är REDO med märkkorte
 ## Spela
 
 - `node src/pipeline/runda.ts <dealer> <vy> [--nara] [--plan]` tar cykelklippen ur registret i ordningen i `content/runda.json`, säger vilka kort som saknar klipp, och sparar hela given som film och ark i `output/forlagor/`.
-- Uppspelningen är en följd (`src/scene/reel.ts`): klippen spelas utan glapp, scenens kort ligger kvar från att det landat, och mellan klippen hålls filmens sista ruta.
+- I Labbet: steget Scen, där dealern "Hela given ur Spelaren" är förvald och spelar. Närbild visar närbilden, och Börja om tar den från början.
+- Uppspelningen är en följd (`src/scene/reel.ts`): klippen spelas utan glapp, scenens kort ligger kvar från att det landat, och mellan klippen hålls filmens sista ruta. `src/scene/round.ts` väljer klippen, lika för `runda.ts` och Labbet.
 
 ## Runway
 
@@ -98,6 +99,6 @@ Med cykeln behövs ett ankare per vy: REDO. Sista bilden är REDO med märkkorte
 | Håller en cykel i ett klipp, dit och tillbaka? | Ja i piloten (plats 4, kort 0): kortet ligger stilla inom 1,2 bildpunkter, handen har ankarets bredd, och skon rör sig högst 1,29. Godkänd av oberoende granskare. |
 | Går klippen att kedja? | Ja: piloten tre gånger i rad ger en skarv på 0,92 mot 1,58 mellan vanliga rutor, och kortet ligger kvar in i nästa klipp. |
 | Blir händer och tatueringar rätt när ankaret görs ur scenens kamera? | Ja, efter krympning. Tatueringarna suddas i rörelseoskärpan mitt i klippet. Skuggning på bordet är inte gjord. |
-| Går samma giv att göra från sidan? | Ankarna ur Plats 7 är godkända. Tagningen underkändes (högra handen lyfter och svävar) och görs om som cykel. |
-| De andra platserna och andra kortet | Dockan gör alla 14. Filmerna beställs i omgångar; läget står i registret. Dealerns egna kort är inte gjorda. |
+| Går samma giv att göra från sidan? | Ja: cykeln till plats 4 ur Plats 7 är godkänd, med texten utökad med att högra handen ligger platt och stilla på bordskanten. Från sidan syns att skon hänger utanför bordskanten. |
+| De andra platserna och andra kortet | Alla 14 ur Spelaren är godkända, i första tagningen (piloten gjordes om en gång för takten). Dealerns egna kort är inte gjorda. |
 | En ny dealer genom samma kedja | Inte prövad. |

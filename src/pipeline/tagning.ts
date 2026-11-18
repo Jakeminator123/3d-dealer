@@ -393,7 +393,8 @@ async function proofOf(root: string, dir: string, clip: string, asset: string, v
   const data = join(dir, 'scen');
   rmSync(data, { recursive: true, force: true });
   mkdirSync(join(data, 'content'), { recursive: true });
-  copyFileSync(join(root, 'content', 'scene.json'), join(data, 'content', 'scene.json'));
+  // Scenen, och dockans mått: där kortet i skons mynning står, som nyckeln målar kortets kant efter (src/scene/marker.ts).
+  for (const file of ['scene.json', 'doll.json']) copyFileSync(join(root, 'content', file), join(data, 'content', file));
   const link = (from: string, file: string) => {
     const to = join(data, 'assets', file);
     mkdirSync(dirname(to), { recursive: true });

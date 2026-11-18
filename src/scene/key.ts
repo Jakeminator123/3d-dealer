@@ -7,7 +7,8 @@
 
 import * as THREE from 'three';
 import type { Frame } from './description.ts';
-import { MARKER_GLSL, markerUniforms, type CardColours } from './marker.ts';
+import type { Pixel } from './geometry.ts';
+import { MARKER_GLSL, markerUniforms, shoeCardUniforms, type CardColours } from './marker.ts';
 
 // Nyckelns gränser: skärmens grönhet är 1, och en bildpunkt är helt dealer under LO och helt skärm över HI.
 // Värdena är gamla projektets för den upprätta delen (lo 0,12 och hi 0,9 − 0,08).
@@ -144,9 +145,10 @@ export function prepareKeyTexture(texture: THREE.Texture, anisotropy: number): v
 
 /**
  * Nyckelns material för en bild i rutan `frame`, gjord genom kameran `projection` (projektion gånger vy): bilden ligger
- * där den kameran såg ytans punkter. Märkkortet målas med kortets färger `card`.
+ * där den kameran såg ytans punkter. Märkkortet målas med kortets färger `card`. `shoeCard` är hörnen av kortet i skons
+ * mynning i bildens bildpunkter: innanför det ritas baksidans kant bara mot kortets egen kant (marker.ts).
  */
-export function createKey(map: THREE.Texture, frame: Frame, projection: THREE.Matrix4, card: CardColours): Key {
+export function createKey(map: THREE.Texture, frame: Frame, projection: THREE.Matrix4, card: CardColours, shoeCard: Pixel[] | null = null): Key {
   const uniforms = {
     map: { value: map },
     film: { value: projection },
@@ -154,6 +156,7 @@ export function createKey(map: THREE.Texture, frame: Frame, projection: THREE.Ma
     texel: { value: new THREE.Vector2(STEP / frame.width, STEP / frame.height) },
     marker: { value: 0 },
     ...markerUniforms(card),
+    ...shoeCardUniforms(shoeCard, frame),
   };
   const material = new THREE.ShaderMaterial({
     uniforms,

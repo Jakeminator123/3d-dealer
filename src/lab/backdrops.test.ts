@@ -2,7 +2,7 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { backdropItems, backdropKind, dealerChoices, PLAIN, sameLook, startLook } from './backdrops.ts';
+import { backdropItems, backdropKind, dealerChoices, PLAIN, roundChoices, sameLook, startLook } from './backdrops.ts';
 import type { Asset, Registry } from './registry.ts';
 
 const asset = (file: string, group: string, more: Record<string, unknown> = {}): Asset => ({
@@ -77,4 +77,48 @@ test('dealerna att välja mellan är dealerns egna dealerfilmer, filmerna först
   ]);
   // Ett gammalt ankare och en helfigur är inga dealerfilmer, och ett tomt register ger inget val.
   assert.deepEqual(dealerChoices(registryOf([]), 'paulina'), []);
+});
+
+test('hela given att välja: varje vy med cykelklipp, klippen i rundans ordning med rundans valörer, och vad som saknas', () => {
+  const cycle = (file: string, seat: number, index: number, more: Record<string, unknown> = {}) =>
+    asset(`dealers/paulina/clips/${file}`, 'clips', { dealer: 'paulina', use: 'dealerfilm', pose: 'redo → redo', status: 'godkänd', view: { kind: 'spelaren' }, lands: { seat, index, at: 1.9 }, seconds: 4, ...more });
+  const round = {
+    order: [
+      { seat: 1, index: 0 },
+      { seat: 2, index: 0 },
+      { seat: 1, index: 1 },
+    ],
+    faces: ['A♠', 'K♥', '7♦'],
+    film: { background: 'scene/backgrounds/prov-rum.jpg', fps: 24, hold: 1.5 },
+  };
+  const registry = registryOf([
+    cycle('prov-2-0.mp4', 2, 0),
+    cycle('prov-1-0.mp4', 1, 0),
+    cycle('prov-1-1.mp4', 1, 1),
+    cycle('prov-p7-1-0.mp4', 1, 0, { view: { kind: 'plats', seat: 7 } }),
+    cycle('prov-saknas.mp4', 2, 0, { view: { kind: 'plats', seat: 7 }, present: false }),
+  ]);
+  const choices = roundChoices(registry, 'paulina', round, [1, 2, 3, 4, 5, 6, 7]);
+  assert.deepEqual(
+    choices.map((choice) => [choice.key, choice.label]),
+    [
+      ['runda:spelaren', 'Hela given ur Spelaren (3 kort)'],
+      ['runda:plats-7', 'Hela given ur Plats 7 (1 av 3 kort)'],
+    ],
+  );
+  // Samma dealerfilm som runda.ts beställer: klippen i rundans ordning, med korten och sista rutan kvar hold sekunder.
+  assert.deepEqual(choices[0]!.dealer, {
+    kind: 'film',
+    view: { kind: 'spelaren' },
+    clips: [
+      { file: 'dealers/paulina/clips/prov-1-0.mp4', card: { seat: 1, index: 0, face: 'A♠', at: 1.9 } },
+      { file: 'dealers/paulina/clips/prov-2-0.mp4', card: { seat: 2, index: 0, face: 'K♥', at: 1.9 } },
+      { file: 'dealers/paulina/clips/prov-1-1.mp4', card: { seat: 1, index: 1, face: '7♦', at: 1.9 } },
+    ],
+    hold: 1.5,
+  });
+  // En post vars fil saknas spelas inte.
+  assert.deepEqual(choices[1]!.plan.missing, [{ seat: 2, index: 0 }, { seat: 1, index: 1 }]);
+  assert.deepEqual(choices[1]!.plan.unusable, [{ file: 'dealers/paulina/clips/prov-saknas.mp4', why: 'filen saknas i assets/' }]);
+  assert.deepEqual(roundChoices(registryOf([]), 'paulina', round, [1, 2]), []);
 });

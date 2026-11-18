@@ -9,8 +9,8 @@
 
 import * as THREE from 'three';
 import type { ClipCard } from './dealer.ts';
-import type { SceneDescription } from './description.ts';
-import { foldSurfaces, fovYDeg, type Eye } from './geometry.ts';
+import type { SceneDescription, Vec3 } from './description.ts';
+import { foldSurfaces, fovYDeg, see, type Eye, type Pixel } from './geometry.ts';
 import { createKey } from './key.ts';
 import { loadPicture, type Clip, type Picture } from './picture.ts';
 import { makeReel, placeIn, reelEnd, type Reel } from './reel.ts';
@@ -42,7 +42,9 @@ const isFilm = (url: string): boolean => /\.(mp4|webm)(\?|$)/i.test(url);
 /**
  * Den vikta ytan för scenen, med klippen `parts` lagda genom ögat `eye` som de är gjorda i, efter varandra. Sista rutan
  * står kvar `hold` sekunder efter sista klippet. `anisotropy` är grafikkortets högsta, så att den liggande delen håller
- * skärpan sedd snett. `changed` anropas när bilden har ändrats, `problem` när något inte gick att läsa.
+ * skärpan sedd snett. `changed` anropas när bilden har ändrats, `problem` när något inte gick att läsa. `shoeCard` är
+ * hörnen av kortet i skons mynning i scenen (hämtstället, pickUpCard i dollPose.ts): nyckeln ritar märkkortets kant bara
+ * där kortets egen kant syns (marker.ts). Utan det ritas kanten mot allt som inte är kort eller hud.
  */
 export function createFilm(
   scene: SceneDescription,
@@ -52,6 +54,7 @@ export function createFilm(
   anisotropy: number,
   changed: () => void,
   problem: (text: string) => void,
+  shoeCard: Vec3[] | null = null,
 ): Film {
   if (parts.length === 0) throw new Error('Dealerns film har inga klipp');
   const { width, height } = eye.frame;
@@ -113,7 +116,10 @@ export function createFilm(
   const sequence = parts.map((part) => pictureOf(part.url));
   const shown = (): Picture => sequence[current]!;
 
-  const key = createKey(sequence[0]!.texture, eye.frame, projection, scene.card.colours);
+  // Kortet i skons mynning så som filmens öga ser det.
+  const seen = shoeCard?.map((corner) => see(eye, corner)) ?? null;
+  const shoeCardSeen = seen && seen.every((pixel): pixel is Pixel => pixel !== null) ? seen : null;
+  const key = createKey(sequence[0]!.texture, eye.frame, projection, scene.card.colours, shoeCardSeen);
   // Kroppen ritas före händerna, som ligger framför den på bordet.
   const layer = (geometry: THREE.BufferGeometry, order: number): THREE.Mesh => {
     const mesh = new THREE.Mesh(geometry, key.material);
