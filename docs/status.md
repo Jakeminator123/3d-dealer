@@ -20,7 +20,7 @@ Serien ur vyn Spelaren görs om med cykeln E (`cykel-nyp-rask`, 3,0 s, ankaret `
 - Spelkärnan (`src/engine`): förd över ur gamla Dealer med sju testfiler; ursprung och avvikelser står i `src/engine/provenance.json`.
 - Prov: `npm test`, `npm run typecheck`, och `npm run reg -- check` för `assets/` mot registret.
 - Mallen för en ny dealer: dealerns fil (`content/dealers/<id>.json`), `src/pipeline/identitet.ts` och `ankare.ts` (från en bild av en person till identitetsbilder och ett REDO-ankare), och Labbets steg Dealer, som visar var en dealer står och nästa kommando. Torrprovad utan betald generering; inte körd på riktigt för en andra dealer.
-- Klippens fart i uppspelningen (`speed.clips` i `content/runda.json`, reglage i steget Kortplan), och ett statiskt bygge av det riktiga Casinot (`npm run build:statisk`); ingenting är utlagt.
+- Klippens fart i uppspelningen (`speed.clips` i `content/runda.json`, reglage i steget Kortplan), och ett statiskt bygge av det riktiga Casinot (`npm run build:statisk`), utlagt på Vercel bakom Jakobs inloggning (hur: [decisions.md](decisions.md), Tekniken). Det läggs ut på nytt när serien ändras. Labbet finns bara på datorn.
 - En sida för mobilen med filmer och läge, privat för Jakob: källan ligger i `output/work/mobilsida/`.
 
 ## Finns inte än
@@ -47,7 +47,7 @@ Tre bakgrunder och fyra material har `utgår` och tas bort vid nästa arbetspass
 ## Näst
 
 1. Serien med E görs klar: de kort i standardrundan som saknar ett godkänt klipp, och spelarnas tredje kort och dealerns extrakort. Sedan sparas hela rundan som en film (`node src/pipeline/runda.ts paulina spelaren --nara`) och läggs på mobilsidan. När serien är godkänd arkiveras de 14 äldre klippen och provklippen A–D, och de ankare som då inte används tas bort.
-2. Två händer: Jakob ser provklippet bredvid E och väljer. En serie med två händer kostar ungefär som serien E.
+2. Två händer: Jakob ser provklippet bredvid E och väljer. En serie med två händer kostar ungefär som serien E. Jakob har föreslagit att flera rörelsemönster godkänns bredvid varandra ("Kanske ska vi godkänna flera rörelsemönster"): alla klipp ur samma ankare kedjas fritt, men rundan väljer i dag den senaste godkända tagningen per kort. Att den väljer bland flera är inte byggt.
 3. Mätfelen som granskarna har pekat ut (`output/work/granskning-e-2/omdome.json`, "matten") rättas i `src/pipeline/matning.ts` och `rorelse.ts`.
 4. Mallen prövas med en andra dealer ur en enda bild, och ankarets steg för lagning vid givhanden läggs till i `ankare.ts`.
 5. Mätningen för sidovyer, och ett nytt ankare och en serie ur Plats 7 på den nya geometrin.

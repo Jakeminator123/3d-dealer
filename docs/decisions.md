@@ -73,6 +73,7 @@ Ett beslut per rad, med datum och skälet i korthet; citat är Jakobs ord. Ett b
 
 - 2026-11-18. En lokal server i en process, som bara svarar på den här datorn: registret, filerna i `assets/`, förhandsbilder i `output/cache/` och sidorna. Ett klick i Labbet sätter Jakobs omdöme och tar aldrig bort en fil.
 - 2026-11-18. Servern startar om sig själv när en fil den läser ändras (Nodes `--watch`), och `npm start` och `npm stop` kör den dold i bakgrunden. Ersätter regeln att servern startas om för hand och att 5310 inte rörs. (Den körde fem timmar gammal kod och svarade 500 efter att registret flyttats.)
+- 2026-11-19. Det statiska Casinot (`npm run build:statisk`) läggs på Vercel bakom Jakobs inloggning, direkt från datorn med `vercel deploy dist/statisk --yes --target preview`, aldrig genom GitHub och aldrig med `--prod`. Adressen ges av kommandot (`vercel ls statisk`). Ett nytt projekts första utlägg blir produktion med en öppen kort adress: det hände 00:20, och adressen togs bort efter två minuter (`vercel alias rm`). ("Kan du inte starta typ 3d-labbet via github till vercel eller något så man kan kolla?")
 - 2026-11-18. Sidorna byggs med Vite och React, 3D med three direkt; inget Next.
 - 2026-11-18. Tester körs med Nodes egen testkörare, och Node 24 kör TypeScript direkt; inga extra paket.
 - 2026-11-18. En förlaga sparas under `output/forlagor/` med ögats plats och riktning; rutan och takten står i `forlaga` i `content/scene.json`.
