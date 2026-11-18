@@ -528,19 +528,22 @@ export function dollTracks(parts: Pick<CycleParts, 'scene' | 'doll'>, move: Para
   const mouth = pickUpCard(parts.scene, parts.doll).centre;
   const between = (a: number[], b: number[]): number =>
     (Math.acos(Math.max(-1, Math.min(1, (a[0]! * b[0]! + a[1]! * b[1]! + a[2]! * b[2]!) / Math.hypot(...a) / Math.hypot(...b)))) * 180) / Math.PI;
+  // Handen som lägger kortet följs (i en tvåhandsgiv den högra, move.carry ur cykelns fil), och den andra är "den vilande".
+  const giving = move.carry ?? 'left';
+  const other = giving === 'left' ? 'right' : 'left';
   for (let k = 0; k < n; k++) {
     const pose = poseAt(parts.scene, parts.doll, move, Math.min(move.seconds, k / fps));
-    const left = pose.hands.left;
+    const left = pose.hands[giving];
     tracks.grepp.points.push(left[4]!.map((value, d) => (value + left[8]![d]!) / 2));
-    tracks.handled.points.push([...pose.arms.left.wrist]);
-    tracks.armbage.points.push([...pose.arms.left.elbow]);
-    tracks.axel.points.push([...pose.arms.left.shoulder]);
-    tracks.andraAxeln.points.push([...pose.arms.right.shoulder]);
+    tracks.handled.points.push([...pose.arms[giving].wrist]);
+    tracks.armbage.points.push([...pose.arms[giving].elbow]);
+    tracks.axel.points.push([...pose.arms[giving].shoulder]);
+    tracks.andraAxeln.points.push([...pose.arms[other].shoulder]);
     tracks.huvud.points.push([...pose.head]);
     tracks.bal.points.push([...pose.torso]);
     tracks.blick.points.push(aim(pose.head, pose.gaze));
     tracks.ansikte.points.push(aim(pose.head, pose.face));
-    tracks.vilandeHand.points.push([...pose.arms.right.wrist]);
+    tracks.vilandeHand.points.push([...pose.arms[other].wrist]);
     tracks.kort.points.push([...(pose.laid ?? pose.card ?? pose.shoeCard).centre]);
     const head = pose.head;
     tracks.motSkon.points.push([between(pose.face.map((value, d) => value - head[d]!), mouth.map((value, d) => value - head[d]!))]);

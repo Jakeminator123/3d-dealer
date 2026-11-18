@@ -253,17 +253,21 @@ function sheetCollector(frames: number, fps: number, every: number, what: string
 // ---------------------------------------------------------------------------------------------------------------------
 // Dockan
 
-/** Dockans handled när kortet läggs och fingrarna vilar: största vinkeln mellan underarm och hand, i grader. */
+/**
+ * Dockans handled när kortet läggs och fingrarna vilar: största vinkeln mellan underarm och hand, i grader. Handen är den
+ * som lägger kortet (move.carry, ur cykelns fil; vänster om inget sägs).
+ */
 export function dollWrist(parts: CycleParts, card: CycleCard): number {
   const { scene, doll } = parts;
   const move = cycleMove(parts, card);
+  const side = move.carry ?? 'left';
   const from = Math.max(0, move.moments.rests - 6);
   const to = move.back?.letsGo ?? move.frameCount - 1;
   let most = 0;
   for (let frame = from; frame <= to; frame++) {
     const pose = poseAt(scene, doll, move, frame / move.fps);
-    const { elbow, wrist } = pose.arms.left;
-    const hand = pose.hands.left;
+    const { elbow, wrist } = pose.arms[side];
+    const hand = pose.hands[side];
     const a = [wrist[0] - elbow[0], wrist[1] - elbow[1], wrist[2] - elbow[2]];
     const b = [hand[9]![0] - hand[0]![0], hand[9]![1] - hand[0]![1], hand[9]![2] - hand[0]![2]];
     const cos = (a[0]! * b[0]! + a[1]! * b[1]! + a[2]! * b[2]!) / (Math.hypot(...a) * Math.hypot(...b));
@@ -296,7 +300,7 @@ export function withinFrame(parts: CycleParts, card: CycleCard, eye: Eye): numbe
   const points: Vec3[] = [];
   for (let frame = from; frame <= to; frame++) {
     const pose = poseAt(parts.scene, parts.doll, move, frame / move.fps);
-    points.push(...pose.hands.left, ...((pose.laid ?? pose.card)?.corners ?? []));
+    points.push(...pose.hands[move.carry ?? 'left'], ...((pose.laid ?? pose.card)?.corners ?? []));
   }
   const last = poseAt(parts.scene, parts.doll, move, move.seconds).laid;
   if (last) points.push(...last.corners);

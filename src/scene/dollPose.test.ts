@@ -1150,3 +1150,78 @@ test('en vändning och ett hålkort som har sparats och lästs igen spelas som d
     }
   }
 });
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Tvåhandsgiven (content/moves/cykel-tva-hander.json, hands): vänster hand drar kortet ur skon till handbytet, höger hand
+// bär, vänder och lägger det. REDO och kortplatsen som i E, armarna fria, och båda händerna arbetar.
+
+const two: DollCycle = readCycle(read('moves/cykel-tva-hander.json'));
+const twos = new Map<string, DollMove>();
+const twoTo = (seat: Seat, index: number, action: Action = 'deal'): DollMove => {
+  const key = `${seat}:${index}:${action}`;
+  if (!twos.has(key)) twos.set(key, moveFor(scene, doll, base, seat, { index, cycle: two, action }));
+  return twos.get(key)!;
+};
+
+test('tvåhandsgiven läses, och fel i den sägs på svenska', () => {
+  const whole = read('moves/cykel-tva-hander.json') as DollCycle;
+  assert.equal(two.hands!.carry, 'right');
+  near(Object.values(two.hands!.parts).reduce((sum, part) => sum + part, 0), two.seconds, 1e-9, 'takten är cykelns längd');
+  assert.throws(() => readCycle({ ...whole, hands: { ...whole.hands!, carry: 'left' } }), /hands\.carry/);
+  assert.throws(() => readCycle({ ...whole, hands: { ...whole.hands!, parts: { ...whole.hands!.parts, carry: 1 } } }), /hands\.parts/);
+  assert.throws(() => readCycle({ ...whole, hands: { ...whole.hands!, handoff: { ...whole.hands!.handoff, edge: 0 } } }), /hands\.handoff/);
+  assert.throws(() => moveFor(scene, doll, base, 4, { cycle: { ...two, hands: { ...two.hands!, handoff: { ...two.hands!.handoff, from: {} } } } }), /handbytet är för plats 4/);
+});
+
+for (const [seat, index] of [[4, 0], [1, 0]] as const) {
+  test(`tvåhandsgiven till plats ${seat}, kort ${index}: REDO som E, kortet där E lägger det, armarna fria och båda händerna arbetar`, () => {
+    const move = twoTo(seat, index);
+    assert.equal(move.carry, 'right');
+    near(move.seconds, two.seconds, 1e-9, 'cykelns längd');
+    const redo = poseAt(scene, doll, base, 0);
+    samePose(poseAt(scene, doll, move, 0), redo, 'första rutan');
+    const end = last(move);
+    samePose(end, redo, 'sista rutan');
+    assert.ok(end.laid, 'kortet ligger kvar');
+    assert.equal(end.laid.up, 'framsida');
+    const corners = cardCorners(scene, cardPlace(scene, seat, index));
+    fromAbove(end.laid).forEach((corner, k) => near(far(corner, corners[k]!), 0, 0.001, `kortets hörn ${k}`));
+    assert.deepEqual(throughShoe(scene, doll, move), []);
+    assert.deepEqual(armHits(scene, doll, move), { shoe: [], restingHand: [], torso: [], table: [] });
+    const bend = (pose: DollPose, side: 'left' | 'right'): number => {
+      const { elbow, wrist } = pose.arms[side];
+      const hand = pose.hands[side];
+      return angleBetween(sub(wrist, elbow), sub(hand[9]!, hand[0]!));
+    };
+    const poses = Array.from({ length: move.frameCount }, (_, frame) => poseAt(scene, doll, move, frame / move.fps));
+    poses.forEach((pose, frame) => {
+      checkPose(pose, `ruta ${frame}`);
+      for (const side of ['left', 'right'] as const) near(handLength(pose.hands[side]), HAND, 0.001, `ruta ${frame}: ${side} hands längd`);
+      assert.ok(pose.arms.left.reached && pose.arms.right.reached, `ruta ${frame}: armarna räcker`);
+      if (frame >= move.moments.rests - 6 && frame <= move.back!.letsGo) assert.ok(bend(pose, 'right') <= two.hands!.wristMost, `ruta ${frame}: höger handled ${bend(pose, 'right').toFixed(0)}°`);
+    });
+    // Ingen av händerna står still mer än en fjärdedel av cykeln (E:s högra hand står still hela tiden).
+    for (const side of ['left', 'right'] as const) {
+      const slow = poses.slice(1, -1).filter((pose, k) => (far(poses[k + 2]!.hands[side][0]!, poses[k]!.hands[side][0]!) * move.fps) / 2 < 0.05).length;
+      assert.ok(slow / (poses.length - 2) < 0.25, `${side} hand under 5 cm/s ${((100 * slow) / (poses.length - 2)).toFixed(0)} % av tiden`);
+    }
+  });
+}
+
+test('tvåhandsgiven: hålkortet, vändningen och väntan görs som utan två händer', () => {
+  const oneHand: DollCycle = { ...two, hands: undefined };
+  for (const [seat, index, action] of [['D', 1, 'hole'], ['D', 1, 'flip'], ['D', 0, 'wait']] as const) {
+    const a = twoTo(seat, index, action);
+    const b = moveFor(scene, doll, base, seat, { index, cycle: oneHand, action });
+    assert.equal(a.frameCount, b.frameCount);
+    assert.equal(a.carry, undefined);
+    for (let frame = 0; frame < a.frameCount; frame += 5) samePose(poseAt(scene, doll, a, frame / a.fps), poseAt(scene, doll, b, frame / b.fps), `${action} ruta ${frame}`);
+  }
+});
+
+test('en tvåhandsgiv som har sparats och lästs igen spelas som den var', () => {
+  const kept = twoTo(4, 0);
+  const again = readMove(JSON.parse(JSON.stringify(kept)));
+  assert.equal(again.carry, 'right');
+  for (const time of [0, 0.5, 1, 1.5, 2, 2.5, kept.seconds]) samePose(poseAt(scene, doll, again, time), poseAt(scene, doll, kept, time), `vid ${time} s`);
+});

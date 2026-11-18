@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "about": "Tvåhandsgiven: samma REDO, blick, huvud, knuff och takt i övrigt som variant E (cykel-nyp-rask, läs dess about), men kortet delas med två händer som en verklig dealer gör (output/work/verklig-dealer/rapport.md, avsnitt 2 och 6). Vänster hand drar kortet ur skon och för det plant på filten mot mitten till handbytet; höger hand lyfter från sin vila och möter kortet där, tar dess kortsida och reser det; vänster hand släpper och går tillbaka till skon medan höger hand bär kortet, vänder det med framsidan upp i luften och lägger det med fingrarna kvar medan de knuffar det på plats, och går hem till vilan (hands, dollPose.ts twoHanded). Händerna arbetar omlott: ingen av dem står still medan den andra arbetar, utom i skarven. Gäller handlingen deal till plats 1–7 och dealerns kort; hålkortet, vändningen och väntan görs tills vidare som i E: parts, back, flip, wait, push, hole och life är kopierade ur E (cykel-nyp-rask) som den stod i Git 2026-11-18 (commit 02d5ecc), och hands ändrar dem inte. E ändras sedan dess för sig; för hålkortet, vändningen och väntan spelas E:s egna klipp. Ett provklipp till plats 4 för Jakob bredvid E innan något mer beställs.",
+  "id": "cykel-tva-hander",
+  "from": "REDO",
+  "to": "REDO",
+  "give": "giv-nyp-plats-4",
+  "seconds": 3,
+  "parts": { "ready": 0.1, "deal": 1.6, "onCard": 0.4, "back": 0.8, "still": 0.1 },
+  "back": { "lift": 0.05, "release": 0.3, "look": 0.6, "open": 0.3, "close": 0.75 },
+  "flip": { "reach": 0.5, "pickUp": 0.3, "from": 50, "follow": 0.2 },
+  "wait": {
+    "look": 0.55,
+    "across": 25,
+    "head": [0.03, 0.03],
+    "trunk": [0.4, 0.5],
+    "seconds": 4,
+    "breath": { "rise": 0.015, "head": 0, "sway": 0, "turn": 4, "fingers": 0.025, "cycles": 1 }
+  },
+  "push": { "reach": 0.02, "from": -0.2, "to": 0.4 },
+  "hole": "flat",
+  "hands": {
+    "carry": "right",
+    "parts": { "ready": 0.1, "slide": 0.7, "raise": 0.3, "carry": 0.7, "onCard": 0.4, "back": 0.7, "still": 0.1 },
+    "release": 0.3,
+    "follow": 1,
+    "leftStill": 0.1,
+    "handoff": {
+      "edge": 0.155,
+      "from": { "1": 0.19, "2": 0.19, "3": 0.19, "4": 0.19, "5": 0.19, "6": 0.15, "7": 0.16, "D": 0.19 }
+    },
+    "lift": { "reach": 0.03, "back": 0.05, "left": 0.04 },
+    "wristMost": 85,
+    "effort": 0.06,
+    "trunkLag": 0,
+    "side": { "from": 0.25, "most": 0.29, "twist": 1, "home": 0.05 },
+    "breath": { "rise": 0.006, "head": 0.008, "sway": 0.016, "turn": 2, "fingers": 0, "cycles": 1 }
+  },
+  "life": {
+    "gazeLead": 0.25,
+    "headLag": 0.1,
+    "headShare": 0.7,
+    "headSpan": 0.3,
+    "trunkLead": 0.1,
+    "trunkLag": 0.15,
+    "leanLeast": 0.03,
+    "effort": 0,
+    "breath": { "rise": 0, "head": 0, "sway": 0, "turn": 0, "fingers": 0, "cycles": 1 },
+    "calm": { "hand": 6, "body": 20 },
+    "touch": 0.5,
+    "look": "place",
+    "nod": 4,
+    "side": { "from": 0.25, "most": 0.29, "twist": 1, "home": 0.15 }
+  },
+  "basis": "antaget",
+  "source": "Valt av agenten 2026-11-19 (natt) efter Jakob (\"Kör annars med fördel med båda händerna om hon gör det på klippet\") och granskningen av E (output/work/granskning-e-1/omdome.json: den vilande handen är död och hon står still vid skon i skarvarna). Ordningen och tiderna ur den verkliga dealern, runda 2, första varvet (studien i D:/dealer-scratch/tmp/yt-referens/ut/giv-fran-2-3.md, läst; [S] läst ruta för ruta där): vänster hand stryker ut kortet och för det plant till höger hand (b–d 0,13 + 0,05 s), båda reser det på kortsidan (d–e 0,10 s), vänster släpper 0,13 s efter handbytet, höger bär 0,23 s, fingrarna kvar 0,25 s, cykeln 0,77 s per kort. Här, i 3,0 s (Kling gör inga klipp under 3 s; uppspelningen tar upp till 2 gånger), cirka 3–4 gånger hennes tider: hands.parts ready 0,1, slide 0,7 (vänster hand drar ut kortet till handbytet medan höger hand går dit), raise 0,3 och carry 0,7 (resningen och bärningen i ett svep med minsta ryck, så att handen inte stannar där kortet står; kortet ligger vid 1,8 s, i E 1,7 s), onCard 0,4 och push som E (fingrarna knuffar kortet på plats), back 0,7 (höger hand hem till vilan), still 0,1. release 0,3: vänster hand släpper 0,3 s efter handbytet och går tillbaka till skon på resten av cykeln (leftStill 0,1), så att den inte står still medan höger hand bär och lägger; hos henne väntar den i stället 0,18–0,30 s med fingrarna på nästa kort (a–b). follow 1: vänster hands fingrar på kortets ände mot skon lyfts med kortets yta medan det reses (\"ligger kvar tvärs över kortet och hjälper det upp på kant\"). handoff: hos henne släpper vänster hand det stående kortet 0,16–0,31 m från skons främre hörn, längre för platserna längre bort [S]. Här är from 0,19 m från skons nos för plats 1–5 och dealern och 0,15–0,16 för plats 6–7 (hennes S2 och S1), och edge 0,155 (kortets mitt 15,5 cm från bordskanten, i dealerns kortrad men till höger om dealerns öppna kort): med hennes 0,24–0,31 för plats 1–3 hamnar kortet ovanpå dealerns öppna kort i andra varvet, och närmare kanten (prövat 7,5 och 14 cm) gick höger underarm genom bålen och handlederna mot bordet (mätt, output/work/tva-hander/). Handbytets punkt vandrar alltså inte med platsen här. Höger hand tar kortet som vänster hand nyper det i skons mynning i REDO, spegelvänt, svängd kring greppet så att den ligger i linje med underarmen (dollPose.ts handYaw), och bär det som den lästa givens vänstra hand bar och vände det (giv-nyp-plats-4, speglad), med svängen mot underarmen också vid kortplatsen. effort 0,06: bärningens väg räknar 6 cm per radian kortet vänds, så att vändningen tar 2–3 rutor i stället för en. wristMost 85: dockans gräns (content/tagning.json, limits.dockansHandled); armbågarna vrids så att handlederna håller sig inom den där det går. trunkLag 0 och side.home 0,05 (E: 0,15 och 0,15): bålen börjar gå hem när höger hand lämnar kortet och är hemma strax efter handen, eftersom handen lämnar kortet senare än i E; med E:s värden gick bålen hem på 0,3 s med 9–10 tvära stopp (rorelse.ts, mätt). breath (E: noll): axlarna 6 mm, huvudet 8 mm upp och 16 mm åt sidan och 2° vridning, en gång per cykel med sin, så att huvudet rör sig från första rutan också vid plats 4, där blicken redan är vid platsen (ansiktet 0,15–0,58 bp per ruta de åtta första rutorna i dockans film, mätt med output/work/tva-hander/flode.py; vid 0,05–0,10 frös Kling, granskning-e-2). Hennes vändning ände över ände kring kortsidan är inte gjord: kortet vänds som i den lästa given. Inte prövat i en beställning."
+}

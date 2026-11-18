@@ -837,8 +837,9 @@ export function layoutFor(parts: CycleParts, view: SeatView, card: CycleCard, me
   const handTop = Math.min(...redo.hands.left.map((point) => at(point).y));
   const waist = measure.waist.map((x) => onEdge(x)) as [Pixel, Pixel];
   const eyeRow = at([redo.head[0], doll.body.eyeHeight, redo.head[2]]).y;
+  // Armen som lägger kortet: i en tvåhandsgiv den högra (move.carry, ur cykelns fil).
   const arm = (t: number): Wrist | null => {
-    const { elbow, wrist } = poseAt(scene, doll, move, t).arms.left;
+    const { elbow, wrist } = poseAt(scene, doll, move, t).arms[move.carry ?? 'left'];
     const w = see(eye, wrist);
     const e = see(eye, elbow);
     if (!w || !e) return null;
