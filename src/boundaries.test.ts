@@ -9,15 +9,20 @@ const src = import.meta.dirname;
 
 /**
  * Vad varje mapp får läsa av de andra. `typer` betyder bara med `import type`: webbläsarens kod (lab, casino) läser
- * kärnan bara så, eftersom kärnan körs i servern. En ny mapp under src/ måste stå här innan den får kod.
+ * kärnan bara så, eftersom kärnan körs i servern. Spelsessionen (game) är kärnan som session: servern kör den, och
+ * visningen kör den i webbläsaren, där sidan inte har någon server; Casinot läser bara dess typer och når den genom
+ * sitt gränssnitt (casino/link.ts). Visningens bygge (visning/bygg.ts) läser registret genom pipeline. En ny mapp under
+ * src/ måste stå här innan den får kod.
  */
 const MAY_READ: Record<string, Record<string, 'allt' | 'typer'>> = {
   engine: {},
   scene: { engine: 'typer' },
+  game: { engine: 'allt', scene: 'typer' },
   lab: { scene: 'allt', engine: 'typer' },
-  casino: { scene: 'allt', engine: 'typer' },
+  casino: { scene: 'allt', engine: 'typer', game: 'typer' },
+  visning: { casino: 'allt', scene: 'allt', game: 'allt', pipeline: 'allt', engine: 'typer' },
   pipeline: { scene: 'allt' },
-  server: { engine: 'allt', pipeline: 'allt' },
+  server: { engine: 'allt', pipeline: 'allt', game: 'allt' },
 };
 
 type Found = { specifier: string; typeOnly: boolean; line: string };

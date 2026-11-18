@@ -1,15 +1,20 @@
 // Kortplanen som Labbet ställer (steget Kortplan) och servern sparar i content/scene.json: spelarnas båge
-// (places.arc), dealerns rad (places.row) och kortens storlek på bordet (card.onTable.scale). Här står vilka tal det är,
-// deras gränser och prövningen av dem. Antalet platser och kortplatser, och allt annat i scenen, ändras inte här.
+// (places.arc), dealerns rad (places.row) och kortens storlek på bordet (card.onTable.scale), och med dem farten
+// dealerns klipp spelas i (content/runda.json, speed.clips). Här står vilka tal det är, deras gränser och prövningen av
+// dem. Antalet platser och kortplatser, och allt annat i scenen och rundan, ändras inte här.
 // Inget three och ingen filläsning, så att servern och Node kan pröva allt.
 
 import { CARD_SCALE, placesOf, type FeltPoint, type PlaceArc, type PlaceRow, type SceneDescription } from './description.ts';
 
-/** Talen som går att ställa: bågens sex, radens två punkter, och kortens storlek. */
+/**
+ * Talen som går att ställa: bågens sex, radens två punkter, kortens storlek, och klippens fart (`speed`, som står i
+ * content/runda.json och inte i scenen). Utan `speed` rörs farten inte.
+ */
 export type CardPlan = {
   arc: Pick<PlaceArc, 'centreX' | 'depth' | 'width' | 'bend' | 'round' | 'step'>;
   row: Pick<PlaceRow, 'first' | 'step'>;
   scale: number;
+  speed?: number;
 };
 
 export class PlanError extends Error {}
@@ -23,7 +28,10 @@ export class PlanError extends Error {}
  * - nästa kort på en plats ligger 2,5–6 cm åt höger, så att det förras valör syns och korten ligger över varandra,
  *   och högst 2 cm i djup (som provet i description.test.ts);
  * - dealerns första kort ligger inom en halv meter i sidled och 5–60 cm från kanten, och nästa kort som hos spelarna;
- * - kortens storlek är CARD_SCALE gånger filmens kort.
+ * - kortens storlek är CARD_SCALE gånger filmens kort;
+ * - klippens fart går från 1, som de är filmade, till 2, dubbelt så fort: ett klipp på 3–4 s tar då 1,5–2 s (en mätt
+ *   dealer delar ett kort på 0,62–0,90 s, och Kling gör inga klipp under 3 s). Fortare än 2 hoppar filmen över mer än
+ *   varannan ruta.
  */
 export const PLAN_LIMITS = {
   centreX: [-0.3, 0.3],
@@ -35,6 +43,7 @@ export const PLAN_LIMITS = {
   rowFirst: { x: [-0.5, 0.5], zFromEdge: [0.05, 0.6] },
   rowStep: { x: [0.025, 0.06], z: [-0.02, 0.02] },
   scale: CARD_SCALE,
+  speed: [1, 2],
 } as const;
 
 /** Talen så som scenen bär dem. Null när scenen inte har båge och rad. */
@@ -69,6 +78,9 @@ export function withPlan(scene: SceneDescription, plan: CardPlan): SceneDescript
 
 const isNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
 const within = (value: unknown, [low, high]: readonly [number, number]): boolean => isNumber(value) && value >= low - 1e-9 && value <= high + 1e-9;
+
+/** Om `value` är en fart som klippen får spelas i (PLAN_LIMITS.speed). */
+export const isSpeed = (value: unknown): value is number => within(value, PLAN_LIMITS.speed);
 const range = ([low, high]: readonly [number, number], from = 0): string =>
   `${String(Number((low + from).toFixed(4))).replace('.', ',')} … ${String(Number((high + from).toFixed(4))).replace('.', ',')}`;
 
@@ -88,12 +100,12 @@ const isPair = (value: unknown): value is [number, number] => Array.isArray(valu
 
 /**
  * Prövar en kortplan som Labbet skickar mot scenen `scene`: bara talen i CardPlan, var och en inom PLAN_LIMITS. Säger
- * på svenska vad som är fel; inget annat tal i scenen tas emot.
+ * på svenska vad som är fel; inget annat tal i scenen eller rundan tas emot.
  */
 export function readPlan(value: unknown, scene: SceneDescription): CardPlan {
   const wrong: string[] = [];
   const edge = scene.dealerEdge.z;
-  const body = exactly(value, ['arc', 'row', 'scale'], 'kortplanen', wrong);
+  const body = exactly(value, ['arc', 'row', 'scale', 'speed'], 'kortplanen', wrong);
   const arc = exactly(body?.arc, ['centreX', 'depth', 'width', 'bend', 'round', 'step'], 'arc', wrong);
   const row = exactly(body?.row, ['first', 'step'], 'row', wrong);
   const need = (ok: boolean, what: string) => {
@@ -113,11 +125,13 @@ export function readPlan(value: unknown, scene: SceneDescription): CardPlan {
     need(isPair(row.step) && within(row.step[0], L.rowStep.x) && within(row.step[1], L.rowStep.z), `row.step [${range(L.rowStep.x)}, ${range(L.rowStep.z)}]`);
   }
   need(within(body?.scale, L.scale), `scale ${range(L.scale)}`);
+  need(body?.speed === undefined || isSpeed(body.speed), `speed ${range(L.speed)}`);
   if (wrong.length > 0) throw new PlanError(`Kortplanen tas inte emot: ${wrong.join('; ')}`);
   const step = (pair: unknown): [number, number] => [(pair as FeltPoint)[0], (pair as FeltPoint)[1]];
   return {
     arc: { centreX: arc!.centreX as number, depth: arc!.depth as number, width: arc!.width as number, bend: arc!.bend as number, round: arc!.round as number, step: step(arc!.step) },
     row: { first: step(row!.first), step: step(row!.step) },
     scale: body!.scale as number,
+    ...(body!.speed === undefined ? {} : { speed: body!.speed as number }),
   };
 }

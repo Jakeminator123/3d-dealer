@@ -14,6 +14,10 @@
 // En del utan fil (spelkärnans fallback, ett kort som saknar klipp) har ingen film: dealern står i REDO, på förra
 // klippets sista ruta (eller nästa klipps första, när inget klipp har gått före), medan tiden går och scenens kort
 // glider dit självt (build.ts). Alla klipp börjar och slutar i REDO, så rutan är dealern i REDO.
+//
+// Klippen spelas i följdens fart (`speed`, reel.ts rateOf): filmen går så många gånger fortare, och följdens tid räknas
+// ur filmens tid delad med farten. Vänta-klippet och delar utan film går i 1. Farten kan ställas om medan följden går
+// (setSpeed): den står kvar där den är i klippet och går vidare i den nya farten.
 
 import * as THREE from 'three';
 import type { CardSpot, ClipCard } from './dealer.ts';
@@ -21,7 +25,7 @@ import type { SceneDescription, Vec3 } from './description.ts';
 import { foldSurfaces, fovYDeg, see, type Eye, type Pixel } from './geometry.ts';
 import { createKey } from './key.ts';
 import { loadPicture, type Clip, type Picture } from './picture.ts';
-import { makeReel, partEnd, placeIn, reelEnd, type Reel } from './reel.ts';
+import { makeReel, partEnd, placeIn, rateOf, reelEnd, sameMoment, type Reel } from './reel.ts';
 
 export type Film = {
   /** Den upprätta delen: står på dealerns bordskant. */
@@ -36,6 +40,8 @@ export type Film = {
   reel(): Reel | null;
   /** Tar bort märkkortets blå ur bilden, eller målar det som kortets framsida. */
   setMarker(gone: boolean): void;
+  /** Ställer farten klippen spelas i (createFilm, `speed`), utan att följden flyttar sig i klippet den står i. */
+  setSpeed(speed: number): void;
   dispose(): void;
 };
 
@@ -58,7 +64,8 @@ const isFilm = (url: string): boolean => /\.(mp4|webm)(\?|$)/i.test(url);
  * `anisotropy` är grafikkortets högsta, så att den liggande delen håller skärpan sedd snett. `changed` anropas när
  * bilden har ändrats, `problem` när något inte gick att läsa. `shoeCard` är hörnen av kortet i skons mynning i scenen
  * (hämtstället, pickUpCard i dollPose.ts): nyckeln ritar märkkortets kant bara där kortets egen kant syns (marker.ts).
- * Utan det ritas kanten mot allt som inte är kort eller hud.
+ * Utan det ritas kanten mot allt som inte är kort eller hud. `speed` är farten klippen spelas i (1 som de är filmade);
+ * vänta-klippet och delar utan film går i 1.
  */
 export function createFilm(
   scene: SceneDescription,
@@ -71,6 +78,7 @@ export function createFilm(
   shoeCard: Vec3[] | null = null,
   loop = true,
   wait: string | null = null,
+  speed = 1,
 ): Film {
   if (parts.length === 0) throw new Error('Dealerns film har inga klipp');
   const { width, height } = eye.frame;
@@ -155,6 +163,13 @@ export function createFilm(
   const startOf = (index: number): number => (index === WAIT ? turnFrom : reel!.starts[index]!);
   /** Om följden väntar efter sista klippet: den har ett vänta-klipp som gick att läsa. */
   const waits = (): boolean => waiting !== null && reel?.wait !== undefined;
+  /** Hur fort delen `index` spelas (reel.ts, rateOf): följdens fart för ett klipp, 1 för väntan och en del utan film. */
+  const rateAt = (index: number): number => (reel ? rateOf(reel, index) : 1);
+  /** Spelar bilden `picture` i delen `index`s fart. */
+  const playAs = (picture: Picture, index: number): void => {
+    if (picture.element instanceof HTMLVideoElement) picture.element.playbackRate = rateAt(index);
+    picture.clip?.play();
+  };
 
   // Kortet i skons mynning så som filmens öga ser det.
   const seen = shoeCard?.map((corner) => see(eye, corner)) ?? null;
@@ -194,13 +209,13 @@ export function createFilm(
   }
 
   /**
-   * Följdens tid medan den går: klippets början och tiden i klippets film, eller klockan i en del utan film. I väntan
-   * varvets början och tiden i vänta-klippet.
+   * Följdens tid medan den går: klippets början och tiden i klippets film delad med dess fart, eller klockan i en del
+   * utan film. I väntan varvets början och tiden i vänta-klippet.
    */
   const running = (): number => {
     if (!reel) return 0;
     if (still) return Math.min(partEnd(reel, current), still.from + (performance.now() - still.since) / 1000);
-    return startOf(current) + (sequence[current]?.clip?.time() ?? 0);
+    return startOf(current) + (sequence[current]?.clip?.time() ?? 0) / rateAt(current);
   };
 
   /**
@@ -226,21 +241,21 @@ export function createFilm(
   }
 
   /**
-   * Spelar följden från delen `index`, tiden `local` in i den. Medan rutan ställs står följden på `standing`: i en skarv
-   * förra delens slut, så att kortet och märkkortet följer rutan som syns.
+   * Spelar följden från delen `index`, tiden `local` in i den (i delens egen tid). Medan rutan ställs står följden på
+   * `standing`: i en skarv förra delens slut, så att kortet och märkkortet följer rutan som syns.
    */
-  function go(index: number, local: number, mine: number, standing = startOf(index) + local): void {
+  function go(index: number, local: number, mine: number, standing = startOf(index) + local / rateAt(index)): void {
     pinned = standing;
     still = null;
     void cue(index, local, mine).then((ok) => {
       if (!ok || !wanted || !reel) return;
       if (sequence[index]) {
         pinned = null;
-        sequence[index]!.clip?.play();
+        playAs(sequence[index]!, index);
         return;
       }
       // En del utan film: klockan går, och scenen ritas om för varje ruta medan kortet glider.
-      still = { from: reel.starts[index]! + local, since: performance.now() };
+      still = { from: reel.starts[index]! + local / rateAt(index), since: performance.now() };
       pinned = null;
       const tick = (): void => {
         if (closed || mine !== turn || !wanted || !still || !reel) return;
@@ -306,6 +321,7 @@ export function createFilm(
       hold,
       // Ett vänta-klipp som inte gick att läsa har ingen längd: då står sista rutan kvar, som utan vänta-klipp.
       waiting?.clip?.seconds() || undefined,
+      speed,
     );
     show(0);
     if (wanted && films) restart();
@@ -325,7 +341,7 @@ export function createFilm(
           wanted = true;
           if (!reel) return;
           if (pinned === null) {
-            if (!still) sequence[current]?.clip?.play();
+            if (!still && sequence[current]) playAs(sequence[current]!, current);
             return;
           }
           // Från slutet börjar följden om; annars går den vidare där den står. En följd som väntar väntar vidare från
@@ -372,6 +388,22 @@ export function createFilm(
     reel: () => reel,
     setMarker(gone) {
       key.setMarker(gone);
+      changed();
+    },
+    setSpeed(next) {
+      if (!(Number.isFinite(next) && next > 0) || next === speed) return;
+      speed = next;
+      if (!reel || closed) return;
+      // Samma delar i den nya farten. Följden står kvar i samma del och på samma tid i dess film: medan ett klipp går
+      // räknas tiden ur filmen och de nya början av sig själv; en stående tid, en del utan film och ett varv av väntan
+      // flyttas med sin del.
+      const before = reel;
+      reel = makeReel(before.parts, hold, before.wait, speed);
+      if (pinned !== null) pinned = sameMoment(before, reel, pinned);
+      if (still) still = { from: still.from - before.starts[current]! + reel.starts[current]!, since: still.since };
+      turnFrom += reelEnd(reel) - reelEnd(before);
+      const picture = sequence[current];
+      if (picture && picture.element instanceof HTMLVideoElement) picture.element.playbackRate = rateAt(current);
       changed();
     },
     dispose() {

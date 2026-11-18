@@ -40,6 +40,17 @@ Läs [README.md](README.md) och [docs/status.md](docs/status.md) först. Orden s
 - Gamla Dealer (`C:\Users\jakem\dev\super-feature-sg\dealer`) är Codex arbetsyta: den läses inte utan Jakobs ord, och dess grenar, arbetsträd och `D:\dealer-scratch` rörs aldrig. En gren eller ett arbetsträd med opushade commits tas aldrig bort utan Jakobs ja för just den, och aldrig i ett annat repo än det här.
 - Ingenting pushas utan Jakobs ord. Publicering, lipsync och ljud väntar tills han säger till.
 
+## Så leds arbetet
+
+Jakob 2026-11-18: "se till att detta arbetssätt går på". En ny chatt som tar över läser `docs/status.md` och fortsätter så här; inga överlämningar skrivs.
+
+- En huvudagent leder. Den sätter målet, delar arbetet i delar som inte rör samma filer, och startar underagenter parallellt med fullständiga beställningar som säger vilka filer som är agentens och vilka som är någon annans.
+- Det en agent har gjort döms av en annan, som inte har gjort det, mäter och ser i full storlek.
+- Betalda beställningar går i steg: ett prov, sedan en liten omgång med ytterlägena, sedan resten. Saldot läses före och efter, och kontot delas med Codex.
+- Huvudagenten committar efter varje agents rapport, när `npm test` och `npm run typecheck` är gröna.
+- Jakob får resultaten som filer och på mobilsidan (källan i `output/work/mobilsida/`), med vad som är mätt och vad som väntar på honom.
+- Riktningen är en mall som gör en spelbar dealer ur enkel indata: en bild av en person ska räcka för att ta henne genom Identitet, Ankare, Film och Spela.
+
 ## Hushållning med läsning
 
 - Filmer, modeller, arkiv, `glb/`, `node_modules/`, `package-lock.json` och registret läses aldrig som text. `.cursorignore` stänger ute dem; `.cursorindexingignore` håller dessutom bilder och stora bakgrundstexter utanför indexet.

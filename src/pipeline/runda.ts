@@ -1,15 +1,16 @@
 // Rundan: en giv som spelkärnan har delat, spelad med dealerns klipp ur en vy och sparad som film ur vyn med rum.
 //
-//   node src/pipeline/runda.ts <dealer> <vy> [--fro <ord>] [--nara] [--plan]
+//   node src/pipeline/runda.ts <dealer> <vy> [--fro <ord>] [--fart <tal>] [--nara] [--plan]
 //
 // <vy> är spelaren eller plats-N. Spelkärnan delar rundan i servern (/api/runda, src/server/game.ts): skon blandas ur
 // fröet i content/runda.json, eller ur --fro, och spelarna där spelar efter dess regel. Samma frö ger samma runda.
 // Vilket klipp varje kort får väljs i src/scene/round.ts, som Labbets steg Scen och Casinot också går genom: ett
 // godkänt cykelklipp efter postens seat, index och action, eller spelkärnans fallback när klippet saknas (kortet går
-// självt medan dealern står i REDO). Klipp som saknas sägs. Filmen sparas genom shoot.ts som en förlaga under
-// output/forlagor/, med beställningen och beskrivningen, rundan (<namn>-runda.json) och ett ark bredvid: första rutan
-// och en ruta när varje kort ligger. Med --nara sparas också vyns närbild, och med --plan sägs bara vad som skulle
-// spelas.
+// självt medan dealern står i REDO). Klipp som saknas sägs. Klippen spelas i farten i content/runda.json (speed.clips),
+// eller i --fart, 1–2, utan att filen ändras; filmen sparas ändå i rundans takt (film.fps), så att i 1,5 tas var
+// 1,5:e ruta ur klippen. Filmen sparas genom shoot.ts som en förlaga under output/forlagor/, med beställningen och
+// beskrivningen, rundan (<namn>-runda.json) och ett ark bredvid: första rutan och en ruta när varje kort ligger. Med
+// --nara sparas också vyns närbild, och med --plan sägs bara vad som skulle spelas.
 //
 // En egen server startas på en ledig port, så att Jakobs studio på 5310 inte rörs; SHOOT_SERVER pekar ut en som går.
 // Rundan avgör ingenting i spelet: korten och utfallet är spelkärnans.
@@ -21,7 +22,8 @@ import { promisify } from 'node:util';
 import sharp from 'sharp';
 import { readScene } from '../scene/description.ts';
 import { seatsOf, type SeatView } from '../scene/geometry.ts';
-import { makeReel } from '../scene/reel.ts';
+import { isSpeed, PLAN_LIMITS } from '../scene/plan.ts';
+import { makeReel, partEnd } from '../scene/reel.ts';
 import { anchorName, backgroundOf, dealName, dealsOf, planRound, readRound, RoundError, roundFilm, spotName, type DealtRound, type OrderBackground, type Plan, type Round } from '../scene/round.ts';
 import { readRegistry, studioRoot } from './registry.ts';
 import { shootAll, startServer, type Shot } from './shoot.ts';
@@ -77,10 +79,17 @@ export function roundOrder(plan: Plan, round: Round, view: SeatView, background:
   };
 }
 
-/** Rundans tidslinje ur klippens längder i registret och fallbackens: där varje del slutar. */
-export function clipEnds(plan: Plan, hold: number): number[] {
-  const reel = makeReel(plan.dealt.map((deal) => ({ seconds: deal.seconds })), hold);
-  return reel.starts.map((start, index) => start + reel.parts[index]!.seconds);
+/**
+ * Rundans tidslinje ur klippens längder i registret och fallbackens, med klippen i farten `speed` (reel.ts): där varje
+ * del slutar, i filmens tid.
+ */
+export function clipEnds(plan: Plan, hold: number, speed = 1): number[] {
+  const parts = plan.dealt.map((deal, index) => {
+    const clip = plan.clips[index]!;
+    return { seconds: deal.seconds, ...(clip.file === null ? { from: clip.from } : {}) };
+  });
+  const reel = makeReel(parts, hold, undefined, speed);
+  return reel.starts.map((_, index) => partEnd(reel, index));
 }
 
 const run = promisify(execFile);
@@ -124,7 +133,7 @@ const tileText = (deal: Plan['dealt'][number]): string => `${deal.face ?? 'baksi
 
 /** Arkets rutor: första rutan, och sista rutan i varje del, med kortet den lade. */
 export function sheetTimes(plan: Plan, round: Round): { time: number; text: string }[] {
-  const ends = clipEnds(plan, round.film.hold);
+  const ends = clipEnds(plan, round.film.hold, round.speed.clips);
   const half = 0.5 / round.film.fps;
   return [
     { time: half, text: 'början' },
@@ -165,10 +174,14 @@ export function anchorsText(plan: Plan): string {
   return others.length === 0 ? text : `${text}; inte valda: ${others.map((one) => `${anchorName(one.anchor)} (${one.clips})`).join(', ')}`;
 }
 
-/** Det som sparas bredvid filmen om rundan: fröet och insatserna (så att den går att göra om), korten och utfallet. */
-function roundRecord(dealt: DealtRound, plan: Plan, dealer: string, viewWord: string) {
+/**
+ * Det som sparas bredvid filmen om rundan: fröet, insatserna och farten (så att den går att göra om), korten och
+ * utfallet.
+ */
+function roundRecord(dealt: DealtRound, plan: Plan, dealer: string, viewWord: string, speed: number) {
   return {
-    made: `node src/pipeline/runda.ts ${dealer} ${viewWord} --fro ${dealt.seed}`,
+    made: `node src/pipeline/runda.ts ${dealer} ${viewWord} --fro ${dealt.seed} --fart ${speed}`,
+    speed,
     seed: dealt.seed,
     bets: dealt.bets,
     hitBelow: dealt.hitBelow,
@@ -187,24 +200,33 @@ if (import.meta.main) {
   const positional: string[] = [];
   let seed: string | undefined;
   let seedMissing = false;
+  let fart: string | undefined;
+  let fartWrong = false;
   for (let index = 0; index < words.length; index++) {
     const word = words[index]!;
     if (word === '--fro') {
       seed = words[++index];
       seedMissing = !seed || seed.startsWith('--');
+    } else if (word === '--fart') {
+      fart = words[++index];
+      fartWrong = !isSpeed(Number(fart?.replace(',', '.')));
     } else if (word.startsWith('--')) flags.add(word);
     else positional.push(word);
   }
   const [dealer, viewWord] = positional;
-  if (!dealer || !viewWord || seedMissing) {
-    console.error('Använd: node src/pipeline/runda.ts <dealer> <spelaren|plats-N> [--fro <ord>] [--nara] [--plan]');
+  if (!dealer || !viewWord || seedMissing || fartWrong) {
+    if (fartWrong) console.error(`--fart ska vara ett tal ${PLAN_LIMITS.speed[0]}–${PLAN_LIMITS.speed[1]}, inte ${fart ?? 'inget'}.`);
+    console.error('Använd: node src/pipeline/runda.ts <dealer> <spelaren|plats-N> [--fro <ord>] [--fart <tal>] [--nara] [--plan]');
     process.exit(1);
   }
   let server: { url: string; stop(): void } | null = null;
   try {
     const root = studioRoot();
     const content = (file: string): unknown => JSON.parse(readFileSync(join(root, 'content', file), 'utf8'));
-    const round = readRound(content('runda.json'));
+    const saved = readRound(content('runda.json'));
+    // --fart gäller bara den här filmen; content/runda.json ändras inte.
+    const round: Round = fart === undefined ? saved : { ...saved, speed: { clips: Number(fart.replace(',', '.')) } };
+    const speed = round.speed.clips;
     const scene = readScene(content('scene.json'));
     const view = viewOfWord(viewWord);
     if (view.kind === 'plats' && !seatsOf(scene).includes(view.seat)) throw new RoundError(`Scenen har ingen plats ${view.seat}`);
@@ -216,6 +238,7 @@ if (import.meta.main) {
     console.log(`Rundan för ${dealer} ur ${viewWord}, frö ${dealt.seed}, insatser ${dealt.bets.map((bet) => `plats ${bet.seat}: ${bet.main}`).join(', ')}, Hit under ${dealt.hitBelow}.`);
     console.log(`Spelkärnan: ${dealt.steps.map((step) => [step.op, step.action].filter(Boolean).join(' ')).join(' → ')}. ${plan.dealt.length} kort, ${played} med dealerns klipp.`);
     console.log(`Ankare: ${anchorsText(plan)}.`);
+    console.log(`Fart: klippen i ${String(speed).replace('.', ',')}${fart === undefined ? ' (content/runda.json)' : ' (--fart)'}, kort utan klipp och väntan i 1; filmen i ${round.film.fps} rutor/s.`);
     plan.dealt.forEach((deal, index) =>
       console.log(`  ${index + 1}. ${deal.face ?? 'baksidan upp'}, ${dealName(deal)}: ${deal.file ? `${deal.file} (kortet ligger från ${comma(deal.at)} s)` : `utan klipp: går självt på ${comma(deal.seconds)} s`}`),
     );
@@ -225,12 +248,12 @@ if (import.meta.main) {
     if (settle) console.log(`Utfall: dealern ${settle.dealerTotal}${settle.dealerBlackjack ? ' (blackjack)' : ''}; ${settle.hands.map((hand) => `plats ${hand.seat}: ${hand.outcome}, ${hand.returned} tillbaka av ${hand.stake}`).join('; ')}. Kassan ${dealt.result.before} → ${dealt.result.after}.`);
     if (!flags.has('--plan')) {
       const background = backgroundOf(registry.assets.find((entry) => entry.file === round.film.background), scene);
-      const label = `runda-${dealer}-${dealt.seed}`;
+      const label = `runda-${dealer}-${dealt.seed}${speed === 1 ? '' : `-fart-${String(speed).replace('.', '-')}`}`;
       const orders = [roundOrder(plan, round, view, background, label), ...(flags.has('--nara') ? [roundOrder(plan, round, view, background, label, true)] : [])];
       const saved = await shootRound(root, server.url, orders, plan, round, (text) => console.error(text));
       for (const files of saved) {
         const record = files.film.replace(/\.mp4$/, '-runda.json');
-        writeFileSync(record, `${JSON.stringify(roundRecord(dealt, plan, dealer, viewWord), null, 2)}\n`);
+        writeFileSync(record, `${JSON.stringify(roundRecord(dealt, plan, dealer, viewWord, speed), null, 2)}\n`);
         console.log(`Sparad: ${files.film}\n  ark: ${files.sheet}\n  beskrivning: ${files.json}\n  rundan: ${record}`);
       }
     }

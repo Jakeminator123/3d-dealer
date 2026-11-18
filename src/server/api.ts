@@ -1,5 +1,5 @@
 // Serverns egna vägar: registret, filerna i assets/ och deras förhandsbilder, förlagorna som scenen sparar, kortplanen
-// som Labbet ställer (kortplan.ts), och spelsessionen (game.ts): Casinots runda mot spelkärnan, och rundan som Labbet
+// och klippens fart som Labbet ställer (kortplan.ts), och spelsessionen (src/game/game.ts): Casinots runda mot spelkärnan, och rundan som Labbet
 // och runda.ts visar.
 // Allt annat lämnas vidare (till Vite, som sköter sidorna).
 
@@ -12,7 +12,7 @@ import { PlanError, savePlan } from '../pipeline/kortplan.ts';
 import { assetsDir, RegistryError, setStatus, setWords, stamp, viewRegistry } from '../pipeline/registry.ts';
 import { readRound, RoundError } from '../pipeline/runda.ts';
 import { pathInside, sendFile, sendJson, sendText } from './files.ts';
-import { createGame, dealRound, type GameOptions } from './game.ts';
+import { createGame, dealRound, type GameOptions } from '../game/game.ts';
 import { canThumbnail, thumbnail } from './thumbs.ts';
 
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
@@ -152,8 +152,9 @@ export function createApi(root: string, now: () => string = stamp, gameOptions: 
       setWords(root, body.file, 'comment', body.comment, now());
       sendJson(response, 200, viewRegistry(root));
     } else if (path === '/api/kortplan' && request.method === 'POST') {
-      // Kortplanen som Labbet ställer (steget Kortplan): bara bågens, radens och kortens storleks tal, inom sina gränser,
-      // sparade i content/scene.json. Svaret är planen som den står efteråt.
+      // Kortplanen som Labbet ställer (steget Kortplan): bara bågens, radens och kortens storleks tal, sparade i
+      // content/scene.json, och klippens fart, sparad i content/runda.json, var och en inom sina gränser (plan.ts).
+      // Svaret är planen som den står efteråt.
       if (!sentByOwnPage(request)) return sendText(response, 403, 'Kortplanen tas bara emot från Labbets egen sida');
       sendJson(response, 200, { plan: savePlan(root, await readJson(request), now()) });
     } else if (path.startsWith('/api/forlaga/') && request.method === 'POST') {

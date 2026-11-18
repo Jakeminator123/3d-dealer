@@ -30,6 +30,7 @@ export type Rgb = readonly [number, number, number];
 /** Hur måtten tas, så som det står i content/tagning.json (measure). Vad varje tal är står där. */
 export type Measure = {
   cardPart: number;
+  frameMargin: number;
   mouthReach: number;
   merged: number;
   placeGrow: number;

@@ -30,5 +30,10 @@
     "most": 4,
     "basis": "antaget",
     "source": "Valt av agenten 2026-11-18 efter Jakobs ord om att dealern inte ska frysa medan spelet väntar. När följden väntar (vänta-klippet, action wait, spelas om och om efter sista klippet) och nästa kort kommer, går det pågående varvet klart innan kortets klipp börjar, så att bytet sker i REDO (src/scene/reel.ts, nextStart). most är hur många sekunder ett nytt kort högst väntar på det: är mer kvar av varvet börjar kortets klipp direkt, med ett hopp. 4 är ett varv av vänta-klippet som det är beställt (4 s), så att korten, pengarna och knapparna aldrig dröjer mer än ett varv. Ingenting är mätt."
+  },
+  "speed": {
+    "clips": 1,
+    "basis": "antaget",
+    "source": "Satt av agenten 2026-11-18 till 1 tills Jakob har valt; han ställer den i Labbets steg Kortplan och sparar den där. clips är farten dealerns klipp spelas i, i Labbet, Casinot och när rundan sparas som film (src/scene/reel.ts): 1 som de är filmade, högst 2 (PLAN_LIMITS.speed i src/scene/plan.ts). Kortets landning, märkkortet, glidningen till kortplanen och bytet till nästa klipp följer med. Vänta-klippet och kort utan klipp går alltid i sin egen takt. Skälet: en mätt dealer delar ett kort på 0,62–0,90 s, och Kling gör inga klipp under 3 s; resten av takten tas i uppspelningen."
   }
 }

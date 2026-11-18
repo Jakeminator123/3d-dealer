@@ -10,6 +10,7 @@ import { promisify } from 'node:util';
 import type { CardNote, CardSpot, ClipCard, DealerNote as Dealer, FilmClip, FilmEye, FilmNote, FilmShoe, OneClipNote, Rgb, Studio } from '../scene/dealer.ts';
 import type { Frame, Vec3 } from '../scene/description.ts';
 import { viewName, type SeatView, type View } from '../scene/geometry.ts';
+import { isSpeed } from '../scene/plan.ts';
 
 export class ForlagaError extends Error {}
 
@@ -171,7 +172,7 @@ function isDealer(dealer: Partial<DealerNote> | null | undefined): dealer is Dea
   }
   if (dealer.kind !== 'film' || !isSeatView(dealer.view)) return false;
   if ('clips' in dealer) {
-    const { clips, hold, loop, eye, shoe } = dealer as Partial<FilmNote>;
+    const { clips, hold, loop, speed, eye, shoe } = dealer as Partial<FilmNote>;
     return (
       Array.isArray(clips) &&
       clips.length >= 1 &&
@@ -179,6 +180,7 @@ function isDealer(dealer: Partial<DealerNote> | null | undefined): dealer is Dea
       clips.every(isClip) &&
       (hold === undefined || (isNumber(hold) && hold >= 0)) &&
       (loop === undefined || typeof loop === 'boolean') &&
+      (speed === undefined || isSpeed(speed)) &&
       (eye === undefined || isFilmEye(eye)) &&
       (shoe === undefined || isFilmShoe(shoe))
     );
@@ -213,6 +215,7 @@ function dealerNote(dealer: DealerNote): DealerNote {
       clips,
       ...(dealer.hold === undefined ? {} : { hold: dealer.hold }),
       ...(dealer.loop === undefined ? {} : { loop: dealer.loop }),
+      ...(dealer.speed === undefined ? {} : { speed: dealer.speed }),
       ...(dealer.eye
         ? { eye: { position: [...dealer.eye.position] as Vec3, forward: [...dealer.eye.forward] as Vec3, focalPx: dealer.eye.focalPx, frame: { width: dealer.eye.frame.width, height: dealer.eye.frame.height } } }
         : {}),

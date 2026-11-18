@@ -1,11 +1,9 @@
-// Det Casinot hämtar och skickar över HTTP: spelsessionen i servern (/api/game, src/server/game.ts), registrets poster,
-// beskrivningarna i content/ och filerna i assets/. Spelkärnan körs i servern; härifrån läses bara dess typer.
+// Studions sida av Casinots gränssnitt (link.ts), över HTTP: spelsessionen i servern (/api/game, src/game/game.ts),
+// registrets poster (/api/registry), beskrivningarna i content/ och filerna i assets/ (/media/). Spelkärnan körs i
+// servern; härifrån läses bara dess typer.
 
-import type { Snapshot } from '../engine/session.ts';
-import type { RoundEntry, RoundStep } from '../scene/round.ts';
-
-/** Bordet så som servern lämnar det: sessionens läge, och rundans steg hittills (tomt när ingen runda pågår). */
-export type Table = { state: Snapshot; steps: (RoundStep & { op: string })[] };
+import type { RoundEntry } from '../scene/round.ts';
+import type { Files, GameLink, Table } from './link.ts';
 
 export const mediaUrl = (file: string): string => `/media/${file.split('/').map(encodeURIComponent).join('/')}`;
 
@@ -16,24 +14,25 @@ async function answer<T>(response: Response, failure: string): Promise<T> {
   return body;
 }
 
-export const fetchTable = async (): Promise<Table> => answer(await fetch('/api/game'), 'Bordet gick inte att läsa');
+const post = (path: string, body: unknown): Promise<Response> =>
+  fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 
-/** Ett kommando till spelkärnan (start, act, insurance, collect), med ett eget requestId och versionen bordet står på. */
-export async function sendCommand(table: Table, command: Record<string, unknown>): Promise<Table> {
-  const body = { ...command, requestId: crypto.randomUUID(), expectedVersion: table.state.ver };
-  return answer(await fetch('/api/game', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }), 'Spelkärnan sade nej');
-}
+/** Spelsessionen i servern. */
+export const serverGame: GameLink = {
+  where: 'i servern',
+  lasts: 'Sessionen börjar om när servern startar om.',
+  table: async (): Promise<Table> => answer(await fetch('/api/game'), 'Bordet gick inte att läsa'),
+  command: async (body): Promise<Table> => answer(await post('/api/game', body), 'Spelkärnan sade nej'),
+  reset: async (): Promise<Table> => answer(await post('/api/game/ny', {}), 'En ny session gick inte att börja'),
+};
 
-/** En ny session: ny sko och ny kassa. */
-export const newSession = async (): Promise<Table> =>
-  answer(await fetch('/api/game/ny', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }), 'En ny session gick inte att börja');
-
-/** Registrets poster: dealerns klipp och rummet. */
-export const fetchEntries = async (): Promise<RoundEntry[]> => (await answer<{ assets: RoundEntry[] }>(await fetch('/api/registry'), 'Registret gick inte att läsa')).assets;
-
-/** En beskrivning ur content/, läst med `read`. */
-export async function fetchContent<T>(file: string, read: (value: unknown) => T): Promise<T> {
-  const response = await fetch(`/content/${file}`);
-  if (!response.ok) throw new Error(`content/${file} gick inte att läsa (${response.status})`);
-  return read(await response.json());
-}
+/** Registrets poster, content/ och assets/ genom servern. */
+export const serverFiles: Files = {
+  async content<T>(file: string, read: (value: unknown) => T): Promise<T> {
+    const response = await fetch(`/content/${file}`);
+    if (!response.ok) throw new Error(`content/${file} gick inte att läsa (${response.status})`);
+    return read(await response.json());
+  },
+  entries: async (): Promise<RoundEntry[]> => (await answer<{ assets: RoundEntry[] }>(await fetch('/api/registry'), 'Registret gick inte att läsa')).assets,
+  url: mediaUrl,
+};

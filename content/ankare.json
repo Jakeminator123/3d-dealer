@@ -1,0 +1,90 @@
+{
+  "schemaVersion": 1,
+  "about": "Ankaret: allt ett REDO-ankare för en dealer ur en vy görs av och prövas mot, utom scenen, dockan och dealern (scene.json, doll.json, moves/, dealers/). Läses av src/pipeline/ankare.ts (förbered, ta-emot) och de lokala stegen i src/pipeline/ankarbild.ts. Texterna har platshållare som src/pipeline/dealer.ts fyller (fillText): {ord} är dealerns ord eller ankarets egna (grid, gaze), {ord?text} står bara när ordet finns och {ord!text} bara när det inte gör det. Bildpunkter (bp) är i vyns ruta, 1920 × 1080. Varje grupp bär basis (mätt eller antaget) och en källa.",
+  "underlag": {
+    "move": "cykel-nyp",
+    "seat": 4,
+    "index": 0,
+    "basis": "antaget",
+    "source": "Dockans REDO: cykelns första ruta (tid 0) ur vyns närbild i ateljén (scene.json, studio), med scenens sko, som ankarna spelaren-redo-2 och -3 gjordes ur (då givens giv-nyp-plats-4 vid tid 0, samma ställning: dollPose.ts, cycled). REDO är gemensamt för alla cykler, så cykeln och kortplatsen här ändrar inte ställningen; klippen börjar och slutar i den."
+  },
+  "steps": [
+    {
+      "step": "ställning",
+      "tool": "generate_image",
+      "model": "nano-banana-pro",
+      "sideModel": "nano-banana-2.1",
+      "imageSize": "2K",
+      "ratio": "16:9",
+      "credits": 20,
+      "references": [
+        { "tag": "pose", "from": "underlag" },
+        { "tag": "face", "from": "ansikte" },
+        { "tag": "outfit", "from": "helkropp" },
+        { "tag": "hands", "from": "händer" }
+      ],
+      "text": [
+        "Edit @pose. @pose is a 3D render from a fixed camera: a plain white mannequin sits behind a green table that has a {grid} grid on it. The mannequin's left hand (on the right side of the picture) pinches the top edge of a yellow card in the mouth of a black card shoe; its right hand (on the left side of the picture) rests on the table at the table's front edge. Both mannequin hands are skin-coloured.",
+        "Keep everything in @pose exactly as it is, at the same pixels and the same size: the 16:9 framing and crop, the camera, the flat uniform bright green background, the lighter green table with its grid lines and its front edge, the black card shoe, and the plain yellow card standing in the shoe's mouth.",
+        "The only change: replace the white mannequin with the real {person} from @face, @outfit and @hands, as a sharp, photorealistic studio photograph. {She} takes exactly the mannequin's pose, position and size: {her} head where the mannequin's head is, {her} shoulders on its shoulders, {her} arms along its arms. {Her} left hand (right side of the picture) pinches the top edge of the yellow card in the shoe's mouth between thumb and fingers, exactly where the mannequin's skin-coloured hand is. {Her} right hand (left side of the picture) rests relaxed and flat on the table at its front edge, exactly where the mannequin's skin-coloured hand is. The mannequin's skin-coloured hands show the true size of {her} hands: draw {her} hands at that size, no larger.",
+        "{She} sits upright and close behind the table, facing the camera. {Her} head faces the same way as the mannequin's head, and {she} looks {gaze}. {Her} eyes are open and awake, irises and pupils visible. A calm, friendly, alert expression, mouth closed, lips relaxed, a hint of a smile. Not sleepy, not heavy-lidded, not looking at the camera.",
+        "{Her} upper body continues down behind the table: {her} clothes reach all the way down to the table's front edge, where the table top hides the rest of {her} body. No green gap between {her} clothes and the table edge.",
+        "{Her} appearance, from @face and @outfit: the same face; {hair?{hair}}{hair!the same hair as in @face}{marks?; the same {marks}}{jewellery?; the {jewellery}}; {outfit}. {handMarks?{Her} hands carry {her} tattoos from @hands: {handMarks}.}{handMarks!{Her} hands are as in @hands: bare skin, without tattoos.} Same soft, even, frontal studio light as in @face.",
+        "No rings, {jewellery?no other jewellery}{jewellery!no jewellery}, no text, no shadows on the green, no other objects or cards. The yellow card stays a plain flat yellow rectangle with no print."
+      ]
+    },
+    {
+      "step": "likhet",
+      "tool": "generate_image",
+      "model": "gpt-image-2.6-sunburst",
+      "imageSize": "2K",
+      "ratio": "16:9",
+      "outputFormat": "png",
+      "credits": 9,
+      "references": [
+        { "tag": "base", "from": "ställning" },
+        { "tag": "face", "from": "ansikte" }
+      ],
+      "text": [
+        "Edit @base. Change only {her} head: face, eyes and hair. Keep everything else in @base exactly as it is, at the same pixels and the same size: the framing and crop, the flat green background, the green table with its grid, the card shoe, the yellow card, {her} clothes{marks?, {her} tattoos}{jewellery?, the {jewellery}}, and both hands{handMarks? with their tattoos}, their size and their position. Do not move, redraw or resize anything below the chin.",
+        "{Her} face is exactly the {person} in @face: the same facial features, eyebrows, eye shape, nose, lips, natural skin texture with visible pores, and the same make-up. {Her} hair is as in @face{hair?: {hair}}. Same soft, even, frontal studio light as in @base.",
+        "{Her} head keeps the direction it has in @base, and {she} looks {gaze}. {Her} eyes are open and awake, the irises clearly visible. A calm, friendly, alert expression with a slight smile, mouth closed. Not sleepy, not heavy-lidded, eyes not closed, not looking at the camera."
+      ]
+    }
+  ],
+  "words": {
+    "gaze": "down at the table top just in front of {her}, not at the card shoe",
+    "basis": "antaget",
+    "source": "gaze: dockans blick i REDO, mot kortplatsen mitt på bordet och aldrig mot skon (content/doll.json, gaze.ready; dollPose.ts, readyGaze), i ord som texten till ankaret spelaren-redo-3 (output/work/ankare-3/text-huvud.txt). grid: rutnätets steg i ateljén (scene.json, studio.grid.step), räknat av ankare.ts."
+  },
+  "order": {
+    "reference": 2048,
+    "basis": "antaget",
+    "source": "Texterna och modellerna ur receptet som gjorde spelaren-redo-2 (docs/production.md, Ankaret steg för steg; output/work/ankare-2/text-stallning.txt och text-likhet.txt, beställningarna 2211a9e1-1634-41ee-8dfb-7728756a5a6e och 94ff1d10-ee13-4160-8f8f-92f9915bc92c), med dealerns ord i stället för Paulinas och utan referensen @look (det gamla ankaret, som en ny dealer inte har). Ställningen håller underlagets geometri inom 4 bp (mätt där); från sidan sideModel, eftersom Pro vände henne mot kameran i fyra försök av fyra. credits: mätt för spelaren-redo-2 (20 och 9). reference: identitetsbilderna förminskas till högst så många bp på längden (output/work/ankare-2/gor-ref.ts). Blicken följer dockans REDO sedan 2026-11-18 kväll (words.gaze), inte skon som i texten till spelaren-redo-2."
+  },
+  "local": {
+    "flatten": { "share": 0.55, "least": 70, "shadow": 25, "shadowLeast": 45, "sample": [0.01, 0.02, 0.16, 0.17] },
+    "hands": { "reach": 200, "seek": 40, "close": 6, "dark": 40, "area": 1.2, "least": 0.55, "most": 1, "keep": 0.97 },
+    "head": { "collar": 1.1, "reach": 30 },
+    "waist": { "reach": 12, "below": 1, "sample": [3, 9] },
+    "clean": { "holeMost": 12, "spotMost": 9, "keepLeast": 2000, "holeSmall": 400 },
+    "edges": { "every": 40, "rows": 150, "least": 10, "most": 8 },
+    "basis": "antaget",
+    "source": "Talen ur skripten som gjorde spelaren-redo-2 för hand (output/work/ankare-2/, giv-4/), nu i src/pipeline/ankarbild.ts. flatten (platta-gront.ts med skuggor): skärm när grönheten är minst share av skärmens egen (medianen i rutan sample, andelar av rutan: x0, y0, x1, y1) och grönt över least, eller grönt minst shadow över rött och blått med grönt från shadowLeast. hands (krymp-hand-2.ts, strikt): handen inom reach bp från dockans hand, början inom seek bp, huden sluten med close bp, ärm och sko under ljusheten dark. Skalan är roten ur area × dockans hudyta i underlaget / handens hudyta, inom least … most, och handen står kvar när skalan är minst keep: area 1,2 är valt så att likhetsbilden i ankare-2 får skalan 0,69 och 0,72 (de för hand valda var 0,71 och 0,70, som ger 1,27 och 1,14: dockans händer visar mindre av handryggen än en hand i REDO; mätt med output/work/mall/hander.ts). Givhanden skalas kring där fingrarna rör kortet och läggs där dockans fingrar rör det; den vilande kring sin ände mot ärmen, där den står kvar. head (klistra-huvud.ts): när likheten har flyttat skon eller bordskanten mer än edges.most bp läggs bara dess huvud på ställningens bild, ovanför raden collar × huvudets radie under huvudets mitt, förskjutet inom ±reach bp. waist (fyll-midja.ts): kläderna förs ned till dealerns bordskant + below där de slutar inom reach bp ovanför den, med klädernas färg sample rader ovanför fållen. clean (rent.ts): hål om högst holeMost bp fylls och lösa delar om högst spotMost bp blir skärm; en del under keepLeast bp räknas som fläck, och ett hål under holeSmall bp som grönt i hår eller tatueringar. edges (bordskant.ts): bordskanten mäts var every:e kolumn utanför dealern och skon, inom rows rader från den räknade, där grönt ökar minst least."
+  },
+  "limits": {
+    "skon": { "what": "skons mörka ruta mot underlagets, största kantavvikelse", "unit": "bp", "most": 3, "source": "spelaren-redo-2: 1 bp (mätt); ställningen höll skon inom 4 bp (docs/production.md)" },
+    "skonOverlapp": { "what": "skons silhuett (det som inte är grönt i skons ruta, utom kring givhanden) mot underlagets, skärning genom förening", "unit": "", "least": 0.9, "source": "granskaren av spelaren-redo-2: silhuetten 0,96 (output/work/granskning-ankare-2/sko-silhuett.ts)" },
+    "kortet": { "what": "det gula kortet i mynningen mot underlagets, största kantavvikelse", "unit": "bp", "most": 3, "source": "spelaren-redo-2: 1 bp (mätt)" },
+    "bordskant": { "what": "bordskanten i bildmodellens bild mot underlagets, värsta kolumnen utanför dealern och skon", "unit": "bp", "most": 4, "see": 2, "source": "spelaren-redo-2: 0–2 bp i sju kolumner (mätt); Nano Banana Pro höll 4 bp (docs/production.md)" },
+    "givhanden": { "what": "givhandens hudyta bortom handleden mot dockans hudfärgade hand i underlaget", "unit": "gånger", "least": 0.8, "most": 1.5, "see": 1.35, "source": "spelaren-redo-2, som granskaren fann i dockans storlek: 1,29 (mätt med samma mått, output/work/mall/prova-ankare-2.ts). Dockans händer visar mindre av handryggen än en verklig hand i REDO, så rätt storlek är mer än 1. Gränserna är agentens: 1,5 i yta är 1,22 gånger på längden" },
+    "vilandeHanden": { "what": "den vilande handens hudyta bortom handleden mot dockans; handleden räknas från handens egen ände mot ärmen", "unit": "gånger", "least": 0.8, "most": 1.5, "see": 1.35, "source": "spelaren-redo-2: 1,22 (mätt som givhanden); gränserna som givhanden" },
+    "gront": { "what": "inre skärmen som avviker mer än 12 från den gröna", "unit": "%", "most": 0.1, "source": "content/tagning.json, limits.gront: samma mått som ett klipp (matning.ts, greenOff)" },
+    "glipa": { "what": "kolumner med glipa mellan kläderna och bordskanten i midjans band", "unit": "kolumner", "most": 0, "source": "docs/production.md: kavajen går ned till bordskanten; spelaren-redo-2: 0 (mätt, matning.ts gapIn)" },
+    "hal": { "what": "skärm innesluten i dealern eller skon, mindre än local.clean.holeSmall bp: grönt i hår och tatueringar, eller en naturlig glipa (läget står i matning.json)", "unit": "hål", "most": 8, "see": 2, "source": "spelaren-redo-2: 2 (79 bp mellan hår och hals, 33 bp mellan tumme och pekfinger; granskaren: ingen skärm innesluten i tatueringarna). Måttet skiljer inte en glipa från grönt i en tatuering: se efter var hålen ligger" },
+    "flackar": { "what": "lösa delar som inte är skärm (under local.clean.keepLeast bp)", "unit": "delar", "most": 3, "see": 0, "source": "spelaren-redo-2: 1, ett löst hårstrå vid 1055,160 som granskaren noterade (mätt)" },
+    "delvisInne": { "what": "bildpunkter inne i dealern som nyckeln delvis tar bort (mer än 2 bp från skärmen)", "unit": "bp", "most": 50, "source": "antaget; spelaren-redo-2: 7 (mätt, rent.ts)" },
+    "basis": "antaget",
+    "source": "Gränserna för ett ankare, mätta av ankare.ts ta-emot i den färdiga bilden mot underlaget (och bordskanten i bildmodellens bild före plattningen). Ett mått utanför sin gräns underkänner inte ankaret, men det syns direkt; en oberoende granskare dömer det i full storlek."
+  }
+}

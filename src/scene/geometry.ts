@@ -367,13 +367,16 @@ export function closeEye(scene: SceneDescription, from: Eye): Eye {
 
 /**
  * Varifrån scenen betraktas. Spelaren är spelarens öga på kamerans plats, och en plats är samma sorts öga flyttat dit.
- * Med `close` är det vyns närbild: samma öga inzoomat på dealern, rutan en dealerfilm görs i.
+ * Med `close` är det vyns närbild: samma öga inzoomat på dealern, rutan en dealerfilm görs i. Med `eye` är vyn låst
+ * till ett öga som det står, till exempel det ett REDO-ankare är gjort genom (src/pipeline/tagning.ts, forbered), så att
+ * dockans film görs genom ankarets öga också när närbilden har räknats om.
  */
-export type SeatView = { kind: 'spelaren'; close?: boolean } | { kind: 'plats'; seat: number; close?: boolean };
+export type SeatView = { kind: 'spelaren'; close?: boolean; eye?: Eye } | { kind: 'plats'; seat: number; close?: boolean; eye?: Eye };
 export type View = SeatView;
 
-/** Ögat som en vy står i. */
+/** Ögat som en vy står i: det låsta ögat när vyn har ett. */
 export function viewEye(scene: SceneDescription, view: View): Eye {
+  if (view.eye) return view.eye;
   const eye = view.kind === 'spelaren' ? playerEye(scene) : seatEye(scene, view.seat);
   return view.close ? closeEye(scene, eye) : eye;
 }

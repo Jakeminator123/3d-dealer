@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "about": "Mallen för en dealer: vad en dealers fil (content/dealers/<id>.json) bär och vad som gäller när den inte säger något, identitetsbildernas slag, orden texterna fylls med, och vad som krävs för att hon ska vara spelbar ur en vy. Läses av src/pipeline/dealer.ts. Texterna som fylls står i content/identitet.json, content/ankare.json och content/tagning.json. Varje grupp bär basis (mätt eller antaget) och en källa.",
+  "file": {
+    "id": "samma som filens namn och registrets dealer: små bokstäver, siffror och bindestreck",
+    "name": "visningsnamnet",
+    "looks": "orden om just henne som texterna till bildmodellerna och Kling fylls med, på engelska som texterna (keys nedan); det som inte står gäller inte henne, eller står på mallens vis (person, outfit)",
+    "identity.images": "hennes identitetsbilder: registernamnet under assets/ (file) och vad bilden visar (shows, ett av roles); den första med ett slag är den som linjen använder för det",
+    "anchors.redo": "vyns REDO-ankare (spelaren eller plats-N): registernamnet under assets/. Pekas ut med node src/pipeline/ankare.ts använd när ankaret är godkänt",
+    "basis": "antaget",
+    "source": "Agentens, 2026-11-18, när det som gällde Paulina flyttade hit ur content/tagning.json (redo.anchors), textmallarna och registret."
+  },
+  "roles": {
+    "källa": { "what": "en bild av personen som de andra görs ur: ett fotografi eller en bild Jakob lämnar", "need": false },
+    "ansikte": { "what": "ansikte och hals i dealerns kläder, framifrån, skarpt", "tag": "face", "need": true },
+    "helkropp": { "what": "hela kroppen stående i dealerns kläder, med händerna synliga", "tag": "outfit", "need": true },
+    "händer": { "what": "händernas ovansida uppifrån, närbild, med manschetterna", "tag": "hands", "need": true },
+    "sida": { "what": "snett från sidan; ges inte till ställningen om bord och sko syns i den (docs/production.md)", "need": false },
+    "sittande": { "what": "sittande vid ett bord", "need": false },
+    "foto": { "what": "ett fotografi som visar en detalj, till exempel tatueringarna; publiceras inte", "need": false },
+    "basis": "antaget",
+    "source": "Agentens, 2026-11-18, efter de bilder ankarna gjordes med (docs/production.md, Ankaret steg för steg: ansikte, helkropp, händer) och Paulinas identitetsbilder i registret. need: linjen behöver slaget för ankarets ställning och likhet; de andra är hennes men används inte av den."
+  },
+  "looks": {
+    "keys": {
+      "person": "vad hon är i texterna, som \"woman\"; utan: people för pronomenet",
+      "pronoun": "she eller he: platshållarna {she}, {She}, {her} och {Her} är skrivna som för en kvinna och blir he, He, his och His för en man",
+      "hair": "håret, med artikel: \"a blonde chin-length bob ...\". Skriv blonde, inte golden-blonde (docs/production.md)",
+      "outfit": "kläderna, med artikel; utan: uniform",
+      "jewellery": "smycket, utan artikel: \"thin necklace with ...\"; utan: inga smycken",
+      "marks": "det som alltid ska synas på kroppen utom händerna, utan \"the same\": tatueringar, märken",
+      "handMarks": "det som alltid ska synas på händerna; utan: händerna är bara hud"
+    },
+    "uniform": "a fitted black single-button blazer, buttoned, with long sleeves to the wrists, over a cream V-neck blouse",
+    "people": { "she": "woman", "he": "man" },
+    "pronouns": {
+      "she": { "she": "she", "She": "She", "her": "her", "Her": "Her" },
+      "he": { "she": "he", "She": "He", "her": "his", "Her": "His" }
+    },
+    "basis": "antaget",
+    "source": "Agentens, 2026-11-18. uniform: Paulinas kläder i ankarna (output/work/ankare-2/text-stallning.txt), som dealerns kläder när hennes fil inte säger andra. {her} används bara som ägande (her hands), så att det blir his för en man."
+  },
+  "series": {
+    "first": ["1/0", "1/1", "2/0", "2/1", "3/0", "3/1", "4/0", "4/1", "5/0", "5/1", "6/0", "6/1", "7/0", "7/1", "D/0", "D/1/hole", "D/1/flip", "D/0/wait"],
+    "then": ["1/2", "2/2", "3/2", "4/2", "5/2", "6/2", "7/2", "D/2", "D/3"],
+    "basis": "antaget",
+    "source": "Agentens, 2026-11-18, efter serien i docs/status.md: först spelarnas två kort, dealerns öppna kort, hålkortet, vändningen och vänta-klippet (spelbar ur vyn när alla är godkända), sedan spelarnas tredje kort och dealerns extrakort. Ett kort skrivs plats/kort, med handlingen efter när den inte är deal (dollPose.ts, Action). Ett kort utan klipp går ändå i rundan, utan dealerns rörelse (content/runda.json, fallback)."
+  }
+}

@@ -14,11 +14,14 @@ const project = resolve(import.meta.dirname, '..', '..');
 let root: string;
 const file = () => join(root, 'content', 'scene.json');
 const text = () => readFileSync(file(), 'utf8');
+const roundFile = () => join(root, 'content', 'runda.json');
+const roundText = () => readFileSync(roundFile(), 'utf8');
 
 before(() => {
   root = mkdtempSync(join(tmpdir(), 'kortplan-'));
   mkdirSync(join(root, 'content'));
   copyFileSync(join(project, 'content', 'scene.json'), file());
+  copyFileSync(join(project, 'content', 'runda.json'), roundFile());
 });
 after(() => rmSync(root, { recursive: true, force: true }));
 
@@ -73,4 +76,33 @@ test('en kortplan utanför gränserna eller med andra fält skrivs inte', () => 
     assert.throws(() => savePlan(root, wrong, '2026-11-18 17:20'), PlanError);
   }
   assert.equal(text(), before);
+});
+
+test('klippens fart sparas i content/runda.json inom 1–2, och en fil vars tal inte ändras skrivs inte', () => {
+  const scene = text();
+  const round = roundText();
+  const plan = planOf(readScene(JSON.parse(scene)))!;
+  // Bara farten ändras: scenen står kvar tecken för tecken, och i rundan byts talet och tiden läggs till.
+  assert.deepEqual(savePlan(root, { ...plan, speed: 1.5 }, '2026-11-18 18:00'), { ...plan, speed: 1.5 });
+  assert.equal(text(), scene);
+  const written = JSON.parse(roundText());
+  assert.deepEqual(written.speed, { ...JSON.parse(round).speed, clips: 1.5, setInLab: 'Jakob i Labbet 2026-11-18 18:00' });
+  const old = round.split('\n');
+  const now = roundText().split('\n');
+  assert.equal(now.length, old.length + 1);
+  assert.deepEqual(now.filter((line) => !old.includes(line)).map((line) => line.trim()), ['"clips": 1.5,', '"setInLab": "Jakob i Labbet 2026-11-18 18:00",']);
+  // Samma fart en gång till: ingenting skrivs, inte ens tiden.
+  const once = roundText();
+  savePlan(root, { ...plan, speed: 1.5 }, '2026-11-18 18:05');
+  assert.equal(roundText(), once);
+  // Utanför gränserna, eller inget tal: ingen av filerna rörs.
+  for (const speed of [0.9, 2.5, '1,5', null]) assert.throws(() => savePlan(root, { ...plan, scale: 1.3, speed }, '2026-11-18 18:10'), /speed 1 … 2/);
+  assert.equal(text(), scene);
+  assert.equal(roundText(), once);
+  // Gränserna själva går, och tillbaka i 1 är rundan som förut, så när som på tiden.
+  savePlan(root, { ...plan, speed: 2 }, '2026-11-18 18:15');
+  assert.equal(JSON.parse(roundText()).speed.clips, 2);
+  savePlan(root, { ...plan, speed: 1 }, '2026-11-18 18:20');
+  assert.equal(roundText().replace(/\n\s*"setInLab": "[^"]*",/, ''), round);
+  assert.equal(text(), scene);
 });

@@ -11,7 +11,8 @@
     "stop": "node src/server/background.ts stop",
     "test": "node --test \"src/**/*.test.ts\"",
     "typecheck": "tsc --noEmit",
-    "reg": "node src/pipeline/registry.ts"
+    "reg": "node src/pipeline/registry.ts",
+    "build:visning": "node src/visning/bygg.ts"
   },
   "dependencies": {
     "react": "^19.3.1",

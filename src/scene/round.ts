@@ -15,6 +15,7 @@ import { captureHeightOf, type Background } from './backdrop.ts';
 import { sameSpot, type CardSpot, type FilmClip, type FilmEye, type FilmNote, type FilmShoe } from './dealer.ts';
 import type { FeltPoint, SceneDescription } from './description.ts';
 import type { SeatView } from './geometry.ts';
+import { isSpeed, PLAN_LIMITS } from './plan.ts';
 
 export class RoundError extends Error {}
 
@@ -41,13 +42,15 @@ export type DealtRound = {
  * insatserna per plats, och hur spelarna spelar (Hit så länge handen är under `hitBelow`, annars Stand; ingen
  * försäkring). `fallback` är hur länge ett kort utan klipp går självt: från skon (`seconds`), vänt där det ligger
  * (`turn`) och flyttat när en hand delas (`move`). `film` är hur rundan sparas som film. `wait.most` är hur länge ett
- * nytt kort högst väntar på att väntans varv ska gå klart (reel.ts, nextStart), i sekunder.
+ * nytt kort högst väntar på att väntans varv ska gå klart (reel.ts, nextStart), i sekunder. `speed.clips` är farten
+ * dealerns klipp spelas i, inom PLAN_LIMITS.speed (plan.ts; FilmNote `speed`); vänta-klippet går alltid i 1.
  */
 export type Round = {
   deal: { seed: string; bets: { seat: number; main: number }[]; hitBelow: number };
   fallback: { seconds: number; turn: number; move: number };
   film: { background: string; fps: number; hold: number };
   wait: { most: number };
+  speed: { clips: number };
 };
 
 /** Den första handen på en plats, och kortplatsen som ord: `plats 4, kort 1`, `plats 4, hand 2, kort 0`, `dealern, kort 1`. */
@@ -76,12 +79,14 @@ export function readRound(value: unknown): Round {
   need(typeof film?.background === 'string' && film.background !== '', 'film.background');
   need(isPositive(film?.fps) && isNumber(film?.hold) && film.hold >= 0, 'film.fps och film.hold');
   need(isNumber(round.wait?.most) && round.wait.most >= 0, 'wait.most');
+  need(isSpeed(round.speed?.clips), `speed.clips ${PLAN_LIMITS.speed[0]} … ${PLAN_LIMITS.speed[1]}`);
   if (wrong.length > 0) throw new RoundError(`Rundan i content/runda.json går inte att använda: ${wrong.join('; ')}`);
   return {
     deal: { seed: deal!.seed, bets: bets.map((bet) => ({ seat: bet.seat, main: bet.main })), hitBelow: deal!.hitBelow },
     fallback: { seconds: fallback!.seconds, turn: fallback!.turn, move: fallback!.move },
     film: { background: film!.background, fps: film!.fps, hold: film!.hold },
     wait: { most: round.wait!.most },
+    speed: { clips: round.speed!.clips },
   };
 }
 
@@ -307,13 +312,26 @@ export function dealName(deal: Deal): string {
   return `${spotName(deal)}${deal.action === 'deal' ? ' (deal)' : what}`;
 }
 
+/** Rundans fart som den står i en dealerfilm (FilmNote `speed`): ingenting i 1, som klippen är filmade. */
+export const speedOf = (round: Round): { speed?: number } => (round.speed.clips === 1 ? {} : { speed: round.speed.clips });
+
 /**
  * Rundan som dealerfilm: delarna i spelordning, gjorda i vyn `view`, med varje kort kvar från att det har landat, och
- * sista rutan kvar rundans `hold` sekunder innan följden börjar om. Med `loop: false` står sista rutan kvar.
+ * sista rutan kvar rundans `hold` sekunder innan följden börjar om, i rundans fart (speedOf). Med `loop: false` står
+ * sista rutan kvar.
  */
 export function roundFilm(plan: Plan, round: Round, view: SeatView, loop = true): FilmNote {
   if (plan.clips.length === 0) throw new RoundError('Rundan har inga kort att spela');
-  return { kind: 'film', view, clips: plan.clips, hold: round.film.hold, ...(loop ? {} : { loop: false }), ...(plan.eye ? { eye: plan.eye } : {}), ...(plan.shoe ? { shoe: plan.shoe } : {}) };
+  return {
+    kind: 'film',
+    view,
+    clips: plan.clips,
+    hold: round.film.hold,
+    ...(loop ? {} : { loop: false }),
+    ...speedOf(round),
+    ...(plan.eye ? { eye: plan.eye } : {}),
+    ...(plan.shoe ? { shoe: plan.shoe } : {}),
+  };
 }
 
 /**
@@ -346,6 +364,24 @@ export function waitClip(entries: RoundEntry[], dealer: string, view: SeatView, 
     if (!best || take > best.take || (take === best.take && order > best.order)) best = { file: entry.file, take, order };
   });
   return (best as { file: string } | null)?.file ?? null;
+}
+
+/**
+ * Klippen som en runda ur REDO-ankaret `anchor` kan spela för dealern och vyn, vilka kort spelkärnan än delar: för varje
+ * kort som ankaret har ett klipp till (plats, kortets nummer, action) det klipp som planRound väljer, och vänta-klippet
+ * (waitClip). Så vet visningen vilka filer den behöver.
+ */
+export function clipsOf(entries: RoundEntry[], dealer: string, view: SeatView, anchor: string | null): string[] {
+  const own = entries.filter((entry) => anchorOf(entry) === anchor);
+  const deals = new Map<string, Deal>();
+  for (const entry of own) {
+    if (entry.dealer !== dealer || entry.use !== 'dealerfilm' || !sameView(entry.view, view) || !isCycle(entry) || entry.action === 'wait') continue;
+    const take = takeOf(entry);
+    if (typeof take !== 'string') deals.set(clipKey(take.seat, take.index, take.action), { seat: take.seat, hand: 0, index: take.index, face: null, action: take.action });
+  }
+  const plan = planRound([...deals.values()], own, dealer, view, { seconds: 1, turn: 1, move: 1 });
+  const wait = waitClip(own, dealer, view, anchor);
+  return [...new Set([...plan.dealt.flatMap((deal) => (deal.file ? [deal.file] : [])), ...(wait ? [wait] : [])])];
 }
 
 /**

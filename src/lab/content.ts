@@ -37,7 +37,10 @@ export async function fetchAll(): Promise<Content> {
   return { scene, doll, round, dealt };
 }
 
-/** Sparar kortplanen i content/scene.json genom servern, och ger den som den står efteråt, eller serverns skäl. */
+/**
+ * Sparar kortplanen genom servern, i content/scene.json och farten i content/runda.json, och ger den som den står
+ * efteråt, eller serverns skäl.
+ */
 export async function savePlan(plan: CardPlan): Promise<CardPlan> {
   const response = await fetch('/api/kortplan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(plan) });
   const body = (await response.json().catch(() => null)) as { plan?: CardPlan; error?: string } | null;

@@ -9,49 +9,58 @@ import { join, resolve } from 'node:path';
 import { after, before, test } from 'node:test';
 import sharp from 'sharp';
 import { probe } from './matning.ts';
-import { about, createRegister, getEntry } from './registry.ts';
+import { about, createRegister, getEntry, importAsset } from './registry.ts';
+import { readDealer, readMall, wordsOf } from './dealer.ts';
 import { cardWords, clipFile, forbered, formatFor, matOm, nextTake, packageId, promptFor, readTagning, registrera, taEmot, type PostFile } from './tagning.ts';
 import { readScene } from '../scene/description.ts';
-import { viewEye } from '../scene/geometry.ts';
+import { cardPlace, type Seat } from '../scene/dollPose.ts';
+import { cardCorners, see, viewEye, type Eye } from '../scene/geometry.ts';
 
 const root = resolve(import.meta.dirname, '..', '..');
 const scene = readScene(JSON.parse(readFileSync(join(root, 'content', 'scene.json'), 'utf8')));
 const content = readTagning(root);
-// Vyns REDO-ankare står i content/tagning.json; provet följer det som står där i stället för ett eget namn.
-const redoAnchor = content.redo.anchors.paulina!.spelaren!;
+// Vyns REDO-ankare och orden för texten står i dealerns fil; provet följer det som står där i stället för ett eget namn.
+const paulina = readDealer(root, 'paulina');
+const redoAnchor = paulina.anchors.redo.spelaren!;
+const words = wordsOf(paulina, readMall(root));
 const quiet = () => {};
 
 test('texten är pilotens med granskarens fras, rättelsen och orden om hur hon rör sig, och samma för varje plats', () => {
-  const text = promptFor(content);
+  const text = promptFor(content, 'deal', words);
   assert.ok(!/[{}]/.test(text), 'inga platshållare');
+  // Det som gäller dealern står i hennes fil: tatueringarna på händerna står bara för den som har dem.
+  assert.ok(text.includes('the same size as in the first frame, with the same tattoos.'), 'handtatueringarna ur dealerns fil');
+  assert.ok(promptFor(content).includes('the same size as in the first frame.') && !promptFor(content).includes('tattoo'), 'utan tatueringar för en dealer utan');
   assert.ok(text.includes('carries it low over the table to its place, where the last frame shows it'), 'granskarens första fras');
   // Granskarens andra fras ("her head turns with it from the shoe to the card's place") beskrev den gamla dockan och är
-  // ersatt av orden om blick, huvud och bål (2026-11-18, output/work/rorelse/forslag.md); de säger inte heller var platsen är.
-  assert.ok(text.includes('they go ahead of the card to its place') && text.includes('She moves like a living person, never like a mannequin'), 'orden om hur hon rör sig');
+  // ersatt av rapportens ord om en verklig dealer (2026-11-18, kväll, output/work/verklig-dealer/rapport.md): en snabb,
+  // van giv, huvudet mot spelaren och aldrig mot skon, och knuffen; de säger inte heller var platsen är.
+  assert.ok(text.includes('A quick, practised deal') && text.includes('her head turns toward the player she deals to') && text.includes('never toward the shoe'), 'orden om hur hon rör sig');
+  assert.ok(text.includes('nudge it into place') && !text.includes('back to the shoe just before') && !text.includes('breathes'), 'knuffen, och inget om blicken till skon eller andning');
   assert.ok(text.includes('the next card stays down in the opening and is not lifted with it'), 'pilotens rättelse');
   assert.ok(!text.includes('in front of her,') && !text.includes('middle of the table'), 'inga ord om plats 4');
   assert.ok(text.startsWith('Locked camera, one continuous shot.') && text.endsWith('No sound.'));
 });
 
 test('texten för hålkortet och vändningen är givens med bara de meningar bytta som handlingen kräver', () => {
-  const deal = promptFor(content);
-  const hole = promptFor(content, 'hole');
-  const flip = promptFor(content, 'flip');
-  assert.equal(promptFor(content, 'deal'), deal);
-  // Hålkortet: läggs gult, vänds inte, och slutar med två gula kort i bild.
-  assert.ok(hole.includes('the card is not turned over') && hole.includes('yellow side up') && hole.includes('the yellow one face down on the table'));
-  assert.ok(!hole.includes('turn over together') && !hole.includes('blue side up') && !hole.includes('the blue card lies'));
+  const deal = promptFor(content, 'deal', words);
+  const hole = promptFor(content, 'hole', words);
+  const flip = promptFor(content, 'flip', words);
+  assert.equal(promptFor(content, 'wait', words).includes('with the same tattoos'), true);
+  // Hålkortet: förs plant ur skon längs bordet, lyfts och vänds aldrig, och slutar med två gula kort i bild.
+  assert.ok(hole.includes('slides the yellow card flat out of the opening') && hole.includes('never lifted and never turned over') && hole.includes('yellow side up') && hole.includes('the yellow one face down on the table'));
+  assert.ok(!hole.includes('turn over together') && !hole.includes('blue side up') && !hole.includes('the blue card lies') && !hole.includes('draws the yellow card up'));
   // Vändningen: inget kort dras; hålkortet ligger på bordet från början och vänds där med samma nyckelvridning som i given.
   assert.ok(flip.includes('A yellow card already lies flat on the table') && flip.includes('without taking a card') && flip.includes('lays the card flat in the same place, blue side up'));
   assert.ok(flip.includes("turn over together about the card's long side, like turning a key"), 'samma vändning som i given');
   assert.ok(!flip.includes('draws the yellow card up out of the opening') && !flip.includes('the whole way out'));
   // Det som inte rör handlingen är ordagrant givens.
   for (const text of [hole, flip]) {
-    for (const same of ['Locked camera, one continuous shot.', 'Then she lifts her hand off the card, and it travels back in a calm arc to the card shoe', 'Her other hand rests on the table and does not move.', 'No sound.']) assert.ok(text.includes(same), same);
+    for (const same of ['Locked camera, one continuous shot.', 'Then her hand goes straight back to the card shoe', 'Her other hand rests on the table and does not move.', 'No sound.']) assert.ok(text.includes(same), same);
     assert.ok(!/[{}]/.test(text));
   }
   // En mening som inte står i texten är ett fel: mallen har ändrats utan bytena.
-  const changed = { ...content, prompt: { ...content.prompt, text: deal.replace('On the way her wrist rolls once', 'Her wrist rolls once') } };
+  const changed = { ...content, prompt: { ...content.prompt, text: content.prompt.text.replace('On the way her wrist rolls once', 'Her wrist rolls once') } };
   assert.throws(() => promptFor(changed, 'hole'), /står inte precis en gång/);
 });
 
@@ -104,7 +113,8 @@ const film = (out: string, colour: string, seconds: number, sound: boolean) =>
 before(async () => {
   project = mkdtempSync(join(tmpdir(), 'tagning-'));
   mkdirSync(join(project, 'content', 'moves'), { recursive: true });
-  for (const file of ['scene.json', 'doll.json', 'tagning.json']) copyFileSync(join(root, 'content', file), join(project, 'content', file));
+  mkdirSync(join(project, 'content', 'dealers'), { recursive: true });
+  for (const file of ['scene.json', 'doll.json', 'tagning.json', 'dealer.json', 'dealers/paulina.json']) copyFileSync(join(root, 'content', file), join(project, 'content', file));
   for (const file of readdirSync(join(root, 'content', 'moves'))) copyFileSync(join(root, 'content', 'moves', file), join(project, 'content', 'moves', file));
   const anchor = join(project, 'assets', ...redoAnchor.split('/'));
   mkdirSync(join(anchor, '..'), { recursive: true });
@@ -121,7 +131,7 @@ test('forbered: paketet har bilderna, dockans film, texten och allt beställning
   assert.equal(made.id, 'paulina_spelaren_cykel-nyp_4-1_t1');
   const at = (file: string) => join(made.dir, file);
   for (const file of ['forsta.png', 'sista.png', 'referens.mp4', 'text.txt', 'docka.json', 'ark-docka.jpg', 'bestallning.json']) assert.ok(existsSync(at(file)), `${file} finns i paketet`);
-  assert.equal(readFileSync(at('text.txt'), 'utf8'), promptFor(content));
+  assert.equal(readFileSync(at('text.txt'), 'utf8'), promptFor(content, 'deal', words));
   const order = JSON.parse(readFileSync(at('bestallning.json'), 'utf8'));
   assert.deepEqual([order.model, order.resolution, order.duration, order.ratio], ['kling-4', '1080p', 4, '16:9']);
   assert.deepEqual(Object.keys(order.inputs), ['startFrame', 'endFrame', 'referenceVideos']);
@@ -151,7 +161,7 @@ test('forbered: paketet har bilderna, dockans film, texten och allt beställning
 });
 
 test('forbered säger vad som saknas: ankare för vyn, plats och kortplats', async () => {
-  await assert.rejects(forbered({ ...spec, view: 'plats-3' }, { root: project, reference: 'docka.mp4', say: quiet }), /inget REDO-ankare för paulina ur plats-3/);
+  await assert.rejects(forbered({ ...spec, view: 'plats-3' }, { root: project, reference: 'docka.mp4', say: quiet }), /paulina.json säger inget REDO-ankare ur plats-3/);
   await assert.rejects(forbered({ ...spec, seat: 9 }, { root: project, reference: 'docka.mp4', say: quiet }), /ingen plats 9/);
   await assert.rejects(forbered({ ...spec, index: 5 }, { root: project, reference: 'docka.mp4', say: quiet }), /ingen kortplats 5/);
   // Ett paket som inte blev klart tas bort, så att nästa försök får samma nummer.
@@ -159,6 +169,63 @@ test('forbered säger vad som saknas: ankare för vyn, plats och kortplats', asy
   const before = nextTake(out, spec, 'cykel-nyp');
   await assert.rejects(forbered(spec, { root: project, reference: 'finns-inte.mp4', say: quiet }));
   assert.equal(nextTake(out, spec, 'cykel-nyp'), before);
+});
+
+test('forbered gör paketet genom ankarets eget öga: samma ankare ger samma paket när bågen ändras, utom där kortplatsen flyttats', async () => {
+  // Ankaret gjort genom ett annat öga än dagens närbild: samma plats, vridet en grad åt sidan och 4 % längre brännvidd.
+  const today = viewEye(scene, { kind: 'spelaren', close: true });
+  const tilt = (eye: typeof today, side: number, up: number) => {
+    const f = eye.forward;
+    const right = [-f[2], 0, f[0]].map((v) => v / Math.hypot(f[0], f[2])) as [number, number, number];
+    const above = [right[1] * f[2] - right[2] * f[1], right[2] * f[0] - right[0] * f[2], right[0] * f[1] - right[1] * f[0]];
+    const moved = f.map((v, k) => v + right[k]! * side + above[k]! * up);
+    const length = Math.hypot(...moved);
+    return { position: [...eye.position], forward: moved.map((v) => v / length), focalPx: eye.focalPx * 1.04, frame: { width: 1920, height: 1080 } };
+  };
+  const register = (name: string, eye: unknown): Promise<unknown> => {
+    const at = join(project, name);
+    createRegister(at, { about: 'prov', statuses: { 'att granska': 'inte dömd' }, asksWhy: [], groups: { anchors: 'ankare' }, sources: { runway: { what: 'Runway' } } });
+    return importAsset(at, { file: redoAnchor, from: join(project, 'assets', ...redoAnchor.split('/')), title: 'prov', group: 'anchors', source: { from: 'runway' }, eye });
+  };
+  const anchorEye = tilt(today, Math.tan((1 * Math.PI) / 180), 0);
+  await register('register-oga', anchorEye);
+  const made = async (seat: Seat, index: number) => {
+    const done = await forbered({ dealer: 'paulina', view: 'spelaren', seat, index }, { root: project, registry: join(project, 'register-oga'), reference: 'docka.mp4', say: quiet });
+    return JSON.parse(readFileSync(join(done.dir, 'bestallning.json'), 'utf8'));
+  };
+  const dealerBefore = await made('D', 0);
+  const seatBefore = await made(4, 0);
+  assert.deepEqual(dealerBefore.scene.eye, anchorEye, 'paketet bär ankarets öga');
+  assert.match(dealerBefore.scene.eyeFrom, /ögat ankaret är gjort genom/);
+  const sceneFile = join(project, 'content', 'scene.json');
+  const kept = readFileSync(sceneFile, 'utf8');
+  const changed = JSON.parse(kept);
+  changed.places.arc.depth -= 0.03;
+  writeFileSync(sceneFile, JSON.stringify(changed));
+  try {
+    const dealerAfter = await made('D', 0);
+    const seatAfter = await made(4, 0);
+    // Dealerns kortplats ligger kvar när bågen ändras: samma öga, samma hörn och samma sista bild.
+    assert.deepEqual(dealerAfter.scene.eye, anchorEye);
+    assert.deepEqual(dealerAfter.inputs.endFrame.corners, dealerBefore.inputs.endFrame.corners);
+    assert.equal(dealerAfter.inputs.endFrame.sha256, dealerBefore.inputs.endFrame.sha256);
+    // Plats 4 har flyttats: samma öga, och kortet målat där den nya kortplatsen syns genom ankarets öga.
+    assert.deepEqual(seatAfter.scene.eye, anchorEye);
+    const moved = readScene(changed);
+    const corners = cardCorners(moved, cardPlace(moved, 4, 0)).map((corner) => see(anchorEye as Eye, corner)!);
+    const painted = seatAfter.inputs.endFrame.corners as number[][];
+    const off = Math.max(...corners.map((corner) => Math.min(...painted.map((p) => Math.hypot(p[0]! - corner.x, p[1]! - corner.y)))));
+    assert.ok(off < 2, `plats 4: hörnen ${off.toFixed(2)} bp från kortplatsen sedd genom ankarets öga`);
+    assert.notDeepEqual(seatAfter.inputs.endFrame.corners, seatBefore.inputs.endFrame.corners, 'plats 4 har flyttats');
+  } finally {
+    writeFileSync(sceneFile, kept);
+  }
+  // Ett ankare vars ruta inte rymmer kortet: forbered vägrar och säger varför.
+  await register('register-utanfor', tilt(today, 0, 0.2));
+  await assert.rejects(
+    forbered({ dealer: 'paulina', view: 'spelaren', seat: 4, index: 0 }, { root: project, registry: join(project, 'register-utanfor'), reference: 'docka.mp4', say: quiet }),
+    /från kanten av .* ruta/,
+  );
 });
 
 let received: PostFile | null = null;

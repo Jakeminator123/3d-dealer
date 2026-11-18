@@ -338,6 +338,44 @@ test('kortplanen sparas från Labbets egen sida: bara de tillåtna talen, inom s
   }
 });
 
+test('klippens fart sparas från Labbets egen sida med kortplanen, bara inom 1–2, i content/runda.json', async () => {
+  const folder = mkdtempSync(join(tmpdir(), 'api-fart-'));
+  mkdirSync(join(folder, 'content'));
+  const project = join(import.meta.dirname, '..', '..', 'content');
+  const scene = readFileSync(join(project, 'scene.json'), 'utf8');
+  const round = readFileSync(join(project, 'runda.json'), 'utf8');
+  writeFileSync(join(folder, 'content', 'scene.json'), scene);
+  writeFileSync(join(folder, 'content', 'runda.json'), round);
+  const { running, base: there } = await serve(folder);
+  const send = (body: unknown) => fetch(`${there}/api/kortplan`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  try {
+    const whole = JSON.parse(scene);
+    const plan = { arc: { centreX: whole.places.arc.centreX, depth: whole.places.arc.depth, width: whole.places.arc.width, bend: whole.places.arc.bend, round: whole.places.arc.round, step: whole.places.arc.step }, row: { first: whole.places.row.first, step: whole.places.row.step }, scale: whole.card.onTable.scale };
+    const saved = await send({ ...plan, speed: 1.5 });
+    assert.equal(saved.status, 200);
+    assert.equal((await saved.json()).plan.speed, 1.5);
+    const written = JSON.parse(readFileSync(join(folder, 'content', 'runda.json'), 'utf8'));
+    assert.deepEqual(written.speed, { ...JSON.parse(round).speed, clips: 1.5, setInLab: 'Jakob i Labbet 2026-11-18 05:30' });
+    // Bara farten: resten av rundan, och scenen, är som förut. Sidorna läser den nya farten.
+    assert.deepEqual({ ...written, speed: undefined }, { ...JSON.parse(round), speed: undefined });
+    assert.equal(readFileSync(join(folder, 'content', 'scene.json'), 'utf8'), scene);
+    assert.equal((await (await fetch(`${there}/content/runda.json`)).json()).speed.clips, 1.5);
+
+    // Utanför gränserna eller inget tal: 400 med skälet, och ingen fil rörs.
+    const now = readFileSync(join(folder, 'content', 'runda.json'), 'utf8');
+    for (const speed of [0, 0.95, 2.05, 9, '1,5', null, [1.5]]) {
+      const refused = await send({ ...plan, speed });
+      assert.equal(refused.status, 400, JSON.stringify(speed));
+      assert.match((await refused.json()).error, /^Kortplanen tas inte emot: speed 1 … 2/);
+    }
+    assert.equal(readFileSync(join(folder, 'content', 'runda.json'), 'utf8'), now);
+    assert.equal(readFileSync(join(folder, 'content', 'scene.json'), 'utf8'), scene);
+  } finally {
+    running.close();
+    rmSync(folder, { recursive: true, force: true });
+  }
+});
+
 test('ett ogiltigt omdöme avvisas med ett skäl', async () => {
   for (const body of [{ file: 'scene/bild.png', status: 'kanske' }, { file: 'finns/inte.png', status: 'utgår' }, { file: 1 }, null]) {
     const response = await post(body);

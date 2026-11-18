@@ -52,8 +52,11 @@ export type DollDescription = {
   body: Marked & { centreX: number; shoulderHeight: number; shoulderHalfWidth: number; head: { x: number; height: number; radius: number }; eyeHeight: number };
   /** Armens två ben, hur långt den når innan kroppen böjs, och hur långt kroppen som mest böjs och vrids (radianer). */
   arm: Marked & { upper: number; fore: number; reach: number; mostLean: number; mostTwist: number };
-  /** Blicken när kortet ligger: en punkt framför huvudet, hur stor del av vägen dit blicken går och på hur lång tid. */
-  gaze: Marked & { down: number; ahead: number; share: number; seconds: number };
+  /**
+   * Blicken när kortet ligger: en punkt framför huvudet, hur stor del av vägen dit blicken går och på hur lång tid. `ready`
+   * är kortplatsen hon ser på i REDO, mitt på bordet (readyGaze); den är gemensam för alla cykler.
+   */
+  gaze: Marked & { down: number; ahead: number; share: number; seconds: number; ready: { seat: Seat; index: number } };
   /** Hur kroppen ritas: bålens mått som andelar och djup, och lemmarnas radier i meter. */
   shape: Marked & {
     torso: { width: number; height: number; depth: number; centre: number };
@@ -167,6 +170,15 @@ export type Back = { letsGo: number; home: number; pace: number; lift: number; b
  *   vid kortet, med 1 bromsar den in till kortet och lyfter genast, som när man lägger ned något och tar handen till sig.
  * - `calm`: hur många gånger givens lästa spår jämnas ut innan de spelas fortare: handen och kortet `hand`, kroppen och
  *   den vilande handen `body` (calmed).
+ * - `breath.still`: andningen och svängen vägs med (1 − cos)/2 över cykeln, så att de börjar och slutar med farten noll i
+ *   REDO och klippet kan följa på en cykel utan andning, och den på det.
+ * - `look`: vart blicken går under given. `card` (när inget sägs): blicken följer kortet från skon, går tillbaka till nästa
+ *   kort i skon, och går från och till REDO:s punkt (readyGaze) på `doll.gaze.seconds` sekunder. `place`: blicken går från
+ *   REDO:s punkt till kortplatsen och tillbaka, aldrig mot skon; den är framme när kortet ligger (i en vändning när handen
+ *   når hålkortet), ligger kvar tills handen lämnar kortet och är tillbaka vid cykelns slut (lookShare); huvudet kommer
+ *   då hem med bålen.
+ * - `nod`: en liten nick när kortet läggs, i grader: huvudet sänks och lyfts igen från `gazeLead` före kortet ligger
+ *   tills handen lämnar det. Saknas den nickar hon inte.
  */
 export type Life = {
   gazeLead: number;
@@ -177,9 +189,11 @@ export type Life = {
   trunkLag: number;
   leanLeast: number;
   effort: number;
-  breath: { rise: number; head: number; sway: number; turn: number; fingers: number; cycles: number };
+  breath: { rise: number; head: number; sway: number; turn: number; fingers: number; cycles: number; still?: boolean };
   touch: number;
   calm: { hand: number; body: number };
+  look?: 'card' | 'place';
+  nod?: number;
 };
 
 /** Bålens planerade lutning i en cykel: radianer per ruta, mot en punkt, med vridningen åt `sign`. */
@@ -196,6 +210,12 @@ export type Lean = { about: string; amount: number[]; toward: Vec3; sign: number
  * `flip` är vändningen av hålkortet, inom samma `deal`: handen går ut till hålkortet på `reach` sekunder, lyfter det på
  * `pickUp` sekunder, och vänder och lägger det på resten av `deal`. `from` är givens ruta där lyftet vänder: där håller
  * handen kortet ovanför bordet strax före givens egen vändning (se cycled).
+ * `push` är knuffen på kortet (saknas den, ingen knuff): kortet landar `reach` meter närmare dealern än sin plats, och
+ * fingrarna skjuter det dit mot spelaren (hålkortet som förs plant: längs sin väg), från sekunden `from` till `to` räknat från
+ * att kortet ligger (from negativt: knuffen börjar medan kortet läggs, så att det glider in), med minsta ryck och högst till
+ * att handen lämnar kortet (`parts.onCard`). I en vändning knuffas kortet när det har vänts och lagts.
+ * `hole` är hur hålkortet läggs: `given` (när inget sägs) är givens rörelse utan vändningen (unturned); `flat` för det
+ * plant ur skon längs filten till sin plats, baksidan upp, utan lyft och vändning (slid).
  */
 export type DollCycle = Marked & {
   schemaVersion: number;
@@ -209,11 +229,14 @@ export type DollCycle = Marked & {
   back: { lift: number; release: number; look: number; open: number; close: number };
   flip: { reach: number; pickUp: number; from: number };
   life: Life;
+  push?: { reach: number; from: number; to: number };
+  hole?: 'given' | 'flat';
   /**
-   * Väntan (handlingen wait): blicken går andelen `look` av vägen från kortet i skon upp mot spelarna (doll.gaze), upp
-   * mellan sekunderna `up` och ned igen mellan `down`, med minsta ryck. Finns den inte görs ingen väntan.
+   * Väntan (handlingen wait): blicken går andelen `look` av vägen från REDO:s punkt (readyGaze) upp mot spelarna
+   * (doll.gaze), upp mellan sekunderna `up` och ned igen mellan `down`, med minsta ryck. Finns den inte görs ingen väntan.
+   * `seconds` är väntans längd (annars cykelns), och `breath` dess andning (annars cykelns, life.breath).
    */
-  wait?: { look: number; up: [number, number]; down: [number, number] };
+  wait?: { look: number; up: [number, number]; down: [number, number]; seconds?: number; breath?: Life['breath'] };
 };
 
 /** En arm: axel, armbåge och handled. `reached` är falskt när handleden ligger längre bort än armen räcker. */
@@ -604,11 +627,23 @@ function reachOf(scene: SceneDescription, doll: DollDescription, moment: Moment)
   return { left, right, upright: shifted(doll, sittingTrunk(scene, doll), moment.body) };
 }
 
+/** Punkten framför henne som hon ser på i VILA och mot spelarna (content/doll.json, gaze). */
+const aheadOf = (doll: DollDescription, head: Vec3): Vec3 => [head[0], head[1] - doll.gaze.down, head[2] + doll.gaze.ahead];
+
+/**
+ * Punkten hon ser på i REDO: kortplatsen `gaze.ready` (content/doll.json) på den lutade filten, mitt på bordet. Hon ser
+ * inte på skon: handen nyper kortet i mynningen utan att hon ser dit. Gemensam för alla cykler, som REDO är.
+ */
+export function readyGaze(scene: SceneDescription, doll: DollDescription): Vec3 {
+  const [x, z] = cardPlace(scene, doll.gaze.ready.seat, doll.gaze.ready.index);
+  return tilted(scene, [x, 0, z]);
+}
+
 /** Punkten hon ser på: kortet hon delar, och när hon har släppt det nästa kort i skon. Utan kort framför sig. */
 function lookOf(scene: SceneDescription, doll: DollDescription, moment: Moment, head: Vec3): Vec3 {
   const dealt = moment.card && cardOnTable(scene, moment.card);
   const fetched = moment.fetch && cardOnTable(scene, moment.fetch);
-  const ahead: Vec3 = [head[0], head[1] - doll.gaze.down, head[2] + doll.gaze.ahead];
+  const ahead = aheadOf(doll, head);
   return fetched && dealt ? mix(dealt.centre, fetched.centre, moment.lookBack) : dealt ? mix(dealt.centre, ahead, moment.lookUp) : ahead;
 }
 
@@ -968,6 +1003,75 @@ function calmed(tracks: Tracks, last: number, calm: Life['calm']): Tracks {
   };
 }
 
+// Hålkortet plant ur skon (slid): så långt utanför nosens spets kortets bakre kortsida är när det ligger plant, i meter,
+// och hur många prov vägen delas i när den mäts.
+const SLIDE_CLEAR = 0.02;
+const SLIDE_SAMPLES = 200;
+
+/** Ett korts axlar: långsidan, framsidan och tvärs. */
+const cardAxes = (card: Standing): Vec3[] => {
+  const long = unit(card.long);
+  const face = unit(sub(card.face, mul(long, dot(card.face, long))));
+  return [long, face, cross(long, face)];
+};
+
+/**
+ * Hålkortet fört plant ur skon längs filten till sin plats (DollCycle.hole `flat`), som en verklig dealer gör: det lyfts
+ * aldrig och vänds inte. Kortet `from` står i mynningen som i REDO; det fälls bakåt tills det ligger plant med baksidan
+ * upp (dess nedre kortsida glider ut ur mynningen), förs ut längs skons mittlinje tills det är SLIDE_CLEAR utanför nosens
+ * spets, och glider vidare på filten till `to`, där det ligger som hålkortet i given när det har lagts. Vägen är en
+ * jämn båge genom de tre lägena, delad efter sin längd. Kortet är plant när andelen `tipped` av vägen är gången (dubbelt så
+ * långt som till läget utanför nosen), och
+ * vrids under resten till sin riktning på platsen. Handen följer kortet: dess punkter räknade i kortets axlar går från
+ * nypet i REDO (`hand0`) till handen på kortet när det ligger (`hand1`), och den sänks mot filten medan kortet fälls.
+ */
+function slid(scene: SceneDescription, from: Standing, hand0: Vec3[], to: Standing, hand1: Vec3[]): { at: (share: number) => { card: Standing; hand: Vec3[]; settle: number }; tipped: number } {
+  const way = mouthWay(scene);
+  const out = scene.shoe.length / 2 + scene.card.height / 2 + SLIDE_CLEAR;
+  const middle: Vec3 = [scene.shoe.at[0] + way[0] * out, 0, scene.shoe.at[1] + way[2] * out];
+  const start = from.centre;
+  const end: Vec3 = [to.centre[0], 0, to.centre[2]];
+  // Bågen (andra gradens Bézier) genom mitten: kontrollpunkten så att bågen når mitten halvvägs.
+  const control = sub(mul(middle, 2), mul(add(start, end), 0.5));
+  const bezier = (u: number): Vec3 => add(add(mul(start, (1 - u) ** 2), mul(control, 2 * u * (1 - u))), mul(end, u * u));
+  const lengths = [0];
+  for (let k = 1; k <= SLIDE_SAMPLES; k++) lengths.push(lengths[k - 1]! + size(sub(bezier(k / SLIDE_SAMPLES), bezier((k - 1) / SLIDE_SAMPLES))));
+  const total = lengths.at(-1)!;
+  const curveAt = (share: number): number => frameAlong(lengths, share * total) / SLIDE_SAMPLES;
+  // Kortet fälls tills det har gått dubbelt så långt som till mitten (utanför nosen), så att fällningen inte går fort.
+  const tipped = Math.min(1, (2 * lengths[SLIDE_SAMPLES / 2]!) / total);
+  const axes0 = cardAxes(from);
+  const flatLong = unit([axes0[0]![0], 0, axes0[0]![2]]);
+  const flatAxes = [flatLong, [0, -1, 0] as Vec3, cross(flatLong, [0, -1, 0])];
+  const axes1 = cardAxes(to);
+  const tip = rotationBetween(axes0, flatAxes);
+  const swing = rotationBetween(flatAxes, axes1);
+  const localOf = (points: Vec3[], card: Standing, axes: Vec3[]): Vec3[] => points.map((point) => {
+    const offset = sub(point, card.centre);
+    return [dot(offset, axes[0]!), dot(offset, axes[1]!), dot(offset, axes[2]!)];
+  });
+  const local0 = localOf(hand0, from, axes0);
+  const local1 = localOf(hand1, to, axes1);
+  return {
+    tipped,
+    at: (share) => {
+      const s = Math.max(0, Math.min(1, share));
+      const tipShare = smooth(s / tipped);
+      const swingShare = smooth(s);
+      const axes = axes0.map((axis) => turned(turned(axis, tip.axis, tip.angle * tipShare), swing.axis, swing.angle * swingShare));
+      const centre = bezier(curveAt(s));
+      // Kortet lyfts av cardOnTable så att inget hörn går ned i filten; i mynningen står det på sin höjd.
+      const lifted: Vec3 = [centre[0], from.centre[1] * (1 - tipShare), centre[2]];
+      const shape = tipShare;
+      const hand = local0.map((point, k) => {
+        const local = mix(point, local1[k]!, shape);
+        return add(lifted, add(add(mul(axes[0]!, local[0]), mul(axes[1]!, local[1])), mul(axes[2]!, local[2])));
+      });
+      return { card: { centre: lifted, long: axes[0]!, face: axes[1]! }, hand, settle: tipShare };
+    },
+  };
+}
+
 /** Givens ruta (med bråkdel) där vägen `path` har nått `along`. */
 function frameAlong(path: number[], along: number): number {
   if (along <= 0) return 0;
@@ -1012,7 +1116,7 @@ function frameAlong(path: number[], along: number): number {
  * vändningen). Både lyftet och läggningen börjar och slutar stilla, med minsta ryck. Kroppen står under tiden som när kortet ligger. Därefter är allt som i given: vilan på
  * kortet, vägen tillbaka och REDO.
  */
-function cycled(doll: DollDescription, move: DollMove, read: Tracks, cycle: DollCycle, bow: number, action: Action = 'deal', hole: Tracks['card'] | null = null): Timing & { tracks: Tracks } {
+function cycled(scene: SceneDescription, doll: DollDescription, move: DollMove, read: Tracks, cycle: DollCycle, bow: number, action: Action = 'deal', hole: Tracks['card'] | null = null): Timing & { tracks: Tracks } {
   const tracks = calmed(read, move.moments.rests, cycle.life.calm);
   if (hole) hole = calmed({ ...read, card: hole }, move.moments.rests, cycle.life.calm).card;
   const frames = (seconds: number): number => Math.round(seconds * move.fps);
@@ -1070,6 +1174,32 @@ function cycled(doll: DollDescription, move: DollMove, read: Tracks, cycle: Doll
     return { held: { ...held, centre: add(held.centre, by) }, hand: hand.map((point) => add(point, by)) };
   };
 
+  // Hålkortet plant ur skon (cycle.hole `flat`): kort och hand fram till att kortet ligger går längs slid, i samma takt
+  // som en giv (minsta ryck med touch), och slutar där given har kortet och handen när kortet ligger.
+  const slide = action === 'hole' && cycle.hole === 'flat' ? slid(scene, cardAt(hole!, 0), leftHand.points[0]!, cardAt(hole!, laid), sampled(leftHand.points, laid, mixPoints)) : null;
+  const slideShare = (frame: number): number => (frame <= ready ? 0 : toCard(Math.min(1, (frame - ready) / deal), life.touch));
+  // Knuffen (cycle.push): kortet landar push.reach meter före sin plats och skjuts dit av fingertopparna medan de ligger
+  // kvar på det, mot spelaren (från dealerns mitt mot kortplatsen), och hålkortet som förs plant längs sin väg.
+  // Förskjutningen växer in medan kortet bärs (i en vändning medan det läggs), och är borta när handen lämnar kortet. Där
+  // kortet ligger på skons sida om den givande axeln (plats 6–7) är armen redan böjd mot kortet, och en knuff mot
+  // spelaren böjer handleden över gränsen (variant E vid plats 7: 84 → 92 grader, mätt): där landar kortet i stället
+  // lika långt bortom sin plats och fingertopparna drar det tillbaka dit. (Längs handens riktning gav dealerns kort en
+  // knyck på 4,6 i armbågen, mätt.)
+  const target = cardAt(cardIn(laid), laid).centre;
+  const shoulderX = doll.body.centreX + doll.body.shoulderHalfWidth;
+  const push = cycle.push && cycle.push.reach > 0 && letsGo > rests ? cycle.push : null;
+  const pushWay: Vec3 = (() => {
+    if (!push) return [0, 0, 0];
+    const from = slide ? slide.at(slide.tipped).card.centre : ([doll.body.centreX, 0, scene.dealerEdge.z - doll.sitting.behindEdge] as Vec3);
+    return mul(unit([target[0] - from[0], 0, target[2] - from[2]]), slide || target[0] <= shoulderX ? 1 : -1);
+  })();
+  const pushedBy = (frame: number): Vec3 => {
+    if (!push || frame > letsGo) return [0, 0, 0];
+    const carried = frame >= rests ? 1 : flip ? smooth((frame - lifts) / (rests - lifts)) : slide ? smooth((slideShare(frame) - slide.tipped) / (1 - slide.tipped)) : smooth((given(frame) - move.moments.leavesShoe) / (laid - move.moments.leavesShoe));
+    const pushed = easeReach((frame - rests - push.from * move.fps) / ((push.to - push.from) * move.fps));
+    return mul(pushWay, -push.reach * carried * (1 - pushed));
+  };
+
   const reaching = heldOf(leftHand.points[0]!);
   const relaxed = heldOf(relaxedLeft(doll));
   /**
@@ -1102,16 +1232,19 @@ function cycled(doll: DollDescription, move: DollMove, read: Tracks, cycle: Doll
     const start = Math.max(rests, Math.min(from, end - 1));
     return { from: start, to: Math.max(start + 1, Math.min(to, end)) };
   };
+  // Med Life.look `place` ser hon inte tillbaka till skon: huvudet kommer hem med bålen, till cykelns sista ruta, så att
+  // det rör sig genom REDO också i en cykel utan andning. Annars är det framme när handen är i skon.
   const clocks = {
-    head: clock(letsGo - frames(life.gazeLead), home),
+    head: clock(letsGo - frames(life.gazeLead), life.look === 'place' ? end : home),
     rest: clock(letsGo, home),
     shoulders: clock(letsGo + frames(life.trunkLag), end),
   };
   // Kroppens lästa spår (axlar, huvud, den vilande handen) följer given i jämn takt, inte längs handens väg: där handen
   // går fort genom givens första rutor skulle deras små lästa ryck annars komma tätt.
-  // I en vändning står kroppen som när kortet ligger medan handen lyfter, vänder och lägger det.
+  // I en vändning står kroppen som när kortet ligger medan handen lyfter, vänder och lägger det, och tills dess klocka går
+  // tillbaka (en vila på kortet efter vändningen läser inte givens spår vidare, så att kroppen inte rycker igång där).
   const evenly = (frame: number): number =>
-    flip ? (frame < rests ? laid : laid + (Math.min(frame, letsGo) - rests) * pace) : Math.max(0, Math.min(Math.min(frame, letsGo) - ready, letsGo - ready)) * pace;
+    flip ? laid : Math.max(0, Math.min(Math.min(frame, letsGo) - ready, letsGo - ready)) * pace;
   /** En del av kroppen i en ruta: givens läge tills dess klocka går, sedan mjukt tillbaka till givens första ruta. */
   const homeward = <T>(track: T[], blend: (a: T, b: T, t: number) => T, frame: number, own: { from: number; to: number }): T => {
     if (frame < rests || frame <= own.from) return sampled(track, evenly(frame), blend);
@@ -1144,7 +1277,14 @@ function cycled(doll: DollDescription, move: DollMove, read: Tracks, cycle: Doll
     // Kortet följer given och ligger sedan kvar där handen släppte det; i en vändning ligger hålkortet kvar tills handen tar det.
     let held = cardAt(cardIn(frame), at);
     let hand: Vec3[] | null = null;
+    let settling: number | null = null;
     if (flip && frame >= arrives && frame < rests) ({ held, hand } = overPlace(held, sampled(leftHand.points, at, mixPoints)));
+    if (slide && frame <= rests) ({ card: held, hand, settle: settling } = slide.at(slideShare(frame)));
+    const by = pushedBy(frame);
+    if (by[0] !== 0 || by[2] !== 0) {
+      held = { ...held, centre: add(held.centre, by) };
+      hand = (hand ?? sampled(leftHand.points, at, mixPoints)).map((point) => add(point, by));
+    }
     made.centre.push(held.centre);
     made.long.push(held.long);
     made.face.push(held.face);
@@ -1163,7 +1303,7 @@ function cycled(doll: DollDescription, move: DollMove, read: Tracks, cycle: Doll
     } else {
       const from = frame >= home || (flip && frame <= ready) ? 0 : at;
       made.left.push(hand ?? sampled(leftHand.points, from, mixPoints));
-      made.settle.push(frame >= home || (flip && frame <= ready) ? 0 : settleAt(from));
+      made.settle.push(settling ?? (frame >= home || (flip && frame <= ready) ? 0 : settleAt(from)));
     }
     if (flip && frame <= ready) {
       made.right.push(rightHand.points[0]!);
@@ -1183,11 +1323,36 @@ function cycled(doll: DollDescription, move: DollMove, read: Tracks, cycle: Doll
   // I en vändning: givens ruta som en ruta i läggningen. Ingen kort lämnar skon, men leavesShoe är givens, så att skon
   // prövas i samma rutor som i varje annan cykel (shoeTested): medan fingrarna är vid mynningen i början och slutet.
   const laying = (frame: number): number => Math.round(lifts + (rests - lifts) * inverseOf(easeReach, (lifting[frame]! - lifting[top]!) / (lifting[laid]! - lifting[top]!)));
-  const moments: DollMove['moments'] = flip
-    ? { leavesShoe: retimed(leavesShoe), edge: [laying(edge[0]), laying(edge[1])], folds: laying(folds), rests }
-    : { leavesShoe: retimed(leavesShoe), edge: [retimed(edge[0]), retimed(edge[1])], folds: retimed(folds), rests };
+  // Hålkortet plant ur skon: kortet lämnar mynningen när det är halvvägs fällt och ligger plant (edge, folds) när det är
+  // helt fällt. Skon prövas inte förrän kortet och handen är ute ur skons hölje, som när fingrarna är i mynningen.
+  const slideFrame = (share: number): number => {
+    for (let frame = ready; frame <= rests; frame++) if (slideShare(frame) >= share) return frame;
+    return rests;
+  };
+  const tipped = slide ? Math.min(rests - 1, Math.max(ready + 2, slideFrame(slide.tipped))) : 0;
+  const slidOut = slide ? Math.min(tipped - 1, Math.max(ready + 1, slideFrame(slide.tipped / 2))) : 0;
+  const slideClear = (): number => {
+    const skeleton = handSkeleton(doll);
+    let last = slidOut;
+    for (let frame = slidOut + 1; frame <= rests; frame++) {
+      const hand = onFelt(fitHand(skeleton, made.left[frame]!, 'left', GRIP), skeleton.radius, made.settle[frame]!);
+      // Kortets hörn på det olutade bordet, som armHits prövar dem (handBalls), och handleden med armens radie.
+      const [long, , side] = cardAxes({ centre: made.centre[frame]!, long: made.long[frame]!, face: made.face[frame]! });
+      const corners = [[-1, 1], [1, 1], [1, -1], [-1, -1]].map(([a, b]) => add(made.centre[frame]!, add(mul(side!, (a! * scene.card.width) / 2), mul(long!, (b! * scene.card.height) / 2))));
+      const inside =
+        [made.centre[frame]!, ...corners].some((point) => intoShoe(scene, doll, point, 0) > TOUCHING) ||
+        hand.some((point, k) => intoShoe(scene, doll, point, k === 0 ? doll.shape.wrist : skeleton.radius[k]!) > TOUCHING);
+      if (inside) last = frame;
+    }
+    return Math.max(1, last - slidOut + 1);
+  };
+  const moments: DollMove['moments'] = slide
+    ? { leavesShoe: slidOut, edge: [tipped, tipped], folds: tipped, rests }
+    : flip
+      ? { leavesShoe: retimed(leavesShoe), edge: [laying(edge[0]), laying(edge[1])], folds: laying(folds), rests }
+      : { leavesShoe: retimed(leavesShoe), edge: [retimed(edge[0]), retimed(edge[1])], folds: retimed(folds), rests };
   // Skon prövas inte förrän handen har gått lika långt efter att kortet lämnat skon som CLEAR_AFTER rutor i given.
-  const clear = Math.max(1, retimed(leavesShoe + CLEAR_AFTER) - retimed(leavesShoe));
+  const clear = slide ? slideClear() : Math.max(1, retimed(leavesShoe + CLEAR_AFTER) - retimed(leavesShoe));
   return {
     frameCount: count,
     seconds: (count - 1) / move.fps,
@@ -1199,7 +1364,7 @@ function cycled(doll: DollDescription, move: DollMove, read: Tracks, cycle: Doll
       ...(flip
         ? { next: { about: 'Nästa kort i skons mynning, som handen nyper i REDO och lämnar där när den går ut till hålkortet.', centre: card.centre[0]!, long: card.long[0]!, face: card.face[0]! } }
         : {}),
-      leftHand: { ...leftHand, points: made.left, ...(flip ? { settle: made.settle } : {}) },
+      leftHand: { ...leftHand, points: made.left, ...(flip || slide ? { settle: made.settle } : {}) },
       rightHand: { ...rightHand, points: made.right },
       body: { ...body, leftShoulder: made.leftShoulder, rightShoulder: made.rightShoulder, head: made.head },
     },
@@ -1209,14 +1374,15 @@ function cycled(doll: DollDescription, move: DollMove, read: Tracks, cycle: Doll
 /**
  * En väntan (handlingen wait): hon står i REDO hela cykeln, `cycle.seconds` lång, med handen vid kortet i skons mynning
  * och den vilande handen på filten. Kroppen lever som i varje cykel (Life: andning, sväng, huvudets vridning och den
- * vilande handens fingrar, i momentOf och poseAt), och blicken går lugnt upp mot spelarna och ned till skon igen
- * (cycle.wait, spåret lookUp). Ögonblicken är satta sist i cykeln, i den ordning en rörelse har dem, så att väntan läses
- * som en cykel; inget kort lämnar skon och skon prövas aldrig (back.clear). Första och sista rutan är REDO.
+ * vilande handens fingrar, i momentOf och poseAt), och blicken går lugnt upp mot spelarna och ned till REDO:s punkt
+ * igen (cycle.wait, spåret lookUp). Väntan är `wait.seconds` lång och andas med `wait.breath`, när de finns, annars som
+ * cykeln. Ögonblicken är satta sist i cykeln, i den ordning en rörelse har dem, så att väntan läses som en cykel; inget
+ * kort lämnar skon och skon prövas aldrig (back.clear). Första och sista rutan är REDO.
  */
 function waited(move: DollMove, tracks: Tracks, cycle: DollCycle): Timing & { tracks: Tracks } {
   if (!cycle.wait) throw new Error(`Cykeln ${cycle.id} säger inte hur hon väntar (wait)`);
   const { look, up, down } = cycle.wait;
-  const count = Math.round(cycle.seconds * move.fps) + 1;
+  const count = Math.round((cycle.wait.seconds ?? cycle.seconds) * move.fps) + 1;
   const end = count - 1;
   const at = (seconds: number): number => seconds * move.fps;
   const share = Array.from({ length: count }, (_, frame) => {
@@ -1231,13 +1397,13 @@ function waited(move: DollMove, tracks: Tracks, cycle: DollCycle): Timing & { tr
     seconds: end / move.fps,
     moments: { leavesShoe: end - 5, edge: [end - 4, end - 4], folds: end - 3, rests: end - 2 },
     back: { letsGo: end - 2, home: end - 1, pace: 1, lift: 0, bow: 0, release: cycle.back.release, look: cycle.back.look, clear: count },
-    life: cycle.life,
+    life: cycle.wait.breath ? { ...cycle.life, breath: cycle.wait.breath } : cycle.life,
     tracks: {
       card: { ...card, about: 'Kortet i skons mynning, som handen håller i REDO hela väntan.', centre: every(card.centre[0]!), long: every(card.long[0]!), face: every(card.face[0]!) },
       leftHand: { ...leftHand, points: every(leftHand.points[0]!), settle: every(0) },
       rightHand: { ...rightHand, points: every(rightHand.points[0]!) },
       body: { ...body, leftShoulder: every(body.leftShoulder[0]!), rightShoulder: every(body.rightShoulder[0]!), head: every(body.head[0]!) },
-      lookUp: { about: 'Hur stor del av vägen blicken har gått från kortet i skon upp mot spelarna, per ruta (dollPose.ts, waited).', share },
+      lookUp: { about: 'Hur stor del av vägen blicken har gått från REDO:s punkt upp mot spelarna, per ruta (dollPose.ts, waited).', share },
     },
   };
 }
@@ -1486,7 +1652,7 @@ function place(scene: SceneDescription, doll: DollDescription, move: DollMove, s
     const given = tracks;
     const hole = action === 'deal' ? null : unturned(given.card, move.moments);
     const shaped = (backBow: number): DollMove => {
-      const { tracks: round, ...rest } = cycled(doll, move, given, cycle, backBow, action, hole);
+      const { tracks: round, ...rest } = cycled(scene, doll, move, given, cycle, backBow, action, hole);
       return { ...move, ...rest, tracks: round };
     };
     const blockedBack = (shape: DollMove): number => {
@@ -1634,7 +1800,9 @@ function momentOf(move: DollMove, tracks: Tracks, frame: number, next: number, s
   // I en cykel andas hon och svänger lite, noll i REDO och med samma fart i slutet som i början (Life.breath).
   const breath = move.life?.breath;
   const phase = (2 * Math.PI * at) / move.fps / move.seconds;
-  const rise = breath ? breath.rise * Math.sin(breath.cycles * phase) : 0;
+  // Med breath.still börjar och slutar andningen stilla: (1 − cos)/2 i stället för sin, så att farten är noll i REDO.
+  const wave = (times: number): number => (breath?.still ? (1 - Math.cos(times * phase)) / 2 : Math.sin(times * phase));
+  const rise = breath ? breath.rise * wave(breath.cycles) : 0;
   const lifted = (offset: Vec3, by: number, aside = 0): Vec3 => (breath ? add(offset, [aside, by, 0]) : offset);
   const lean = tracks.lean;
   // Den vilande handens pekfinger lyfts lite två gånger per cykel och långfingret tre, noll i REDO.
@@ -1659,7 +1827,7 @@ function momentOf(move: DollMove, tracks: Tracks, frame: number, next: number, s
     body: {
       left: lifted(from(body.leftShoulder), rise),
       right: lifted(from(body.rightShoulder), rise),
-      head: lifted(from(body.head), breath ? breath.head * Math.sin(breath.cycles * phase) : 0, breath ? breath.sway * Math.sin(phase) : 0),
+      head: lifted(from(body.head), breath ? breath.head * wave(breath.cycles) : 0, breath ? breath.sway * wave(1) : 0),
     },
     lean: lean ? { amount: lean.amount[frame]! + (lean.amount[next]! - lean.amount[frame]!) * share, toward: lean.toward, sign: lean.sign } : null,
     elbowTurn: leftArm ? radians(leftArm.turnDeg[frame]! + (leftArm.turnDeg[next]! - leftArm.turnDeg[frame]!) * share) : 0,
@@ -1692,13 +1860,33 @@ export function poseAt(scene: SceneDescription, doll: DollDescription, move: Dol
   };
   const pose = compose(scene, doll, momentAt(time));
   const life = move.life;
-  if (!move.back || !life) return pose;
+  const ready = readyGaze(scene, doll);
+  if (!move.back || !life) {
+    // REDO ser på kortplatsen mitt på bordet (readyGaze). En rörelse som inte är en cykel går därifrån till kortet på
+    // doll.gaze.seconds sekunder och följer det sedan; i VILA (restPose) gäller punkten framför henne.
+    const gaze = mix(ready, pose.gaze, smooth(time / doll.gaze.seconds));
+    return { ...pose, gaze, face: gaze };
+  }
+  const ends = move.seconds;
+  // Dit blicken siktar vid tiden t, före försprånget. I en väntan går den från REDO:s punkt upp mot spelarna och tillbaka
+  // (lookUp). Med Life.look `place` går den från REDO:s punkt till kortplatsen och tillbaka, aldrig mot skon. Annars
+  // följer den kortet och nästa kort i skon (lookOf), och går från och till REDO:s punkt på doll.gaze.seconds sekunder.
+  const lastCard = (frame: number): Standing => ({ centre: tracks.card.centre[frame]!, long: tracks.card.long[frame]!, face: tracks.card.face[frame]! });
+  const place = !tracks.lookUp && life.look === 'place' ? cardOnTable(scene, lastCard(move.frameCount - 1)).centre : null;
+  const toward = place ? lookShare(move) : null;
+  const aimAt = (t: number): Vec3 => {
+    const moment = momentAt(t);
+    if (tracks.lookUp) return mix(ready, aheadOf(doll, pose.head), moment.lookUp);
+    if (place && toward) return mix(ready, place, toward(t));
+    const share = smooth(t / doll.gaze.seconds) * smooth((ends - t) / doll.gaze.seconds);
+    return mix(ready, lookOf(scene, doll, moment, pose.head), share);
+  };
   // I en cykel går blicken före: den ser dit den annars skulle se `gazeLead` sekunder senare, och försprånget växer in
   // från REDO. Huvudet vänds mot dit blicken såg `headLag` sekunder tidigare, och bara andelen `headShare` av vägen från
-  // REDO; ögonen tar resten. I REDO, i början och slutet, ser båda på kortet i skons mynning.
+  // REDO; ögonen tar resten. I REDO, i början och slutet, ser båda på REDO:s punkt mitt på bordet.
   const lookAt = (seconds: number): Vec3 => {
-    const t = Math.max(0, Math.min(move.seconds, seconds));
-    return lookOf(scene, doll, momentAt(t + life.gazeLead * smooth(t / life.gazeLead)), pose.head);
+    const t = Math.max(0, Math.min(ends, seconds));
+    return aimAt(Math.min(ends, t + life.gazeLead * smooth(t / life.gazeLead)));
   };
   const gaze = lookAt(time);
   // Huvudet följer blicken mjukt: riktningen dit blicken såg, vägd över headSpan sekunder kring `headLag` sekunder sedan,
@@ -1708,10 +1896,32 @@ export function poseAt(scene: SceneDescription, doll: DollDescription, move: Dol
   const late = unit(sub(seen, pose.head));
   const between = Math.acos(Math.max(-1, Math.min(1, dot(first, late))));
   const aimed = between < 1e-9 ? late : turned(first, unit(cross(first, late)), between * life.headShare);
-  // Och lite fram och tillbaka kring lodlinjen hela cykeln, noll i REDO (Life.breath.turn).
-  const phase = (2 * Math.PI * Math.max(0, Math.min(move.seconds, time))) / move.seconds;
-  const way = turned(aimed, UP, radians(life.breath.turn) * (0.6 * Math.sin(2 * phase) + 0.4 * Math.sin(3 * phase)));
+  // En liten nick när kortet läggs (Life.nod): från två gazeLead före kortet ligger till gazeLead efter att handen lämnat
+  // det, som en klocka med farten och accelerationen noll i båda ändarna (64 x³ (1 − x)³, störst 1 halvvägs).
+  const nodFrom = move.moments.rests / move.fps - 2 * life.gazeLead;
+  const nodTo = move.back.letsGo / move.fps + life.gazeLead;
+  const nodShare = (time - nodFrom) / (nodTo - nodFrom);
+  const nodding = life.nod && !tracks.lookUp && nodShare > 0 && nodShare < 1 ? 64 * nodShare ** 3 * (1 - nodShare) ** 3 : 0;
+  const nodded = nodding > 0 ? turned(aimed, unit(cross(aimed, UP)), -radians(life.nod!) * nodding) : aimed;
+  // Och lite fram och tillbaka kring lodlinjen hela cykeln, noll i REDO (Life.breath.turn); med breath.still också med
+  // farten noll i REDO.
+  const phase = (2 * Math.PI * Math.max(0, Math.min(ends, time))) / ends;
+  const swing = life.breath.still ? 0.6 * Math.sin(phase) * Math.sin(2 * phase) + 0.4 * (1 - Math.cos(3 * phase)) / 2 : 0.6 * Math.sin(2 * phase) + 0.4 * Math.sin(3 * phase);
+  const way = turned(nodded, UP, radians(life.breath.turn) * swing);
   return { ...pose, gaze, face: add(pose.head, mul(way, size(sub(seen, pose.head)))) };
+}
+
+/**
+ * Hur stor del av vägen blicken har gått från REDO:s punkt mot kortplatsen vid en tid, med Life.look `place`: upp med
+ * minsta ryck från början tills kortet ligger (i en vändning tills handen når hålkortet), kvar tills handen lämnar
+ * kortet, och tillbaka med minsta ryck till cykelns slut, med huvudet och bålen. Försprånget (gazeLead) läggs på i poseAt.
+ */
+function lookShare(move: DollMove): (seconds: number) => number {
+  const back = move.back!;
+  const reached = (back.out?.[1] ?? move.moments.rests) / move.fps;
+  const leaves = back.letsGo / move.fps;
+  const home = (move.frameCount - 1) / move.fps;
+  return (t) => (t < reached ? easeReach(t / reached) : t <= leaves ? 1 : 1 - easeReach((t - leaves) / (home - leaves)));
 }
 
 // Huvudets vägning av blicken (poseAt): sju prov över Life.headSpan, med binomialvikter.
@@ -1791,6 +2001,11 @@ export function readDoll(value: unknown): DollDescription {
   need(positive(arm?.upper, arm?.fore, arm?.reach) && arm!.reach < arm!.upper + arm!.fore, 'arm.reach ska vara kortare än armens två ben');
   marked(arm, 'arm');
   need([gaze?.down, gaze?.ahead, gaze?.share].every(isNumber) && positive(gaze?.seconds), 'gaze');
+  const ready = gaze?.ready;
+  need(
+    !!ready && ((isNumber(ready.seat) && Number.isInteger(ready.seat) && ready.seat > 0) || ready.seat === 'D') && Number.isInteger(ready.index) && ready.index >= 0,
+    'gaze.ready: platsen (från 1, eller D) och kortplatsen hon ser på i REDO',
+  );
   marked(gaze, 'gaze');
   need(positive(shape?.torso?.width, shape?.torso?.height, shape?.torso?.depth, shape?.torso?.centre), 'shape.torso');
   need(positive(shape?.yoke, shape?.shoulder, shape?.elbow, shape?.wrist), 'shape.yoke, shape.shoulder, shape.elbow och shape.wrist');
@@ -1899,11 +2114,17 @@ export function readCycle(value: unknown): DollCycle {
     'flip: reach och pickUp över 0 och tillsammans kortare än deal, och from en ruta i given',
   );
   const wait = cycle?.wait;
+  const waits = wait?.seconds ?? cycle?.seconds;
   need(
-    wait === undefined || (isNumber(wait.look) && wait.look >= 0 && wait.look <= 1 && isPair(wait.up) && isPair(wait.down) && wait.up[0] >= 0 && wait.up[0] < wait.up[1] && wait.up[1] <= wait.down[0] && wait.down[0] < wait.down[1] && isNumber(cycle?.seconds) && wait.down[1] <= cycle.seconds),
-    'wait: look en andel, och up och down två tider var i ordning inom cykeln',
+    wait === undefined ||
+      (isNumber(wait.look) && wait.look >= 0 && wait.look <= 1 && isPair(wait.up) && isPair(wait.down) && wait.up[0] >= 0 && wait.up[0] < wait.up[1] && wait.up[1] <= wait.down[0] && wait.down[0] < wait.down[1] &&
+        isNumber(waits) && waits > 0 && wait.down[1] <= waits && (wait.breath === undefined || isBreath(wait.breath))),
+    'wait: look en andel, up och down två tider var i ordning inom väntan, seconds över 0 och breath som life.breath när de finns',
   );
-  need(isLife(cycle?.life), 'life: gazeLead, headLag, trunkLead, trunkLag, leanLeast och effort från 0, headShare en andel, och breath med rise, head och sway från 0 och cycles ett heltal från 1');
+  const push = cycle?.push;
+  need(push === undefined || (isNumber(push.reach) && push.reach >= 0 && isNumber(push.from) && isNumber(push.to) && push.from < push.to && isNumber(parts?.onCard) && isNumber(parts?.deal) && push.to <= parts.onCard + 1e-9 && -push.from < parts.deal), 'push: reach från 0, och from och to sekunder från att kortet ligger, from < to, to högst parts.onCard och from inom deal');
+  need(cycle?.hole === undefined || cycle.hole === 'given' || cycle.hole === 'flat', 'hole ska vara given eller flat');
+  need(isLife(cycle?.life), 'life: gazeLead, headLag, trunkLead, trunkLag, leanLeast och effort från 0, headShare en andel, breath med rise, head och sway från 0 och cycles ett heltal från 1, look card eller place och nod från 0 när de finns');
   need(isMarked(cycle ?? undefined), 'basis och source');
   if (wrong.length > 0) throw new Error(`Cykeln går inte att använda: ${wrong.join('; ')}`);
   return cycle as DollCycle;
@@ -1913,12 +2134,22 @@ export function readCycle(value: unknown): DollCycle {
 function isLife(value: unknown): value is Life {
   const life = value as Partial<Life> | null | undefined;
   const fromZero = (...values: unknown[]): boolean => values.every((entry) => isNumber(entry) && entry >= 0);
-  const breath = life?.breath;
   return (
     fromZero(life?.gazeLead, life?.headLag, life?.headSpan, life?.trunkLead, life?.trunkLag, life?.leanLeast, life?.effort) &&
     isNumber(life?.headShare) && life.headShare >= 0 && life.headShare <= 1 &&
-    fromZero(breath?.rise, breath?.head, breath?.sway, breath?.turn, breath?.fingers) && Number.isInteger(breath?.cycles) && breath!.cycles >= 1 &&
+    isBreath(life?.breath) &&
     isNumber(life?.touch) && life.touch >= 0 && life.touch <= 1 &&
-    [life?.calm?.hand, life?.calm?.body].every((passes) => Number.isInteger(passes) && passes! >= 0)
+    [life?.calm?.hand, life?.calm?.body].every((passes) => Number.isInteger(passes) && passes! >= 0) &&
+    (life?.look === undefined || life.look === 'card' || life.look === 'place') &&
+    (life?.nod === undefined || fromZero(life.nod))
+  );
+}
+
+/** Om ett värde är en andning (Life.breath): mått från 0, ett helt antal andetag per cykel, och still sant eller falskt. */
+function isBreath(value: unknown): value is Life['breath'] {
+  const breath = value as Partial<Life['breath']> | null | undefined;
+  return (
+    [breath?.rise, breath?.head, breath?.sway, breath?.turn, breath?.fingers].every((entry) => isNumber(entry) && entry >= 0) &&
+    Number.isInteger(breath?.cycles) && breath!.cycles! >= 1 && (breath?.still === undefined || typeof breath.still === 'boolean')
   );
 }

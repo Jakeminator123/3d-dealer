@@ -19,6 +19,7 @@ const round: Round = {
   fallback: { seconds: 1.2, turn: 0.8, move: 0.8 },
   film: { background: 'scene/backgrounds/prov-rum.jpg', fps: 24, hold: 1.5 },
   wait: { most: 4 },
+  speed: { clips: 1 },
 };
 const deals: Deal[] = [
   { seat: 1, hand: 0, index: 0, face: 'A♠', action: 'deal' },
@@ -59,6 +60,10 @@ test('rundans beställning, med klipp och kort som går självt, går genom samm
   assert.throws(() => broken({ file: null, seconds: 1, card: { seat: 'X', index: 1, face: '7♣', at: 1 }, from: 'skon' }), /dealer/);
   assert.throws(() => readOrder({ ...order, card: { seat: 1, index: 0, face: 'A♠', from: 1 }, frames: 24, frame: scene.forlaga.frame, eye }), /card hör till ett ensamt klipp/);
   assert.throws(() => roundOrder({ clips: [], dealt: [], missing: [], unusable: [], anchor: null, anchors: [] }, round, { kind: 'spelaren' }, background, 'x'), /inga kort/);
+  // I en annan fart bär beställningen farten, och beskrivningen säger den; utanför 1–2 tas den inte emot.
+  const fast = roundOrder(plan, { ...round, speed: { clips: 1.5 } }, { kind: 'spelaren' }, background, 'runda-paulina-prov-fart-1-5');
+  assert.deepEqual(readOrder({ ...fast, frames: 24, frame: scene.forlaga.frame, eye }).dealer, { kind: 'film', view: { kind: 'spelaren' }, clips: plan.clips, hold: 1.5, speed: 1.5 });
+  for (const speed of [0.5, 3, '1,5']) assert.throws(() => readOrder({ ...fast, dealer: { ...fast.dealer!, speed }, frames: 24, frame: scene.forlaga.frame, eye }), /dealer/);
 });
 
 test('arket visar första rutan och sista rutan i varje del, klipp eller fallback, med kortet den lade', () => {
@@ -71,6 +76,11 @@ test('arket visar första rutan och sista rutan i varje del, klipp eller fallbac
   assert.ok(Math.abs(times[5]!.time - (10.24 - 0.5 / 24)) < 1e-9);
   assert.match(times[2]!.text, /^2: 9♦ dealern, kort 0 \(deal\), utan klipp/);
   assert.match(times[4]!.text, /^4: baksidan dealern, kort 1 med baksidan upp/);
+  // I 1,5 tar klippen två tredjedelar så lång tid; korten utan klipp går i sin egen takt.
+  const fast = clipEnds(plan, 1.5, 1.5);
+  assert.deepEqual(fast.map((end) => Math.round(end * 1000) / 1000), [2.693, 3.893, 5.893, 7.093, 7.893]);
+  const quick = sheetTimes(plan, { ...round, speed: { clips: 1.5 } });
+  assert.ok(Math.abs(quick[5]!.time - (fast[4]! - 0.5 / 24)) < 1e-9);
   assert.deepEqual(viewOfWord('spelaren'), { kind: 'spelaren' });
   assert.deepEqual(viewOfWord('plats-7'), { kind: 'plats', seat: 7 });
   assert.throws(() => viewOfWord('filmkameran'), /Okänd vy/);

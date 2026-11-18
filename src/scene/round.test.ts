@@ -17,7 +17,7 @@ const project = resolve(import.meta.dirname, '..', '..');
 const readJson = (file: string): unknown => JSON.parse(readFileSync(join(project, 'content', file), 'utf8'));
 const FALLBACK = { seconds: 1.2, turn: 0.8, move: 0.8 };
 const rounded = (flying: ReturnType<typeof flyingAt>) => flying && { ...flying, progress: Math.round(flying.progress * 1e6) / 1e6 };
-const round: Round = { deal: { seed: 'prov', bets: [{ seat: 4, main: 10 }], hitBelow: 15 }, fallback: FALLBACK, film: { background: 'scene/backgrounds/prov-rum.jpg', fps: 24, hold: 1.5 }, wait: { most: 4 } };
+const round: Round = { deal: { seed: 'prov', bets: [{ seat: 4, main: 10 }], hitBelow: 15 }, fallback: FALLBACK, film: { background: 'scene/backgrounds/prov-rum.jpg', fps: 24, hold: 1.5 }, wait: { most: 4 }, speed: { clips: 1 } };
 
 // Spelkärnans händelser och vy, i den form seats.ts ger dem. Bara det rundan läser är ifyllt.
 const card = (face: string, shoeDraw: number) => ({ r: face.slice(0, -1), s: face.slice(-1), serial: shoeDraw, shoeDraw });
@@ -259,6 +259,16 @@ test('content/runda.json går att läsa, och en runda som inte går att använda
   assert.throws(() => readRound({ ...whole, wait: { most: -1 } }), /wait\.most/);
   assert.throws(() => readRound({ ...whole, wait: undefined }), /wait\.most/);
   assert.throws(() => readRound(null), /deal\.seed/);
+  // Klippens fart: 1–2, och den står i filen.
+  assert.ok(read.speed.clips >= 1 && read.speed.clips <= 2);
+  for (const clips of [1, 1.5, 2]) assert.equal(readRound({ ...whole, speed: { clips } }).speed.clips, clips);
+  for (const speed of [{ clips: 0.9 }, { clips: 2.5 }, { clips: '1,5' }, {}, undefined]) assert.throws(() => readRound({ ...whole, speed }), /speed\.clips 1 … 2/);
+});
+
+test('rundans dealerfilm spelar klippen i rundans fart, och säger ingen fart i 1', () => {
+  const plan = planRound([{ seat: 4, hand: 0, index: 0, face: 'A♠', action: 'deal' }], [clip('a.mp4', { seat: 4, index: 0, lands: { seat: 4, index: 0, at: 1.9 } })], 'paulina', { kind: 'spelaren' }, FALLBACK);
+  assert.equal('speed' in roundFilm(plan, round, { kind: 'spelaren' }), false);
+  assert.equal(roundFilm(plan, { ...round, speed: { clips: 1.5 } }, { kind: 'spelaren' }).speed, 1.5);
 });
 
 test('ett klipp som bär sitt öga, sin sko och var kortet landar spelas så, också när scenens tal har ändrats', () => {

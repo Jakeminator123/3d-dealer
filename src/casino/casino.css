@@ -91,8 +91,11 @@ button.go {
   margin-left: 6px;
 }
 
+.purse {
+  gap: 8px;
+}
+
 .purse strong {
-  margin-left: 6px;
   color: var(--accent);
   font-size: 17px;
 }
@@ -241,4 +244,93 @@ button.go {
   margin: 0;
   color: var(--dim);
   font-size: 13px;
+}
+
+/*
+ * Stående, som en telefon: scenen överst i full bredd, i scenens sidförhållande (--frame, satt av sidan), och knapparna
+ * under. Sidan rullar i stället för att scenen krymper.
+ */
+@media (orientation: portrait) {
+  .casino {
+    height: auto;
+    min-height: 100%;
+    grid-template-rows: auto auto;
+  }
+
+  .room {
+    grid-template-rows: auto auto;
+  }
+
+  .tableview {
+    aspect-ratio: var(--frame, 16 / 9);
+  }
+}
+
+/* Liggande med liten höjd, som en telefon på sidan: scenen till vänster och panelen till höger, där den rullar. */
+@media (orientation: landscape) and (max-height: 560px) {
+  .room {
+    grid-template-columns: minmax(0, 1fr) minmax(300px, 42%);
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  .panel {
+    align-content: start;
+    min-width: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    border-top: 0;
+    border-left: 1px solid var(--line);
+    padding: 10px 14px;
+  }
+
+  .seats {
+    flex: 1 1 100%;
+  }
+
+  .seats button {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
+/* En tumme: knappar och fält att träffa, och text som går att läsa. */
+@media (pointer: coarse) {
+  button {
+    min-height: 44px;
+    padding: 10px 16px;
+    touch-action: manipulation;
+  }
+
+  .seats button {
+    min-width: 44px;
+  }
+
+  .stake input {
+    min-height: 44px;
+    font-size: 16px;
+  }
+}
+
+@media (max-width: 560px) {
+  body {
+    font-size: 16px;
+  }
+
+  .panel {
+    padding: 12px 14px 18px;
+  }
+
+  .seats {
+    flex: 1 1 100%;
+  }
+
+  .seats button {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .missing,
+  .fine {
+    font-size: 14px;
+  }
 }

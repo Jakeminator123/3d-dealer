@@ -21,7 +21,8 @@
 //     Kör forbered och ta-emot på pilottagningen (output/work/cykel/pilot/) och jämför talen med pilotens egna.
 //
 // Vyn är `spelaren` eller `plats-N`, kort är kortplatsens nummer på platsen (0 för den första). Det som tagningen byggs
-// av och prövas mot står i content/tagning.json; scenen, dockan och cykeln i content/scene.json, doll.json och moves/.
+// av och prövas mot står i content/tagning.json; vyns REDO-ankare och dealerns ord för texten i hennes fil
+// (content/dealers/<dealer>.json, dealer.ts); scenen, dockan och cykeln i content/scene.json, doll.json och moves/.
 // Mätningarna står i matning.ts. STUDIO_DATA pekar ut ett annat register, som för npm run reg.
 //
 // Registrets post för ett klipp bär `seat` (1–7, eller "D" för dealern), `index` (kortplatsens nummer) och `action`
@@ -33,10 +34,11 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import sharp from 'sharp';
 import type { FilmEye } from '../scene/dealer.ts';
-import { readScene } from '../scene/description.ts';
+import { readScene, type Vec3 } from '../scene/description.ts';
 import { ACTIONS, cardPlace, poseAt, type Action, type Seat } from '../scene/dollPose.ts';
-import { viewEye, type Eye, type SeatView } from '../scene/geometry.ts';
-import { closeView, cycleMove, paintedPicture, placeWords, readCycleParts, type CycleCard, type CycleParts } from './cykel.ts';
+import { see, viewEye, type Eye, type SeatView } from '../scene/geometry.ts';
+import { dealerFile, fillText, placeholdersOf, readDealer, readMall, wordKeys, wordsOf, type Words } from './dealer.ts';
+import { closeView, cycleEye, cycleMove, paintedPicture, placeWords, readCycleParts, type CycleCard, type CycleParts } from './cykel.ts';
 import { dollMotion, filmMotion, MotionError, motionNumbers, screenOf, type MotionMeasure } from './rorelse.ts';
 import {
   countIn,
@@ -63,7 +65,7 @@ import {
   type Probe,
   type Values,
 } from './matning.ts';
-import { about, addMeasurement, addOrder, addUpload, dropMeasurements, getEntry, importAsset, sha256Of, stamp, studioRoot, unsigned, type Order, type Post } from './registry.ts';
+import { about, addMeasurement, addOrder, addUpload, dropMeasurements, getEntry, importAsset, registerPath, sha256Of, stamp, studioRoot, unsigned, type Order, type Post } from './registry.ts';
 import { shootAll } from './shoot.ts';
 
 export class TagningError extends Error {}
@@ -79,9 +81,8 @@ export const PACKAGES = 'output/tagningar';
 // Det som står i content/tagning.json
 
 export type TagningContent = {
-  order: { tool: string; model: string; resolution: string; duration: number; ratio: string; source: string };
+  order: { tool: string; model: string; resolution: string; duration: number; least: number; ratio: string; source: string };
   reference: { studio: { screen: number[]; table: number[] }; fps: number };
-  redo: { anchors: Record<string, Record<string, string>> };
   /**
    * `text` är texten för en giv. `actions` säger vad som byts i den för de andra handlingarna: varje par är en mening ur
    * `text` och den mening som står i stället, så att det som är lika står på ett ställe.
@@ -100,15 +101,19 @@ export function readTagning(root = ROOT): TagningContent {
   const need = (ok: boolean, what: string) => {
     if (!ok) wrong.push(what);
   };
-  for (const group of ['order', 'reference', 'redo', 'prompt', 'proof', 'measure', 'motion', 'limits'] as const) {
+  for (const group of ['order', 'reference', 'prompt', 'proof', 'measure', 'motion', 'limits'] as const) {
     const marked = read[group] as { basis?: unknown; source?: unknown } | undefined;
     need((marked?.basis === 'mätt' || marked?.basis === 'antaget') && typeof marked?.source === 'string', `${group}: basis och source`);
   }
-  need(typeof read.order?.model === 'string' && Number.isFinite(read.order?.duration), 'order: model och duration');
+  need(typeof read.order?.model === 'string' && Number.isFinite(read.order?.duration) && Number.isFinite(read.order?.least) && read.order.least > 0, 'order: model, duration och least');
+  need(Number.isFinite(read.measure?.frameMargin) && read.measure.frameMargin >= 0, 'measure.frameMargin');
   need(Number.isFinite(read.reference?.fps) && read.reference.fps > 0, 'reference.fps');
-  need([read.motion?.still, read.motion?.moving, read.motion?.degrees].every((value) => Number.isFinite(value) && value! > 0) && Number.isFinite(read.motion?.handBlend) && read.motion.handBlend >= 0, 'motion: still, moving och degrees över 0, och handBlend från 0');
-  need(typeof read.prompt?.text === 'string' && !/[{}]/.test(read.prompt.text), 'prompt.text, utan platshållare');
-  need(typeof read.prompt?.actions?.wait?.text === 'string' && read.prompt.actions.wait.text !== '' && typeof read.prompt.actions.wait.source === 'string', 'prompt.actions.wait: text och source');
+  need([read.motion?.still, read.motion?.moving, read.motion?.degrees, read.motion?.slowShare, read.motion?.yawPerShare].every((value) => Number.isFinite(value) && value! > 0) && [read.motion?.handBlend, read.motion?.restLeast, read.motion?.orderLeast, read.motion?.orderTurn].every((value) => Number.isFinite(value) && value! >= 0), 'motion: still, moving, degrees, slowShare och yawPerShare över 0, och handBlend, restLeast, orderLeast och orderTurn från 0');
+  // Texten bär bara dealerns ord som platshållare (dealer.ts, fillText): det som gäller en viss dealer står i hennes fil.
+  const known = wordKeys(readMall(root));
+  const unknown = (text: unknown): boolean => typeof text !== 'string' || placeholdersOf(text).some((key) => !known.includes(key));
+  need(!unknown(read.prompt?.text), `prompt.text: bara dealerns ord som platshållare (${known.join(', ')})`);
+  need(typeof read.prompt?.actions?.wait?.text === 'string' && read.prompt.actions.wait.text !== '' && !unknown(read.prompt.actions.wait.text) && typeof read.prompt.actions.wait.source === 'string', 'prompt.actions.wait: text och source, med bara dealerns ord som platshållare');
   for (const action of ACTIONS.filter((entry): entry is Exclude<Action, 'deal' | 'wait'> => entry !== 'deal' && entry !== 'wait')) {
     const given = read.prompt?.actions?.[action];
     const pairs = Array.isArray(given?.replace) && given.replace.every((pair) => Array.isArray(pair) && pair.length === 2 && pair.every((part) => typeof part === 'string' && part !== ''));
@@ -125,19 +130,30 @@ export function readTagning(root = ROOT): TagningContent {
 /**
  * Texten till filmmodellen för en handling: samma för varje plats och vy (content/tagning.json, prompt). För en giv är
  * det mallens text; för hålkortet och vändningen byts de meningar som handlingen kräver (prompt.actions). En mening som
- * inte står i texten precis en gång är ett fel: då har mallen ändrats utan att bytena har det.
+ * inte står i texten precis en gång är ett fel: då har mallen ändrats utan att bytena har det. Sist fylls dealerns ord
+ * (`words`, dealer.ts wordsOf): utan dem står inget som gäller en viss dealer, till exempel inga tatueringar.
  */
-export function promptFor(content: TagningContent, action: Action = 'deal'): string {
-  if (action === 'deal') return content.prompt.text;
+export function promptFor(content: TagningContent, action: Action = 'deal', words: Words = {}): string {
+  if (action === 'deal') return fillText(content.prompt.text, words);
   // En väntan delar inget kort, så den har en egen text.
-  if (action === 'wait') return content.prompt.actions.wait.text;
+  if (action === 'wait') return fillText(content.prompt.actions.wait.text, words);
   let text = content.prompt.text;
   for (const [from, to] of content.prompt.actions[action].replace) {
     const at = text.indexOf(from);
     if (at < 0 || text.indexOf(from, at + 1) >= 0) throw new TagningError(`prompt.actions.${action}: "${from.slice(0, 60)}…" står inte precis en gång i texten`);
     text = text.slice(0, at) + to + text.slice(at + from.length);
   }
-  return text;
+  return fillText(text, words);
+}
+
+/** Dealerns ord för texten (dealer.ts, wordsOf), eller inga när hennes fil inte går att läsa. */
+function wordsFor(root: string, dealer: string): Words {
+  try {
+    const mall = readMall(root);
+    return wordsOf(readDealer(root, dealer, mall), mall);
+  } catch {
+    return {};
+  }
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -153,8 +169,8 @@ const kindOf = (spec: Spec, cycle: string): string => `${cycle}${(spec.action ??
 const seatName = (seat: Seat): string => (seat === 'D' ? 'd' : String(seat));
 const prefixOf = (spec: Spec, cycle: string): string => `${spec.dealer}_${spec.view}_${kindOf(spec, cycle)}_${seatName(spec.seat)}-${spec.index}`;
 /**
- * Paketets namn: dealer, vy, slag, plats-kort och tagning, till exempel paulina_spelaren_cykel-nyp_4-0_t1 och
- * paulina_spelaren_cykel-nyp-hole_d-1_t1.
+ * Paketets namn: dealer, vy, slag, plats-kort och tagning, till exempel <dealer>_spelaren_cykel-nyp_4-0_t1 och
+ * <dealer>_spelaren_cykel-nyp-hole_d-1_t1.
  */
 export const packageId = (spec: Spec, cycle: string, take: number): string => `${prefixOf(spec, cycle)}_t${take}`;
 /** Klippets namn i registret, som tagningarna där heter: dealers/<dealer>/clips/<slag>-<plats>-<kort>_<vy>_t<n>.mp4. */
@@ -256,6 +272,46 @@ export function dollWrist(parts: CycleParts, card: CycleCard): number {
   return Math.round(most);
 }
 
+/**
+ * Ögat ett REDO-ankare är gjort genom, ur dess post i registret (`eye`, som ett klipp bär det), eller null när registret
+ * eller posten saknas eller posten inte bär något öga (äldre poster): då gäller vyns närbild i dag.
+ */
+export function anchorEyeOf(registry: string, file: string): Eye | null {
+  if (!existsSync(registerPath(registry))) return null;
+  const eye = getEntry(registry, file)?.eye as Partial<FilmEye> | undefined;
+  const vector = (value: unknown): value is [number, number, number] => Array.isArray(value) && value.length === 3 && value.every((part) => Number.isFinite(part));
+  if (!eye || !vector(eye.position) || !vector(eye.forward) || !(Number(eye.focalPx) > 0) || !(Number(eye.frame?.width) > 0) || !(Number(eye.frame?.height) > 0)) return null;
+  return { position: [...eye.position], forward: [...eye.forward], focalPx: eye.focalPx!, frame: { width: eye.frame!.width, height: eye.frame!.height } };
+}
+
+/**
+ * Hur nära rutans kant, i bildpunkter genom ögat `eye`, kortet och handen som lägger det kommer: kortets hörn och
+ * givhandens punkter från att kortet ligger tills handen lämnar det, och det lagda kortets hörn i sista rutan. Negativt
+ * när något är utanför rutan. En väntan lägger inget kort: där prövas handen i REDO.
+ */
+export function withinFrame(parts: CycleParts, card: CycleCard, eye: Eye): number {
+  const move = cycleMove(parts, card);
+  const from = card.action === 'wait' ? 0 : move.moments.rests;
+  const to = card.action === 'wait' ? 0 : (move.back?.letsGo ?? move.frameCount - 1);
+  const points: Vec3[] = [];
+  for (let frame = from; frame <= to; frame++) {
+    const pose = poseAt(parts.scene, parts.doll, move, frame / move.fps);
+    points.push(...pose.hands.left, ...((pose.laid ?? pose.card)?.corners ?? []));
+  }
+  const last = poseAt(parts.scene, parts.doll, move, move.seconds).laid;
+  if (last) points.push(...last.corners);
+  let least = Infinity;
+  for (const point of points) {
+    const pixel = see(eye, point);
+    if (!pixel) return -Infinity;
+    least = Math.min(least, pixel.x, pixel.y, eye.frame.width - pixel.x, eye.frame.height - pixel.y);
+  }
+  return least;
+}
+
+/** Filmens längd för en cykel: cykelns sekunder uppåt till hela sekunder, och minst order.least (Kling 4 tar 3–30 s). */
+export const durationFor = (content: TagningContent, seconds: number): number => Math.max(content.order.least, Math.ceil(seconds - 1e-9));
+
 /** Dockans referensfilm ur vyns närbild i grå ateljé, sparad av scenen med shoot.ts. Svaret är filen, räknad från projektmappen. */
 async function shootReference(content: TagningContent, cycle: string, view: SeatView, card: CycleCard, say: (text: string) => void): Promise<string> {
   const { seat, index, action } = card;
@@ -307,6 +363,8 @@ export type PrepareOptions = {
   reference?: string;
   /** En annan text än mallens: bara för en tagning som redan är beställd (pröva). */
   text?: string;
+  /** Registret där ankarets post står (med dess öga); annars projektets, eller STUDIO_DATA. */
+  registry?: string;
   say?: (text: string) => void;
 };
 
@@ -340,10 +398,24 @@ async function prepare(spec: Spec, options: PrepareOptions, made: { dir?: string
   cardPlace(scene, spec.seat, spec.index);
   const card: CycleCard = { seat: spec.seat, index: spec.index, action };
   const words = cardWords(spec.seat, spec.index, action);
-  const anchorFile = content.redo.anchors[spec.dealer]?.[spec.view];
-  if (!anchorFile) throw new TagningError(`content/tagning.json säger inget REDO-ankare för ${spec.dealer} ur ${spec.view} (redo.anchors)`);
+  // Vyns REDO-ankare och orden för texten står i dealerns fil (dealer.ts).
+  const mall = readMall(root);
+  const dealer = readDealer(root, spec.dealer, mall);
+  const anchorFile = dealer.anchors.redo[spec.view];
+  if (!anchorFile) throw new TagningError(`${dealerFile(spec.dealer)} säger inget REDO-ankare ur ${spec.view} (anchors.redo). Gör ett: node src/pipeline/ankare.ts förbered ${spec.dealer} ${spec.view}`);
   const anchor = join(root, 'assets', anchorFile);
   if (!existsSync(anchor)) throw new TagningError(`${anchorFile} finns inte i assets/`);
+  // Ankarets öga: dockans film, kortets hörn och sista bilden görs genom det, så att ett ankare gäller också när
+  // kortplanen ändras och närbilden räknas om. En äldre post utan eye: vyns närbild i dag, som förut.
+  const anchorEye = anchorEyeOf(options.registry ?? (options.root ? root : studioRoot()), anchorFile);
+  const seen: CycleParts = anchorEye ? { ...parts, eye: anchorEye } : parts;
+  const eye = cycleEye(seen, view);
+  const margin = withinFrame(seen, card, eye);
+  if (margin < content.measure.frameMargin) {
+    throw new TagningError(
+      `${words} ligger ${shown(Math.round(margin))} bp från kanten av ${anchorFile}s ruta (minst ${content.measure.frameMargin}, content/tagning.json measure.frameMargin): kortet eller handen som lägger det syns inte hela genom ankarets öga. Gör ankaret om i dagens närbild.`,
+    );
+  }
 
   const take = options.take ?? nextTake(out, spec, cycle);
   const id = packageId(spec, cycle, take);
@@ -353,32 +425,34 @@ async function prepare(spec: Spec, options: PrepareOptions, made: { dir?: string
   const at = (file: string) => join(dir, file);
 
   // Första bilden är ankaret; i en vändning ligger hålkortet målat gult i den. Sista bilden har kortet som det ligger.
-  const firstPainted = await paintedPicture(parts, anchor, card, 'first', at('forsta.png'), { ...view, close: true });
+  const firstPainted = await paintedPicture(seen, anchor, card, 'first', at('forsta.png'), { ...view, close: true });
   if (!firstPainted) copyFileSync(anchor, at('forsta.png'));
   // En väntan slutar som den börjar: sista bilden är ankaret.
-  const painted = await paintedPicture(parts, anchor, card, 'last', at('sista.png'), { ...view, close: true });
+  const painted = await paintedPicture(seen, anchor, card, 'last', at('sista.png'), { ...view, close: true });
   if (!painted) copyFileSync(anchor, at('sista.png'));
 
   let source = options.reference;
   if (!source) {
-    say(`Dockans film för ${words} ur ${spec.view} sparas i ${content.reference.fps} rutor/s …`);
-    source = await shootReference(content, cycle, view, card, say);
+    say(`Dockans film för ${words} ur ${spec.view} sparas i ${content.reference.fps} rutor/s${anchorEye ? ' genom ankarets öga' : ''} …`);
+    source = await shootReference(content, cycle, anchorEye ? { ...view, eye } : view, card, say);
   }
   copyFileSync(join(root, source), at('referens.mp4'));
   const reference = await probe(at('referens.mp4'));
-  const text = options.text ?? promptFor(content, action);
+  const text = options.text ?? promptFor(content, action, wordsOf(dealer, mall));
   writeFileSync(at('text.txt'), text);
 
   // Dockans film mätt som klippet sedan mäts, och sedd som ark.
-  const layout = layoutFor(parts, view, card, content.measure);
+  const layout = layoutFor(seen, view, card, content.measure);
   const { doll } = await measureDoll(root, dir, layout, content.measure, true);
 
   const wrist = dollWrist(parts, card);
   const checks = content.limits.dockansHandled ? [judgeOne('dockansHandled', wrist, content.limits.dockansHandled)] : [];
   // Dockans rörelse mot rörelsens gränser (rorelse.ts), innan något beställs: en stel docka ger ett stelt klipp.
-  const motion = motionNumbers(dollMotion(parts, cycleMove(parts, card), content.motion, content.reference.fps));
-  // En väntan har ingen väg ut och tillbaka: måtten för ordningen mellan huvud, bål och hand finns inte för den.
-  for (const [key, value] of Object.entries(motion)) if (content.limits[key] && !(action === 'wait' && value === null)) checks.push(judgeOne(key, value, content.limits[key]!));
+  const moved = cycleMove(parts, card);
+  const motion = motionNumbers(dollMotion(parts, moved, content.motion, content.reference.fps));
+  // Ett mått som inte gäller slaget saknas (null) och prövas inte: en väntan har ingen väg ut och tillbaka, en vändning inga
+  // tider för en giv, och ordningen mellan huvud och hand mäts bara när huvudet vrids (motion.orderTurn).
+  for (const [key, value] of Object.entries(motion)) if (content.limits[key] && value !== null) checks.push(judgeOne(key, value, content.limits[key]!));
   const pkg = posix(relative(root, dir));
   const order = {
     about: 'Beställningen av en tagning, gjord av src/pipeline/tagning.ts forbered. Allt Runways generate_video behöver: modell, upplösning, längd, text och vilka filer som är startFrame, endFrame och referenceVideos. Filerna ligger i paketet; source säger var de kommer ifrån.',
@@ -396,8 +470,9 @@ async function prepare(spec: Spec, options: PrepareOptions, made: { dir?: string
     anchor: anchorFile,
     model: content.order.model,
     resolution: content.order.resolution,
-    // Filmen är lika lång som cykeln, i hela sekunder (Kling 4 tar 3–30 s); content/tagning.json säger längden för cykeln på 4,0 s.
-    duration: Math.max(content.order.duration, Math.ceil(parts.cycle.seconds - 1e-9)),
+    // Filmen är lika lång som cykeln (en väntan kan ha sin egen längd), i hela sekunder och minst order.least (Kling 4 tar
+    // 3–30 s); content/tagning.json säger vanliga längden (duration), som formatets gräns gäller.
+    duration: durationFor(content, moved.seconds),
     ratio: content.order.ratio,
     tool: content.order.tool,
     promptFile: `${pkg}/text.txt`,
@@ -412,7 +487,7 @@ async function prepare(spec: Spec, options: PrepareOptions, made: { dir?: string
             spared: firstPainted.spared,
             corners: firstPainted.corners,
           }
-        : { file: `${pkg}/forsta.png`, asset: anchorFile, sha256: sha256Of(at('forsta.png')), note: 'vyns REDO-ankare (content/tagning.json, redo.anchors), oförändrat' },
+        : { file: `${pkg}/forsta.png`, asset: anchorFile, sha256: sha256Of(at('forsta.png')), note: `vyns REDO-ankare (${dealerFile(spec.dealer)}, anchors.redo), oförändrat` },
       endFrame: painted
         ? {
             file: `${pkg}/sista.png`,
@@ -438,9 +513,11 @@ async function prepare(spec: Spec, options: PrepareOptions, made: { dir?: string
     doll: { file: `${pkg}/docka.json`, seconds: doll.seconds, wristDeg: wrist, sheet: `${pkg}/ark-docka.jpg` },
     scene: {
       shoe: shoeOf(scene.shoe),
-      eye: eyeOf(viewEye(scene, { ...view, close: true })),
+      eye: eyeOf(anchorEye ?? viewEye(scene, { ...view, close: true })),
+      eyeFrom: anchorEye ? `${anchorFile}: ögat ankaret är gjort genom (registrets post, eye)` : `vyns närbild i content/scene.json (${anchorFile}s post saknar eye)`,
+      frameMargin: Math.round(margin),
       place: cardPlace(scene, spec.seat, spec.index),
-      source: 'content/scene.json när paketet gjordes: skon, som är inbakad i ankaret och klippet, vyns närbild som filmen görs i, och kortplatsen kortet läggs på. Klippet mäts mot dem (partsOf), och posten bär dem (eye, shoe, place)',
+      source: 'content/scene.json när paketet gjordes: skon, som är inbakad i ankaret och klippet, ögat filmen görs genom (ankarets, eyeFrom), och kortplatsen kortet läggs på. frameMargin: hur nära rutans kant kortet och handen som lägger det kommer, i bp. Klippet mäts mot dem (partsOf), och posten bär dem (eye, shoe, place)',
     },
     checks,
     uploads: `${pkg}/uppladdat.json: [{ "role": "startFrame" | "endFrame" | "referenceVideos", "url": "<adressen>", "assetId": "<id>", "at": "ÅÅÅÅ-MM-DD TT:MM" }]`,
@@ -458,7 +535,7 @@ async function prepare(spec: Spec, options: PrepareOptions, made: { dir?: string
   say('  1. Se på ark-docka.jpg. Läs saldot (whoami eller show_plans_and_credits).');
   say('  2. Ladda upp forsta.png, sista.png och referens.mp4 (init_upload, curl, complete_upload). Skriv adresserna i');
   say(`     ${pkg}/uppladdat.json (formen står i bestallning.json, uploads).`);
-  say(`  3. generate_video: ${content.order.model}, ${content.order.resolution}, ${content.order.duration} s, ${content.order.ratio}; startFrame forsta.png,`);
+  say(`  3. generate_video: ${content.order.model}, ${content.order.resolution}, ${order.duration} s, ${content.order.ratio}; startFrame forsta.png,`);
   say('     endFrame sista.png, referenceVideos [referens.mp4], texten ur text.txt.');
   say('  4. Läs saldot igen och ladda ned filmen. Sedan:');
   say(`     node src/pipeline/tagning.ts ta-emot ${id} <film> --task <taskId> --krediter <n> --saldo-fore <n> --saldo-efter <n>`);
@@ -604,7 +681,11 @@ async function measureTake(root: string, dir: string, ordered: Ordered, clip: st
   // Rörelsen i klippet (rorelse.ts): stillhet, knyckar och ordningen mellan huvud, bål och hand. Går den inte att spåra
   // (ingen dealer i bild) saknas måtten, och det syns i omdömet.
   try {
-    Object.assign(values, motionNumbers((await filmMotion(clip, content.motion, screenOf(content.reference.studio))).values));
+    const action = ordered.action ?? 'deal';
+    const motion = motionNumbers((await filmMotion(clip, content.motion, screenOf(content.reference.studio), true, action === 'deal' || action === 'hole')).values);
+    // Som i forbered: ett mått som inte gäller saknas (null) och prövas inte. Huvudet mot skon mäts bara på dockan, och
+    // ordningen mellan huvud och hand bara när huvudet vrids (motion.orderTurn).
+    for (const [key, value] of Object.entries(motion)) if (value !== null) values[key] = value;
   } catch (error) {
     if (!(error instanceof MotionError)) throw error;
     say(`Rörelsen gick inte att mäta: ${error.message}`);
@@ -783,7 +864,7 @@ export async function taEmot(id: string, download: string, receipt: Receipt, opt
       creditsBasis: basis === 'mätt' ? 'mätt: saldot direkt före och direkt efter' : `antaget: krediterna ${receipt.credits} är inte skillnaden mellan saldona ${receipt.before} och ${receipt.after}`,
       references,
       prompt: ordered.prompt,
-      promptNote: ordered.prompt === promptFor(content, action)
+      promptNote: ordered.prompt === promptFor(content, action, wordsFor(root, ordered.dealer))
         ? `mallen i content/tagning.json, prompt${action === 'deal' ? '' : ` med prompt.actions.${action}`} (${pkg}/text.txt)`
         : `${pkg}/text.txt, inte mallen i content/tagning.json`,
       package: pkg,
@@ -901,7 +982,8 @@ export async function prova(options: { root?: string; registry?: string; say?: (
   const say = options.say ?? ((text: string) => console.log(text));
   const pilot = JSON.parse(readFileSync(join(root, PILOT, 'bestallning.json'), 'utf8'));
   const inputs = pilot.order.inputs;
-  const spec: Spec = { dealer: 'paulina', view: 'spelaren', seat: 4, index: 0 };
+  // Pilotens dealer, ur klippets namn i dess egen beställning (dealers/<dealer>/clips/…).
+  const spec: Spec = { dealer: String(/^dealers\/([a-z0-9-]+)\//.exec(String(pilot.suggestedAssetPath))?.[1] ?? ''), view: 'spelaren', seat: 4, index: 0 };
   // Pilotens referensfilm: sparad i 30 rutor/s med den gamla handen. Den används som den var, och bara om den är oförändrad.
   const id = packageId(spec, 'cykel-nyp', 1);
   const kept = join(root, PACKAGES, id, 'referens.mp4');
@@ -980,9 +1062,9 @@ const USAGE = `Använd:
   node src/pipeline/tagning.ts pröva
 Vyn är spelaren eller plats-N. Platsen är 1–7, eller D för dealern; kort är kortplatsens nummer på platsen, 0 för den
 första (dealerns kort 0 är det öppna kortet och kort 1 hålkortet). Handlingen är deal om inget sägs:
-  deal  kortet läggs med framsidan upp         forbered paulina spelaren 3 2      forbered paulina spelaren D 0
-  hole  hålkortet läggs med baksidan upp       forbered paulina spelaren D 1 hole
-  flip  hålkortet vänds där det ligger          forbered paulina spelaren D 1 flip`;
+  deal  kortet läggs med framsidan upp         forbered <dealer> spelaren 3 2     forbered <dealer> spelaren D 0
+  hole  hålkortet läggs med baksidan upp       forbered <dealer> spelaren D 1 hole
+  flip  hålkortet vänds där det ligger          forbered <dealer> spelaren D 1 flip`;
 
 /** Platsen ur ett ord: 1–7, eller D (d) för dealern. */
 const seatOf = (word: string): Seat => (word === 'D' || word === 'd' ? 'D' : /^\d+$/.test(word) ? Number(word) : NaN);

@@ -118,6 +118,12 @@ export type SceneHandle = {
    * kvar som det byggdes. Så ställs planen i Labbet medan given spelar.
    */
   setPlan(next: SceneDescription): void;
+  /**
+   * Ställer farten dealerns klipp spelas i (FilmNote `speed`) medan följden går: den står kvar där den är i klippet och
+   * går vidare i den nya farten, med korten, märkkortet och glidningen efter den. Vänta-klippet och kort utan klipp går i
+   * 1. Så ställs farten i Labbet medan given spelar. Utan dealerfilm gör den ingenting.
+   */
+  setSpeed(speed: number): void;
   /** Ytans storlek på sidan. Hela vyns ruta visas alltid, inpassad på höjden eller bredden. */
   resize(width: number, height: number): void;
   /** Ritar en ruta nu. Annars ritas scenen bara när något har ändrats. */
@@ -284,6 +290,7 @@ export function buildScene(host: HTMLElement, scene: SceneDescription, options: 
           options.doll ? pickUpCard(filmShoeScene, options.doll).corners : null,
           chosen.loop ?? true,
           chosen.wait ? options.urlOf(chosen.wait) : null,
+          chosen.speed ?? 1,
         )
       : null;
   // Dockans punkter står redan i scenens mått med bordets lutning inräknad: hon läggs olutad i världen.
@@ -592,6 +599,9 @@ export function buildScene(host: HTMLElement, scene: SceneDescription, options: 
       for (const entry of laid.values()) entry.to = planPlace(plan, entry.note) ?? entry.from;
       outlinePlaces();
       changed();
+    },
+    setSpeed(speed) {
+      film?.setSpeed(speed);
     },
     resize(width, height) {
       if (!(width > 0 && height > 0)) return;

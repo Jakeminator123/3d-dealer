@@ -1,7 +1,8 @@
-// Steget Kortplan: var korten ligger på bordet och hur stora de är. Jakob ställer spelarnas båge, dealerns rad och
-// kortens storlek med reglage, ser planen rakt uppifrån och hela given ur Spelaren medan han ställer, och sparar talen i
-// content/scene.json genom servern. Talen och deras gränser står i src/scene/plan.ts; uppspelningen som lägger korten
-// efter dem är den enda (src/scene/build.ts, reel.ts glideAt), också i steget Scen, i Casinot och i runda.ts.
+// Steget Kortplan: var korten ligger på bordet och hur stora de är, och hur fort dealerns klipp spelas. Jakob ställer
+// spelarnas båge, dealerns rad, kortens storlek och klippens fart med reglage, ser planen rakt uppifrån och hela given ur
+// Spelaren medan han ställer, och sparar talen genom servern: planen i content/scene.json, farten i content/runda.json.
+// Talen och deras gränser står i src/scene/plan.ts; uppspelningen som lägger korten och spelar klippen efter dem är den
+// enda (src/scene/build.ts, reel.ts), också i steget Scen, i Casinot och i runda.ts.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { buildScene, type Background, type FilmNote, type SceneHandle } from '../scene/build.ts';
@@ -9,7 +10,7 @@ import { readScene, type FeltPoint, type SceneDescription } from '../scene/descr
 import type { DollDescription } from '../scene/dollPose.ts';
 import { seatsOf, tablePosition } from '../scene/geometry.ts';
 import { PLAN_LIMITS, planOf, samePlan, withPlan, type CardPlan } from '../scene/plan.ts';
-import { backgroundOf, planPlace, spotPlace } from '../scene/round.ts';
+import { backgroundOf, planPlace, readRound, spotPlace } from '../scene/round.ts';
 import { roundChoices } from './backdrops.ts';
 import { fetchAll, fetchContent, savePlan, type Content } from './content.ts';
 import { fetchRegistry, mediaUrl, type Registry } from './registry.ts';
@@ -34,15 +35,16 @@ export default function PlanStep() {
   if (!registry || !content) return <main className="notice">{problem ?? 'Läser kortplanen …'}</main>;
   const saved = planOf(content.scene);
   if (!saved) return <main className="notice">Scenen har ingen båge och rad att ställa (places.arc och places.row i content/scene.json).</main>;
-  return <Workbench registry={registry} {...content} start={saved} problem={problem} onProblem={setProblem} />;
+  return <Workbench registry={registry} {...content} start={{ ...saved, speed: content.round.speed.clips }} problem={problem} onProblem={setProblem} />;
 }
 
-type WorkbenchProps = Content & { registry: Registry; start: CardPlan; problem: string | null; onProblem: (text: string | null) => void };
+type WorkbenchProps = Content & { registry: Registry; start: Required<CardPlan>; problem: string | null; onProblem: (text: string | null) => void };
 
 function Workbench({ registry, scene, doll, round, dealt, start, problem, onProblem }: WorkbenchProps) {
-  // Det sparade i content/scene.json, och det Jakob ställer. Scenen byggs en gång; planen ställs om i den medan given spelar.
-  const [saved, setSaved] = useState<CardPlan>(start);
-  const [draft, setDraft] = useState<CardPlan>(start);
+  // Det sparade i content/scene.json och content/runda.json, och det Jakob ställer. Scenen byggs en gång; planen och
+  // farten ställs om i den medan given spelar.
+  const [saved, setSaved] = useState<Required<CardPlan>>(start);
+  const [draft, setDraft] = useState<Required<CardPlan>>(start);
   const [showPlaces, setShowPlaces] = useState(true);
   const [busy, setBusy] = useState(false);
   const [said, setSaid] = useState<string | null>(null);
@@ -65,7 +67,7 @@ function Workbench({ registry, scene, doll, round, dealt, start, problem, onProb
     [choice, scene],
   );
 
-  const set = (change: (plan: CardPlan) => CardPlan) => {
+  const set = (change: (plan: Required<CardPlan>) => Required<CardPlan>) => {
     setDraft((plan) => change(plan));
     setSaid(null);
   };
@@ -73,10 +75,11 @@ function Workbench({ registry, scene, doll, round, dealt, start, problem, onProb
     setBusy(true);
     onProblem(null);
     try {
-      const plan = await savePlan(draft);
+      const answer = await savePlan(draft);
+      const plan = { ...answer, speed: answer.speed ?? draft.speed };
       setSaved(plan);
       setDraft(plan);
-      setSaid(`Sparad i content/scene.json ${new Date().toTimeString().slice(0, 5)}. Labbet, Casinot och runda.ts spelar med den från nästa gång de läser scenen.`);
+      setSaid(`Sparad ${new Date().toTimeString().slice(0, 5)}: kortplanen i content/scene.json och farten i content/runda.json. Labbet, Casinot och runda.ts spelar med dem från nästa gång de läser filerna.`);
     } catch (error) {
       onProblem((error as Error).message);
     } finally {
@@ -87,11 +90,13 @@ function Workbench({ registry, scene, doll, round, dealt, start, problem, onProb
     setBusy(true);
     onProblem(null);
     try {
-      const fresh = planOf(await fetchContent('scene.json', 'Scenens beskrivning', readScene));
-      if (!fresh) throw new Error('Scenen har ingen båge och rad att ställa');
+      const [scene, round] = await Promise.all([fetchContent('scene.json', 'Scenens beskrivning', readScene), fetchContent('runda.json', 'Rundan', readRound)]);
+      const plan = planOf(scene);
+      if (!plan) throw new Error('Scenen har ingen båge och rad att ställa');
+      const fresh = { ...plan, speed: round.speed.clips };
       setSaved(fresh);
       setDraft(fresh);
-      setSaid('Återställd till det som står i content/scene.json.');
+      setSaid('Återställd till det som står i content/scene.json och content/runda.json.');
     } catch (error) {
       onProblem((error as Error).message);
     } finally {
@@ -106,6 +111,13 @@ function Workbench({ registry, scene, doll, round, dealt, start, problem, onProb
   const edge = scene.dealerEdge.z;
   const L = PLAN_LIMITS;
   const { glide } = scene.card.onTable;
+  // Hur länge ett kort med klipp tar i given: klippens längder i registret, i farten som ställs.
+  const lengths = (choice?.plan.dealt ?? []).flatMap((deal) => (deal.file !== null && deal.seconds > 0 ? [deal.seconds] : []));
+  const span = (scale: number) => {
+    if (lengths.length === 0) return null;
+    const [low, high] = [comma(Math.min(...lengths) / scale, 1), comma(Math.max(...lengths) / scale, 1)];
+    return low === high ? `${low} s` : `${low}–${high} s`;
+  };
   return (
     <div className="planstep">
       <div className="planviews">
@@ -131,7 +143,7 @@ function Workbench({ registry, scene, doll, round, dealt, start, problem, onProb
           </h2>
           <div className="planscene">
             {choice ? (
-              <Stage scene={scene} planned={planned} doll={doll} dealer={choice.dealer} background={background} places={showPlaces} onProblem={onProblem} onHandle={setHandle} />
+              <Stage scene={scene} planned={planned} speed={draft.speed} doll={doll} dealer={choice.dealer} background={background} places={showPlaces} onProblem={onProblem} onHandle={setHandle} />
             ) : (
               <p className="notice">Registret har inga godkända cykelklipp ur Spelaren att spela.</p>
             )}
@@ -160,18 +172,32 @@ function Workbench({ registry, scene, doll, round, dealt, start, problem, onProb
             <Slider label="Nästa kort mot spelaren" range={L.rowStep.z} value={draft.row.step[1]} show={cm} onChange={(z) => set((plan) => ({ ...plan, row: { ...plan.row, step: [plan.row.step[0], z] } }))} />
           </fieldset>
           <fieldset>
-            <legend>Korten</legend>
+            <legend>Korten och farten</legend>
             <Slider label="Storlek på bordet" range={L.scale} step={0.01} value={draft.scale} show={(value) => `${comma(value, 2)} ×`} hint={`1 är filmens kort, ${cm(scene.card.width)} × ${cm(scene.card.height)}`} onChange={(scale) => set((plan) => ({ ...plan, scale }))} />
+            <Slider
+              label="Klippens fart"
+              range={L.speed}
+              step={0.05}
+              value={draft.speed}
+              show={(value) => `${comma(value, 2)} ×`}
+              hint="1 är som klippen är filmade, 2 dubbelt så fort. Vänta-klippet och kort utan klipp går alltid i sin egen takt."
+              onChange={(speed) => set((plan) => ({ ...plan, speed }))}
+            />
+            {span(1) && (
+              <p className="controlhint">
+                Ett kort med klipp tar {span(draft.speed)} (filmat {span(1)}).
+              </p>
+            )}
             <div className="planbuttons">
-              <button type="button" className="go" disabled={!changed || busy} onClick={save}>
-                Spara i content/scene.json
+              <button type="button" className="go" disabled={!changed || busy} title="Kortplanen i content/scene.json och farten i content/runda.json" onClick={save}>
+                Spara
               </button>
               <button type="button" className="reset" disabled={busy} onClick={reset}>
                 Återställ till det sparade
               </button>
             </div>
             <p className="controlhint" role="status">
-              {busy ? 'Arbetar …' : (said ?? (changed ? 'Ändrat men inte sparat: det syns här, men inte i steget Scen, Casinot eller runda.ts förrän det är sparat.' : 'Som det står i content/scene.json.'))}
+              {busy ? 'Arbetar …' : (said ?? (changed ? 'Ändrat men inte sparat: det syns här, men inte i steget Scen, Casinot eller runda.ts förrän det är sparat.' : 'Som det står i content/scene.json och content/runda.json.'))}
             </p>
           </fieldset>
         </div>
@@ -181,6 +207,11 @@ function Workbench({ registry, scene, doll, round, dealt, start, problem, onProb
             landar där dealerns hand lade det i filmen, i filmens storlek, och när handen har släppt det och lyft ({comma(glide.after, 1)} s
             efter att det landat) glider det på {comma(glide.seconds, 1)} s till sin plats i planen och sin storlek. Är planen densamma
             som när filmen gjordes rör sig ingenting. I luften har kortet alltid filmens storlek.
+          </p>
+          <p>
+            <strong>Farten gäller också direkt:</strong> dealerns klipp spelas så många gånger fortare än de är filmade, och allt som hör
+            till klippets tid följer med: när kortet landar och märkkortet byts mot scenens kort, glidningen (tiderna ovan delas med farten)
+            och bytet till nästa klipp. Vänta-klippet, när dealern väntar på spelet, och kort utan klipp går alltid i sin egen takt.
           </p>
           <p>
             <strong>Kräver nya filmer:</strong> var dealerns hand lägger kortet. Dockan, förlagorna och nya tagningar följer den sparade
@@ -289,11 +320,14 @@ function PlanView({ scene, doll, filmed }: PlanViewProps) {
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
-// Scenen ur Spelaren med hela given. Den byggs med den sparade scenen och får planen som ställs (setPlan) utan att byggas om.
+// Scenen ur Spelaren med hela given. Den byggs med den sparade scenen och får planen och farten som ställs (setPlan,
+// setSpeed) utan att byggas om.
 
 type StageProps = {
   scene: SceneDescription;
   planned: SceneDescription;
+  /** Farten dealerns klipp spelas i, som den ställs. */
+  speed: number;
   doll: DollDescription;
   dealer: FilmNote;
   background: Background | null;
@@ -302,7 +336,7 @@ type StageProps = {
   onHandle: (handle: SceneHandle | null) => void;
 };
 
-function Stage({ scene, planned, doll, dealer, background, places, onProblem, onHandle }: StageProps) {
+function Stage({ scene, planned, speed, doll, dealer, background, places, onProblem, onHandle }: StageProps) {
   const holder = useRef<HTMLDivElement>(null);
   const [handle, setHandle] = useState<SceneHandle | null>(null);
   const dealerKey = JSON.stringify(dealer);
@@ -333,6 +367,9 @@ function Stage({ scene, planned, doll, dealer, background, places, onProblem, on
   useEffect(() => {
     handle?.setPlan(planned);
   }, [handle, planned]);
+  useEffect(() => {
+    handle?.setSpeed(speed);
+  }, [handle, speed]);
   useEffect(() => {
     handle?.setPlaces(places);
   }, [handle, places]);

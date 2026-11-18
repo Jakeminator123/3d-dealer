@@ -15,6 +15,8 @@ const tagning = JSON.parse(readFileSync(join(root, 'content', 'tagning.json'), '
 const MOTION = ['stillaHelt', 'langstaStillhet', 'huvudetIVila', 'tvara', 'knyck', 'huvudFore', 'balEfterTillbaka'];
 
 const minJerk = (t: number): number => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * t * (10 - 15 * t + 6 * t * t));
+const near = (actual: number, expected: number, tolerance: number, what: string) =>
+  assert.ok(Math.abs(actual - expected) <= tolerance, `${what}: ${actual} ligger inte inom ${tolerance} från ${expected}`);
 /** En sträckning `metres` lång på `seconds` sekunder med minsta ryck, med stilla rutor före och efter. */
 const reach = (fps: number, seconds: number, metres = 0.4, pad = 6): number[][] => {
   const n = Math.round(seconds * fps);
@@ -117,6 +119,70 @@ test('variant D vid plats 6 och 7: handleden under 85 grader och armbågen under
     }
   }
 });
+
+test('cykelns tider ur handens fart: vid skon, ut, på kortet och tillbaka, och tillbaka mot ut', () => {
+  const fps = 24;
+  // Stilla 0,25 s, ut 1,0 s, en långsam knuff 0,5 s, tillbaka 0,75 s, stilla 0,5 s: 3,0 s.
+  const still = (seconds: number, at: number) => Array.from({ length: Math.round(seconds * fps) }, () => [at, 0]);
+  const way = (seconds: number, from: number, to: number) => Array.from({ length: Math.round(seconds * fps) }, (_, k) => [from + (to - from) * minJerk((k + 1) / Math.round(seconds * fps)), 0]);
+  const hand = [...still(0.25, 0), ...way(1, 0, 0.6), ...way(0.5, 0.6, 0.62), ...way(0.75, 0.62, 0), ...still(0.5, 0)];
+  const tracks: Tracks = { hand: { fps, points: hand }, head: { fps, points: hand.map(([x]) => [x! * 0.1, 0]) }, trunk: { fps, points: hand.map(([x]) => [x! * 0.05, 0]) } };
+  const values = motionNumbers(motionValues(tracks, { hand: 'hand', head: 'head', trunk: 'trunk', body: ['hand', 'head', 'trunk'] }, { ...tagning.motion, scale: 0.254, smooth: 0, cyclic: true }));
+  // Med slowShare 0,2 räknas den långsamma början och slutet av varje sträckning till skon och kortet: för minsta ryck
+  // är farten under 0,2 av toppen de första och sista 0,16 av tiden.
+  near(values.vagUt!, 1 - 2 * 0.16, 0.09, 'vägen ut');
+  near(values.vagTillbaka!, 0.75 * (1 - 2 * 0.16), 0.09, 'vägen tillbaka');
+  near(values.paKortet!, 0.5 + 0.16 * 1.75, 0.09, 'på kortet');
+  near(values.vidSkon!, 0.75 + 0.16 * 1.75, 0.09, 'vid skon');
+  near(values.tillbakaMotUt!, 0.75, 0.05, 'tillbaka mot ut');
+  // Huvudet i vila: handen står still 0,75 s i sträck (kedjad), så det mäts; utan sidled i huvudet finns ingen sväng.
+  assert.ok(values.huvudetIVila !== null);
+  assert.equal(values.huvudSvang, null);
+});
+
+test('huvudet i vila mäts bara där handen står still minst restLeast i sträck, och en vändning i REDO är ingen vila', () => {
+  const fps = 24;
+  const hand = reach(fps, 1.5, 0.4, 4);
+  const tracks: Tracks = { hand: { fps, points: [...hand, ...[...hand].reverse()] }, head: { fps, points: [...hand, ...[...hand].reverse()].map(([x]) => [x! * 0.1, 0]) }, trunk: { fps, points: [...hand, ...[...hand].reverse()].map(([x]) => [x! * 0.05, 0]) } };
+  const roles = { hand: 'hand', head: 'head', trunk: 'trunk', body: ['hand', 'head', 'trunk'] };
+  // Handen står still i vändningen ute och i REDO (kedjad). Är den längsta stillheten kortare än restLeast mäts inget.
+  const measured = (restLeast: number) => motionNumbers(motionValues(tracks, roles, { ...tagning.motion, restLeast, scale: 0.254, smooth: 0, cyclic: true }));
+  const longest = measured(0).handStilla!;
+  assert.ok(longest > 0.2 && longest < 1, `handen står still ${longest} s`);
+  assert.equal(measured(longest + 0.05).huvudetIVila, null);
+  assert.ok(measured(longest - 0.05).huvudetIVila !== null);
+});
+
+// Variant E (cykel-nyp-rask): varje slag mot alla rörelsens gränser som gäller slaget, och handleden och armbågen.
+const RASK: [Seat, number, Action][] = [
+  ...[1, 2, 3, 4, 5, 6, 7].flatMap((seat) => [0, 1, 2].map((index): [Seat, number, Action] => [seat, index, 'deal'])),
+  ['D', 0, 'deal'],
+  ['D', 1, 'hole'],
+  ['D', 1, 'flip'],
+  ['D', 2, 'deal'],
+  ['D', 3, 'deal'],
+  ['D', 0, 'wait'],
+];
+const raskParts = readCycleParts('cykel-nyp-rask');
+const motionKeys = Object.keys(tagning.limits).filter((key) => key in motionNumbers(dollMotion(raskParts, cycleMove(raskParts, { seat: 4, index: 0, action: 'deal' }), tagning.motion)));
+for (const [seat, index, action] of RASK) {
+  test(`variant E, ${action} till ${seat === 'D' ? 'dealern' : `plats ${seat}`}, kort ${index}: alla rörelsens gränser, handleden och armbågen`, () => {
+    const card = { seat, index, action };
+    const move = cycleMove(raskParts, card);
+    const values = motionNumbers(dollMotion(raskParts, move, tagning.motion));
+    // Ett mått som inte gäller slaget saknas: en väntan har ingen väg ut och tillbaka, en vändning inga tider för en giv.
+    const limits = Object.fromEntries(motionKeys.filter((key) => values[key] !== null).map((key) => [key, tagning.limits[key]!]));
+    for (const entry of judge(values, limits)) assert.equal(entry.verdict, 'inom', `${entry.key}: ${entry.value} mot ${entry.limit}`);
+    assert.ok(values.redoMotSkon! >= 20 && values.huvudMotSkon! >= 15, 'huvudet aldrig mot skon');
+    if (action !== 'wait') {
+      const wrist = dollWrist(raskParts, card);
+      assert.ok(wrist <= tagning.limits.dockansHandled!.most!, `handleden ${wrist} grader`);
+      for (const key of ['vidSkon', 'vagUt', 'paKortet', 'vagTillbaka', 'tillbakaMotUt', 'huvudSvang']) if (action !== 'flip') assert.notEqual(values[key], null, `${key} mäts`);
+    }
+    const elbow = Math.max(0, ...(move.tracks.leftArm?.turnDeg ?? [0]).map(Math.abs));
+    assert.ok(elbow <= 90, `armbågen ${elbow} grader`);
+  });
+}
 
 for (const [name, seat, index, action] of CYCLES) {
   test(`${name}, ${action} till ${seat === 'D' ? 'dealern' : `plats ${seat}`}, kort ${index}: dockans rörelse är inom rörelsens gränser`, () => {

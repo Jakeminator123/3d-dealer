@@ -48,8 +48,10 @@ export type FilmClip = { file: string; card?: ClipCard } | { file: null; seconds
  * registret säger det (FilmEye, FilmShoe); utan dem räknas de ur scenen och vyn. `wait` är vänta-klippet som registrets
  * `file` (waitClip i round.ts): med det väntar dealern efter sista klippet i stället för att sista rutan står kvar, i
  * hela varv som täcker `hold` innan följden börjar om, och med `loop: false` tills följden ställs om (reel.ts).
+ * `speed` är farten klippen i `clips` spelas i (content/runda.json speed.clips): 1 som de är filmade, 1,5 en och en
+ * halv gång så fort. Vänta-klippet och delar utan fil går alltid i 1. Utan `speed` är farten 1.
  */
-export type FilmNote = { kind: 'film'; view: SeatView; clips: FilmClip[]; hold?: number; loop?: boolean; wait?: string; eye?: FilmEye; shoe?: FilmShoe };
+export type FilmNote = { kind: 'film'; view: SeatView; clips: FilmClip[]; hold?: number; loop?: boolean; wait?: string; speed?: number; eye?: FilmEye; shoe?: FilmShoe };
 
 /**
  * Ett ensamt klipp skrivet som förr: filen här, och kortet bredvid i beställningen (`card`, CardNote). Det läses som en

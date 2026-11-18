@@ -1,15 +1,18 @@
-// Spelsessionen: spelkärnan (src/engine) körs här, i servern, och sidorna når den över HTTP (api.ts). Kärnan avgör kort
-// och pengar; här hålls bara sessionen och rundans steg så som kärnan svarade på dem, så att Casinot kan spela upp
-// rundan och läsa om den efter en omladdning.
+// Spelsessionen: spelkärnan (src/engine) som en session, med rundans steg så som kärnan svarade på dem. Kärnan avgör
+// kort och pengar; här hålls bara sessionen och stegen, så att Casinot kan spela upp rundan och läsa om den.
 //
-// Här delas också rundan som Labbet och src/pipeline/runda.ts visar (dealRound): en session med frö, där spelarna i
-// content/runda.json spelar efter en enkel regel. Regeln är spelarens val, inte kärnans: kärnan avgör allt annat.
+// Samma session körs på två ställen: i studions server (src/server/api.ts, /api/game och /api/runda), som sidorna når
+// över HTTP, och i webbläsaren i visningen (src/visning), där sidan inte har någon server. Casinot talar med båda genom
+// samma gränssnitt (src/casino/link.ts).
 //
-// Sessionen lever så länge serverprocessen lever. Servern startar om sig själv när dess kod ändras, och då börjar
-// sessionen om med en ny sko och ny kassa.
+// Här delas också rundan som Labbet, visningen och src/pipeline/runda.ts visar (dealRound): en session med frö, där
+// spelarna i content/runda.json spelar efter en enkel regel. Regeln är spelarens val, inte kärnans: kärnan avgör allt annat.
+//
+// Sessionen lever så länge processen eller sidan lever. Servern startar om sig själv när dess kod ändras, och då börjar
+// sessionen om med en ny sko och ny kassa; i visningen börjar den om när sidan laddas om.
 
 import { createSession, type Session, type Snapshot } from '../engine/session.ts';
-import type { DealtRound, Round, RoundStep } from '../pipeline/runda.ts';
+import type { DealtRound, Round, RoundStep } from '../scene/round.ts';
 
 /** Ett steg som spelkärnan svarade på: kommandot (och handlingen), händelserna i spelordning och vyn efter steget. */
 export type GameStep = RoundStep & { op: string };

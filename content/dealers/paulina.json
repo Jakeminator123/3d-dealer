@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "about": "Dealern Paulina (förut Pau och Paow). Formen står i content/dealer.json, och src/pipeline/dealer.ts läser filen. Var hon står på vägen till spelbar: node src/pipeline/dealer.ts paulina, eller Labbets steg Dealer.",
+  "id": "paulina",
+  "name": "Paulina",
+  "looks": {
+    "person": "woman",
+    "pronoun": "she",
+    "hair": "a blonde chin-length bob with slightly darker roots and a side parting",
+    "outfit": "a fitted black single-button blazer, buttoned, with long sleeves to the wrists, over a cream V-neck blouse",
+    "jewellery": "thin necklace with a small white flower pendant",
+    "marks": "dense black-and-grey ornamental tattoos covering the front of the neck and the upper chest down into the neckline",
+    "handMarks": "a rose in a mandala covering the back of each hand and small symbol tattoos on the backs of the fingers, fine grey-black linework, thumbs bare",
+    "basis": "antaget",
+    "source": "Orden ur texterna som gjorde ankaret spelaren-redo-2 (output/work/ankare-2/text-stallning.txt, beställningen 2211a9e1-1634-41ee-8dfb-7728756a5a6e), flyttade hit 2026-11-18. Tatueringarna på hals, bröst och båda händerna syns alltid, och handtatueringarna ritas som i identitetsbilderna (docs/decisions.md 2026-11-18: \"hon alltid ska ha tatueringar, även på händerna\"). blonde: \"warm golden-blonde\" gav orange hår (docs/production.md)."
+  },
+  "identity": {
+    "images": [
+      { "file": "dealers/paulina/identity/ansikte-kavaj.png", "shows": "ansikte" },
+      { "file": "dealers/paulina/identity/helkropp-staende.png", "shows": "helkropp" },
+      { "file": "dealers/paulina/identity/hander-ovansida.png", "shows": "händer" },
+      { "file": "dealers/paulina/identity/sida-kavaj-tatuerad.png", "shows": "sida", "note": "Bord och sko syns i den: ges inte till ställningen, som då tar dess uppställning (docs/production.md)." },
+      { "file": "dealers/paulina/identity/sittande-vid-bord.png", "shows": "sittande" },
+      { "file": "dealers/paulina/identity/foto-armar-hander.png", "shows": "foto", "note": "Fotografiet av de verkliga tatueringarna. Publiceras inte." }
+    ],
+    "basis": "antaget",
+    "source": "Registrets identitetsbilder för paulina utom original-sida-kavaj.png (utgår), med slaget ur deras poster. ansikte, helkropp och händer är de som ankaret spelaren-redo-2 gjordes med (dess post, steget ställning)."
+  },
+  "anchors": {
+    "redo": {
+      "spelaren": "dealers/paulina/anchors/spelaren-redo-3.png",
+      "plats-7": "dealers/paulina/anchors/plats-7-redo.png"
+    },
+    "basis": "antaget",
+    "source": "Flyttat hit 2026-11-18 ur content/tagning.json (redo.anchors). Spelaren: spelaren-redo-3.png, godkänt 2026-11-18 kväll av oberoende granskare: samma kvinna som i spelaren-redo-2.png, förd över till dagens öga med en homografi och med huvudet rakt fram och ned mot filten som dockans REDO (output/work/ankare-3/). spelaren-redo-2.png gäller inte längre för vyn. Plats 7: godkänt 2026-11-18 på den gamla geometrin, med en godkänd cykel till plats 4."
+  }
+}

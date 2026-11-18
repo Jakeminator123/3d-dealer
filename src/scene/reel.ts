@@ -10,68 +10,89 @@
 // En följd kan sluta i väntan (`wait`, vänta-klippets längd): efter sista delen spelas vänta-klippet om och om, ett varv
 // i taget, i stället för att sista rutan hålls. Varje varv börjar och slutar i REDO, liksom varje klipp, så nästa klipp
 // börjar där ett varv slutar (nextStart). Utan vänta-klipp hålls sista rutan, som förut.
+//
+// Följden har en fart (`speed`, content/runda.json speed.clips): delarna med film spelas så många gånger fortare än de
+// är filmade. Följdens tid är tiden som den syns; tiden i en del (`local`, card.at, glidningen) är filmens egen. Allt som
+// hör till klippets tid följer därför med farten: när kortet landar, när märkkortet tas bort, glidningen och skarven
+// till nästa del. En del utan film (dess längd står redan i följdens tid) och vänta-klippet går alltid i 1 (rateOf).
 
 import { spotKey, type CardSpot, type ClipCard } from './dealer.ts';
 import type { FeltPoint } from './description.ts';
 
 /**
- * En del av följden: dess längd i sekunder och kortet den lägger. `from` finns bara på en del utan film: varifrån
- * kortet kommer (skon, en annan kortplats, eller samma kortplats när det vänds).
+ * En del av följden: dess längd i sekunder i filmens egen tid och kortet den lägger, med kortets tid (card.at) i samma
+ * tid. `from` finns bara på en del utan film: varifrån kortet kommer (skon, en annan kortplats, eller samma kortplats
+ * när det vänds).
  */
 export type ReelPart = { seconds: number; card?: ClipCard; from?: CardSpot | 'skon' };
 
 /**
  * Följden: delarna, var och en börjar, tiden efter sista delen (`hold`), och hela längden med den tiden inräknad. Utan
  * `wait` står sista rutan kvar under `hold`. Med `wait`, vänta-klippets längd, väntar följden efter sista delen: `hold`
- * är då hela varv av väntan, minst ett, och väntan går vidare förbi `seconds` så länge ingen börjar om följden. Allt i
- * sekunder.
+ * är då hela varv av väntan, minst ett, och väntan går vidare förbi `seconds` så länge ingen börjar om följden.
+ * `speed` är farten delarna med film spelas i (rateOf). Allt i sekunder i följdens tid, utom delarnas egna längder.
  */
-export type Reel = { parts: ReelPart[]; starts: number[]; hold: number; seconds: number; wait?: number };
+export type Reel = { parts: ReelPart[]; starts: number[]; hold: number; seconds: number; wait?: number; speed: number };
 
 // Tider som skiljer mindre än så här är samma tid: summan av klippens längder avrundas annorlunda än en tid räknad ur dem.
 const SLACK = 1e-9;
 
 /**
- * Var följden står: delen (från 0), tiden i den, och om följden är förbi sista delen och står på dess sista ruta. När
- * följden väntar är delen den sista och hel (alla kort ligger), och `wait` säger varvet (från 0) och tiden i
- * vänta-klippet. Utan väntan finns inget `wait`.
+ * Var följden står: delen (från 0), tiden i den i delens egen tid (filmens), och om följden är förbi sista delen och
+ * står på dess sista ruta. När följden väntar är delen den sista och hel (alla kort ligger), och `wait` säger varvet
+ * (från 0) och tiden i vänta-klippet. Utan väntan finns inget `wait`.
  */
 export type ReelPlace = { index: number; local: number; held: boolean; wait?: { turn: number; local: number } };
 
+/** Om delen är en fallback: ingen film, och kortet går självt. */
+export const isStill = (part: ReelPart): boolean => part.from !== undefined;
+
+/** En fart som går att spela i: ett tal över 0, annars 1. */
+const paceOf = (speed: number): number => (Number.isFinite(speed) && speed > 0 ? speed : 1);
+
 /**
  * Följden av delarna `parts`. Utan `wait` står sista rutan kvar `hold` sekunder. Med `wait`, vänta-klippets längd i
- * sekunder, väntar följden efter sista delen i stället, i så många hela varv som täcker `hold`, minst ett.
+ * sekunder, väntar följden efter sista delen i stället, i så många hela varv som täcker `hold`, minst ett. Delarna med
+ * film spelas i farten `speed`: en del på 3 s tar 2 s i 1,5. `hold` och väntan står i följdens tid.
  */
-export function makeReel(parts: ReelPart[], hold = 0, wait?: number): Reel {
+export function makeReel(parts: ReelPart[], hold = 0, wait?: number, speed = 1): Reel {
   if (parts.length === 0) throw new Error('En följd behöver minst ett klipp');
+  const pace = paceOf(speed);
   const starts: number[] = [];
   let at = 0;
   for (const part of parts) {
     starts.push(at);
-    at += Math.max(0, part.seconds);
+    at += Math.max(0, part.seconds) / (isStill(part) ? 1 : pace);
   }
   if (wait !== undefined && Number.isFinite(wait) && wait > 0) {
     const turns = Math.max(1, Math.ceil(Math.max(0, hold) / wait - SLACK));
-    return { parts, starts, hold: turns * wait, seconds: at + turns * wait, wait };
+    return { parts, starts, hold: turns * wait, seconds: at + turns * wait, wait, speed: pace };
   }
   const rest = Math.max(0, hold);
-  return { parts, starts, hold: rest, seconds: at + rest };
+  return { parts, starts, hold: rest, seconds: at + rest, speed: pace };
+}
+
+/**
+ * Hur fort delen `index` spelas: delens sekunder per sekund i följden. Följdens fart för en del med film, 1 för en del
+ * utan film och för väntan (index `parts.length` och förbi).
+ */
+export function rateOf(reel: Reel, index: number): number {
+  const part = reel.parts[index];
+  return !part || isStill(part) ? 1 : reel.speed;
 }
 
 /** Där sista delen slutar, och dess sista ruta börjar stå kvar eller väntan börjar. */
 export const reelEnd = (reel: Reel): number => reel.seconds - reel.hold;
 
 /** Där delen `index` slutar. */
-export const partEnd = (reel: Reel, index: number): number => reel.starts[index]! + Math.max(0, reel.parts[index]!.seconds);
-
-/** Om delen är en fallback: ingen film, och kortet går självt. */
-export const isStill = (part: ReelPart): boolean => part.from !== undefined;
+export const partEnd = (reel: Reel, index: number): number => reel.starts[index]! + Math.max(0, reel.parts[index]!.seconds) / rateOf(reel, index);
 
 /**
  * Var följden står vid tiden `time`. En del gäller från sin början fram till nästa dels början. Före början står
  * följden på första delens början; från sista delens slut står den på dess sista ruta (`held`, och `local` är delens
  * längd), eller, när följden har en väntan, i väntan: varvet och tiden i vänta-klippet, också förbi följdens längd.
- * Skarven mellan två varv hör till nästa varv, som skarven mellan två delar hör till nästa del.
+ * Skarven mellan två varv hör till nästa varv, som skarven mellan två delar hör till nästa del. Tiden i delen är
+ * filmens: i 1,5 har en del som har gått 1 s i följden gått 1,5 s i sin film.
  */
 export function placeIn(reel: Reel, time: number): ReelPlace {
   const t = Math.max(0, time);
@@ -84,7 +105,7 @@ export function placeIn(reel: Reel, time: number): ReelPlace {
     }
   }
   const seconds = Math.max(0, reel.parts[index]!.seconds);
-  const local = t - reel.starts[index]!;
+  const local = (t - reel.starts[index]!) * rateOf(reel, index);
   if (index === last && local >= seconds - SLACK) {
     if (reel.wait === undefined) return { index, local: seconds, held: true };
     const since = Math.max(0, t - reelEnd(reel));
@@ -92,6 +113,19 @@ export function placeIn(reel: Reel, time: number): ReelPlace {
     return { index, local: seconds, held: false, wait: { turn, local: Math.max(0, since - turn * reel.wait) } };
   }
   return { index, local, held: false };
+}
+
+/**
+ * Tiden i följden `to` som står på samma ställe som tiden `time` i följden `from`, två följder av samma delar i olika
+ * fart: samma del och samma tid i dess film, eller lika långt förbi sista delens slut (där sista rutan står kvar eller
+ * följden väntar). Så står följden kvar där den är när farten ställs om.
+ */
+export function sameMoment(from: Reel, to: Reel, time: number): number {
+  const t = Math.max(0, time);
+  const end = reelEnd(from);
+  if (t >= end - SLACK) return reelEnd(to) + Math.max(0, t - end);
+  const { index, local } = placeIn(from, t);
+  return to.starts[index]! + local / rateOf(to, index);
 }
 
 /**
@@ -151,7 +185,8 @@ export function flyingAt(reel: Reel, time: number): { part: number; progress: nu
 
 /**
  * Hur ett lagt kort går från där handen lade det till sin plats i kortplanen och sin storlek på bordet
- * (content/scene.json, card.onTable.glide): det börjar `after` sekunder efter att kortet har landat och tar `seconds`.
+ * (content/scene.json, card.onTable.glide): det börjar `after` sekunder efter att kortet har landat och tar `seconds`,
+ * båda i filmens tid, så att glidningen följer klippets fart.
  */
 export type Glide = { after: number; seconds: number };
 
@@ -166,15 +201,17 @@ const ease = (t: number): number => t * t * (3 - 2 * t);
  * sin storlek på bordet (1), mjukt i början och slutet. Det börjar `glide.after` sekunder efter att kortet har landat
  * (card.at), alltså när handen har släppt kortet och lyft, och kan fortsätta in i nästa del. Före det, och när följden
  * har börjat om, är det 0. En del utan film lägger kortet direkt på planens plats (build.ts, carry): där är det 1.
+ * Glidningen går i delens fart (rateOf), också när den fortsätter in i nästa del.
  */
 export function glideAt(reel: Reel, index: number, time: number, glide: Glide): number {
   const part = reel.parts[index];
   if (!part?.card) return 0;
   if (isStill(part)) return 1;
-  const start = reel.starts[index]! + part.card.at + Math.max(0, glide.after);
+  const rate = rateOf(reel, index);
+  const start = reel.starts[index]! + part.card.at / rate + Math.max(0, glide.after) / rate;
   const t = Math.max(0, time) - start;
   if (glide.seconds <= 0) return t >= 0 ? 1 : 0;
-  return ease(Math.min(1, Math.max(0, t / glide.seconds)));
+  return ease(Math.min(1, Math.max(0, (t * rate) / glide.seconds)));
 }
 
 /**

@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "about": "Identiteten ur en bild: beställningarna av de identitetsbilder linjen behöver (content/dealer.json, roles med need), gjorda ur en eller två bilder av personen (slaget källa) och dealerns ord (looks). Läses av src/pipeline/identitet.ts, som skriver paketet; agenten beställer genom Runways MCP-server (generate_image), och identitet.ts ta-emot för in bilderna i registret under dealern. Texterna har platshållare som src/pipeline/dealer.ts fyller (fillText): {ord} är dealerns ord, {ord?text} står bara när ordet finns och {ord!text} bara när det inte gör det. Varje grupp bär basis och en källa.",
+  "order": {
+    "tool": "generate_image",
+    "model": "nano-banana-pro",
+    "imageSize": "2K",
+    "credits": 20,
+    "reference": 2048,
+    "basis": "antaget",
+    "source": "Agentens, 2026-11-18. Nano Banana Pro i 2K gjorde Paulinas handbild hander-ovansida.png och tatueringarna i sida-kavaj-tatuerad.png (20 krediter per bild, mätt där). reference: referensbilderna förminskas till högst så många bildpunkter på längden, som ankarets referenser gjordes (output/work/ankare-2/gor-ref.ts). Inte prövad för en ny dealer."
+  },
+  "roles": {
+    "ansikte": {
+      "file": "ansikte",
+      "ratio": "1:1",
+      "references": [
+        { "tag": "person", "from": "källa" },
+        { "tag": "person2", "from": "källa", "nth": 2, "optional": true }
+      ],
+      "text": [
+        "A sharp, photorealistic studio portrait of the {person} in @person{person2? and @person2}. Exactly the same person: the same facial features, eyebrows, eye shape, nose, lips, skin tone, natural skin texture with visible pores, and the same make-up. {hair?{Her} hair is {hair}.}{hair!{Her} hair is exactly as in @person.}",
+        "Head, neck and upper chest, facing the camera straight on, eyes open and looking into the camera, a calm, friendly expression with the mouth closed. {She} wears {outfit}{marks?, and {her} {marks} are clearly visible}{jewellery?, with a {jewellery}}.{marks! Any tattoos or marks on {her} neck and chest are exactly as in @person, with nothing added.}",
+        "Soft, even, frontal studio light, a plain light grey background, square framing. No {jewellery!jewellery, no }text, no other people."
+      ]
+    },
+    "helkropp": {
+      "file": "helkropp",
+      "ratio": "3:4",
+      "references": [
+        { "tag": "face", "from": "ansikte" },
+        { "tag": "person", "from": "källa" }
+      ],
+      "text": [
+        "A sharp, photorealistic full-length studio photograph of the {person} in @face and @person, standing upright and facing the camera, arms relaxed at {her} sides with both hands fully visible, backs of the hands toward the camera. The same face, hair and skin tone as in @face, and the same body build as in @person.",
+        "{She} wears {outfit}{marks?; {her} {marks} are visible}{jewellery?; a {jewellery}}. {handMarks?{Her} hands carry {handMarks}.}{handMarks!{Her} hands are as in @person, with nothing added.}",
+        "Soft, even, frontal studio light, a plain light grey background, the whole body from head to shoes in frame. No rings, {jewellery!no jewellery, }no text, no other people."
+      ]
+    },
+    "händer": {
+      "file": "hander",
+      "ratio": "16:9",
+      "references": [
+        { "tag": "outfit", "from": "helkropp" },
+        { "tag": "person", "from": "källa" }
+      ],
+      "text": [
+        "Photorealistic studio close-up, seen from slightly above, of the two hands of the {person} in @outfit, resting flat and relaxed side by side on a plain white table, backs of the hands up, fingers slightly apart, short natural nails. The same skin tone as in @outfit and @person, and at the wrists the same sleeve cuffs as {her} clothes in @outfit.",
+        "{handMarks?These are {her} hands with {handMarks}: the same tattoos as on the hands in @outfit, sharp and clearly visible, following the curvature of the hands and fingers.}{handMarks!The hands are bare skin, as in @outfit, without tattoos.}",
+        "The two hands fill most of the frame. Soft, even, frontal studio light with a faint natural contact shadow under the hands, seamless white background, sharp focus, visible skin texture. One left hand and one right hand, five fingers each, no rings, no jewellery, no text."
+      ]
+    },
+    "basis": "antaget",
+    "source": "Agentens, 2026-11-18, inte prövade i en beställning. Texterna följer dem som gjorde Paulinas handbild (hander-ovansida.png, beställningen d4121204-c145-476d-8d08-9bbe144262a5) och ankarets ställning (output/work/ankare-2/text-stallning.txt), med dealerns ord i stället för hennes. Ordningen är ansikte, helkropp, händer: helkroppen görs med ansiktet som referens och händerna med helkroppen (kläder och hud), så att bilderna är samma person. file: filens namn under assets/dealers/<dealer>/identity/, med -2, -3 … när namnet är taget."
+  }
+}

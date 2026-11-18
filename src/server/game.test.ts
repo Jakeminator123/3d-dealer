@@ -11,7 +11,7 @@ import { join, resolve } from 'node:path';
 import { after, before, test } from 'node:test';
 import { dealName, dealsOf, planRound, readRound, type RoundEntry } from '../pipeline/runda.ts';
 import { createApi } from './api.ts';
-import { createGame, dealRound, type Table } from './game.ts';
+import { createGame, dealRound, type Table } from '../game/game.ts';
 import { handler } from './main.ts';
 
 const project = resolve(import.meta.dirname, '..', '..');
