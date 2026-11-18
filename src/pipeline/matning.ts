@@ -1191,7 +1191,12 @@ export function dollOf(read: FilmRead, fps: number, measure: Measure, layout?: P
     hands: read.rows.map((row) => ({ t: row.t, w: row.hand?.w ?? null })),
     next: read.rows.map((row) => row.nextShare ?? null),
     beyond: read.rows.map((row) => row.beyond ?? null),
-    own: { ...cardValues(read.rows, times, measure, layout?.action), ...(layout ? turnValues(read.rows, layout) : {}) },
+    own: {
+      ...cardValues(read.rows, times, measure, layout?.action),
+      ...(layout ? turnValues(read.rows, layout) : {}),
+      // Hur långt före slutet dockans hand är åter i REDO, som handenISkon i klippet.
+      handenISkon: times.home === null ? null : round((read.rows.length - 1 - times.home) / fps, 3),
+    },
   };
 }
 
@@ -1401,18 +1406,24 @@ export function limitText(limit: Limit): string {
 }
 
 /**
- * Gränsen för en plats: en gräns med `doll` höjs till dockans eget värde för samma mått plus `doll`, när det är större.
- * Det dockan själv gör vid platsen (till exempel kortet som dras ut rakt framför mynningen vid plats 7) är inget fel.
+ * Gränsen för en plats: en gräns med `doll` flyttas till dockans eget värde för samma mått plus `doll`, när det ger mer
+ * utrymme: en övre gräns (most) höjs, en undre (least) sänks (då är `doll` negativ). Det dockan själv gör vid platsen
+ * (till exempel kortet som dras ut rakt framför mynningen vid plats 7, eller handen som är hemma i skon 0,17 s före
+ * slutet i en cykel på 3 s) är inget fel.
  */
 export function limitFor(limit: Limit, dollValue?: number | string | boolean | null): Limit {
-  if (limit.doll === undefined || typeof dollValue !== 'number' || limit.most === undefined) return limit;
-  return { ...limit, most: Math.max(limit.most, dollValue + limit.doll) };
+  if (limit.doll === undefined || typeof dollValue !== 'number') return limit;
+  return {
+    ...limit,
+    ...(limit.most !== undefined ? { most: Math.max(limit.most, dollValue + limit.doll) } : {}),
+    ...(limit.least !== undefined ? { least: Math.min(limit.least, dollValue + limit.doll) } : {}),
+  };
 }
 
 /** Ett mått mot sin gräns. Ett mått som inte gick att ta är `saknas`. `dollValue` är dockans eget värde (limitFor). */
 export function judgeOne(key: string, value: number | string | boolean | null | undefined, given: Limit, dollValue?: number | string | boolean | null): Judged {
   const limit = limitFor(given, dollValue);
-  const raised = limit.most !== given.most ? ` (dockan ${shown(dollValue as number)} + ${shown(given.doll!)})` : '';
+  const raised = limit.most !== given.most || limit.least !== given.least ? ` (dockan ${shown(dollValue as number)} ${given.doll! < 0 ? '−' : '+'} ${shown(Math.abs(given.doll!))})` : '';
   const base = { key, what: limit.what, value: value ?? null, unit: limit.unit ?? '', limit: `${limitText(limit)}${raised}`, source: limit.source };
   if (value === null || value === undefined) return { ...base, verdict: 'saknas' };
   if (limit.is !== undefined) return { ...base, verdict: value === limit.is ? 'inom' : 'utanför' };

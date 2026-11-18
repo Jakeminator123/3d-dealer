@@ -8,7 +8,7 @@ import type { Action, Seat } from '../scene/dollPose.ts';
 import { cycleMove, readCycleParts } from './cykel.ts';
 import { dollWrist } from './tagning.ts';
 import { judge, type Limit } from './matning.ts';
-import { abrupt, busiest, dollMotion, filled, longestRun, motionNumbers, motionValues, peaksIn, segments, snap, sparc, speedOf, type MotionMeasure, type Tracks } from './rorelse.ts';
+import { DOLL_ROLES, abrupt, busiest, dollMotion, dollTracks, filled, longestRun, motionNumbers, motionValues, peaksIn, segments, snap, sparc, speedOf, type MotionMeasure, type Tracks } from './rorelse.ts';
 
 const root = resolve(import.meta.dirname, '..', '..');
 const tagning = JSON.parse(readFileSync(join(root, 'content', 'tagning.json'), 'utf8')) as { motion: MotionMeasure; limits: Record<string, Limit> };
@@ -100,12 +100,11 @@ const CYCLES: [string, Seat, number, Action][] = [
   ['cykel-nyp', 'D', 1, 'flip'],
   ['cykel-nyp-lugn', 4, 0, 'deal'],
   ['cykel-nyp-lugn', 1, 0, 'deal'],
-  // Variant D, med vändningen och väntan.
+  // Variant D, med vändningen (väntan görs bara med E).
   ['cykel-nyp-flytande', 4, 0, 'deal'],
   ['cykel-nyp-flytande', 7, 1, 'deal'],
   ['cykel-nyp-flytande', 'D', 0, 'deal'],
   ['cykel-nyp-flytande', 'D', 1, 'flip'],
-  ['cykel-nyp-flytande', 'D', 0, 'wait'],
 ];
 test('variant D vid plats 6 och 7: handleden under 85 grader och armbågen under 90 när kortet läggs alldeles intill skon', () => {
   const parts = readCycleParts('cykel-nyp-flytande');
@@ -181,6 +180,37 @@ for (const [seat, index, action] of RASK) {
     }
     const elbow = Math.max(0, ...(move.tracks.leftArm?.turnDeg ?? [0]).map(Math.abs));
     assert.ok(elbow <= 90, `armbågen ${elbow} grader`);
+  });
+}
+
+// Kling ungefär halverar små rörelser (mätt): med stillhetens gräns dubblad gav dockans film för den första väntan med E
+// 0,385 av tiden stilla och 0,92 s i sträck, och Klings klipp mätte 0,412 och 0,875 (output/work/variant-e/rattning/,
+// film-matt.ts). Väntan och vändningen ska därför aldrig stå still också med gränsen dubblad, mätt på de delar en film
+// spårar i bild (huvudets och axlarnas lägen och bålen, inte huvudets vridning).
+for (const action of ['wait', 'flip'] as const) {
+  test(`variant E, ${action === 'wait' ? 'väntan' : 'vändningen'}: aldrig stilla, också om Kling halverar rörelsen`, () => {
+    const move = cycleMove(raskParts, { seat: 'D', index: action === 'wait' ? 0 : 1, action });
+    const tracks = dollTracks(raskParts, move, 24);
+    const roles = { ...DOLL_ROLES, body: action === 'wait' ? ['huvud', 'axel', 'andraAxeln', 'bal'] : ['grepp', 'huvud', 'axel', 'andraAxeln', 'bal'] };
+    const options = { ...tagning.motion, still: 2 * tagning.motion.still, scale: 2 * raskParts.doll.body.head.radius, smooth: 0, cyclic: true, phases: false };
+    const values = motionNumbers(motionValues(tracks, roles, options));
+    if (action === 'wait') {
+      assert.equal(values.stillaHelt, 0, `stilla ${values.stillaHelt} av tiden`);
+      assert.equal(values.langstaStillhet, 0, `längst ${values.langstaStillhet} s`);
+    } else {
+      // Vändningen: från att handen lämnar REDO tills den är tillbaka i skon står kroppen aldrig still mer än två rutor i
+      // följd, där handen släpper kortet (passagen genom REDO vid skon är densamma som i givklippen och ändras inte här).
+      const hb = 2 * raskParts.doll.body.head.radius;
+      const speed = (name: string, k: number): number => {
+        const a = tracks[name]!.points[k - 1]!;
+        const b = tracks[name]!.points[k]!;
+        return (Math.hypot(...b.map((value, d) => value - a[d]!)) * 24) / hb;
+      };
+      const from = Math.ceil((move.back!.out![0] / move.fps) * 24) + 1;
+      const to = Math.floor((move.back!.home / move.fps) * 24);
+      const still = Array.from({ length: to - from + 1 }, (_, k) => !roles.body.some((name) => speed(name, from + k) > options.still));
+      assert.ok(longestRun(still, 24, false) <= 2 / 24 + 1e-9, `stilla ${still.filter(Boolean).length} rutor, längst ${longestRun(still, 24, false)} s i sträck`);
+    }
   });
 }
 

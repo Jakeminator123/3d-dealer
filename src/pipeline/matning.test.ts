@@ -277,6 +277,13 @@ test('gränsen för en plats: höjs till dockans eget värde plus det som står,
   assert.equal(judgeOne('gulForm', 8, gul, 7).limit, '≤ 8 (dockan 7 + 1)');
   assert.equal(judgeOne('gulForm', 8, gul).verdict, 'utanför');
   assert.deepEqual(judge({ gulForm: 8, takt: 1.49 }, { gulForm: gul, takt: { what: 'takt', see: 1.25, most: 1.6, source: 'g' } }, { gulForm: 7, takt: 1 }).map((entry) => entry.verdict), ['inom', 'se efter']);
+  // En undre gräns sänks till dockans värde plus `doll` (negativ), aldrig höjs: handen i skon i en cykel på 3 s.
+  const hem = { what: 'handen i skon', unit: 's', least: 0.25, doll: -0.1, source: 'granskaren' };
+  assert.equal(limitFor(hem, 0.167).least, 0.067);
+  assert.equal(limitFor(hem, 0.5).least, 0.25);
+  assert.equal(judgeOne('handenISkon', 0.125, hem, 0.167).verdict, 'inom');
+  assert.equal(judgeOne('handenISkon', 0.125, hem, 0.167).limit, '≥ 0,067 (dockan 0,167 − 0,1)');
+  assert.equal(judgeOne('handenISkon', 0.125, hem).verdict, 'utanför');
 });
 
 test('ett mått mot sin gräns: minst, högst, exakt, se efter, och saknas', () => {

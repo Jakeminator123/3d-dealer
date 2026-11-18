@@ -47,9 +47,12 @@ test('texten för hålkortet och vändningen är givens med bara de meningar byt
   const hole = promptFor(content, 'hole', words);
   const flip = promptFor(content, 'flip', words);
   assert.equal(promptFor(content, 'wait', words).includes('with the same tattoos'), true);
-  // Hålkortet: förs plant ur skon längs bordet, lyfts och vänds aldrig, och slutar med två gula kort i bild.
-  assert.ok(hole.includes('slides the yellow card flat out of the opening') && hole.includes('never lifted and never turned over') && hole.includes('yellow side up') && hole.includes('the yellow one face down on the table'));
-  assert.ok(!hole.includes('turn over together') && !hole.includes('blue side up') && !hole.includes('the blue card lies') && !hole.includes('draws the yellow card up'));
+  // Hålkortet: dras en bit upp ur skon, läggs ned plant och glider till sin plats, vänds aldrig, och slutar med två gula
+  // kort i bild. Inget blått nämns: med en blå sida i texten målade Kling kortet i skon blått (första klippet, utgår).
+  assert.ok(hole.includes('draws the yellow card a little way up out of the opening') && hole.includes('slides it flat along the table') && hole.includes('never turned over') && hole.includes('yellow side up'));
+  assert.ok(hole.includes('stays yellow in the opening the whole time') && hole.includes('two yellow cards in view') && hole.includes('like every card in this clip'));
+  assert.ok(!/blue/i.test(hole), 'inget blått i hålkortets text');
+  assert.ok(!hole.includes('turn over together') && !hole.includes('carries it low over the table'));
   // Vändningen: inget kort dras; hålkortet ligger på bordet från början och vänds där med samma nyckelvridning som i given.
   assert.ok(flip.includes('A yellow card already lies flat on the table') && flip.includes('without taking a card') && flip.includes('lays the card flat in the same place, blue side up'));
   assert.ok(flip.includes("turn over together about the card's long side, like turning a key"), 'samma vändning som i given');

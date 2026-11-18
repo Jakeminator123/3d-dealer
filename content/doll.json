@@ -82,7 +82,9 @@
     "boxEnd": 0.238,
     "boxHeight": 0.206,
     "noseHeight": 0.068,
+    "frontHeight": 0.113,
+    "frontEnd": 0.464,
     "basis": "mätt",
-    "source": "Skons hölje, för att se om en hand går genom skon (throughShoe i src/scene/dollPose.ts). Andelar av skons längd (scene.shoe.length): halva bredden, takets höjd längst bak, var den slutna lådan slutar räknat från skons mitt mot mynningen, takets höjd där, och höjden vid nosens spets. Mätt i models/shoe.glb som tal 2026-11-18 (högsta punkt per centimeter längs skon, med modellen skalad till 0,442 m): 0,137 m bred, 0,147 m hög längst bak, taket sluttar rakt till 0,091 m vid 0,105 m framför mitten, och mynningens sidor faller därifrån till 0,049 m vid 0,18 m och 0,03 m vid nosen. Höljet är fyllt också där mynningen är öppen. Talen hör hemma hos skon i content/scene.json och kan flyttas dit."
+    "source": "Skons hölje, för att se om en hand går genom skon (throughShoe i src/scene/dollPose.ts). Andelar av skons längd (scene.shoe.length): halva bredden, takets höjd längst bak, var den slutna lådan slutar räknat från skons mitt mot mynningen, takets höjd där, och höjden vid nosens spets. Mätt i models/shoe.glb som tal 2026-11-18 (högsta punkt per centimeter längs skon, med modellen skalad till 0,442 m): 0,137 m bred, 0,147 m hög längst bak, taket sluttar rakt till 0,091 m vid 0,105 m framför mitten, och mynningens sidor faller därifrån till 0,049 m vid 0,18 m och 0,03 m vid nosen. Höljet är fyllt också där mynningen är öppen. frontHeight och frontEnd: mynningens front framför kortet i REDO, som hålkortet måste gå över (slid i src/scene/dollPose.ts): klacken är 2,6–3,0 cm hög tvärs hela bredden och mässingsramens list löper snett över mittlinjen 0,17–0,205 m framför mitten, 4,3–5,0 cm hög; frontHeight är listens högsta, 5,0 cm, och frontEnd var fronten slutar, 0,205 m. Bortom den faller nosen till 1,2 cm vid spetsen. Mätt 2026-11-18 (kväll) av agenten i models/shoe.glb som tal, med högsta punkt per halv centimeter i ett band kring mittlinjen (output/work/variant-e/rattning/skons-nos.ts). Talen hör hemma hos skon i content/scene.json och kan flyttas dit."
   }
 }
