@@ -73,6 +73,14 @@ test('skarven: ett steg som grannstegen är inget hopp, men ett hopp där allt a
   // Den som rör sig men hoppar dubbelt så långt i skarven: hoppet utöver grannstegen räknas.
   const [both] = seamSteps({ beforeLast: at(20), last: at(22), first: at(28), second: at(30) }, [box]);
   assert.ok(both!.beyond > 0.5 * moving!.seam, `steget utöver grannarna: ${both!.beyond}`);
+  // Ett kort som ligger i regionen i slutet men inte i början (dealerns kortplats) är ingen skarv när kortets ruta undantas.
+  const card = { x0: 40, y0: 8, x1: 50, y1: 14 };
+  const still = at(20);
+  const laid = paint(copy(still), card, BLUE);
+  const [counted] = seamSteps({ beforeLast: laid, last: laid, first: still, second: still }, [box]);
+  assert.ok(counted!.beyond > 0, 'utan undantag syns kortet som ett hopp');
+  const [skipped] = seamSteps({ beforeLast: laid, last: laid, first: still, second: still }, [box], card);
+  assert.equal(skipped!.beyond, 0);
 });
 
 test('en sammanhängande del: yta, tyngdpunkt, ruta och hörn som ytterpunkter', () => {

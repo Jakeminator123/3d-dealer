@@ -946,10 +946,10 @@ export type FilmRead = {
  * när den står still runt skarven men inte är på samma ställe i båda ändar. Ett hopp i skarven syns som ett steg som är
  * större än grannarna, vilket det än är som rör sig.
  */
-export function seamSteps(read: Pick<FilmRead, 'first' | 'second' | 'last' | 'beforeLast'>, boxes: Box[]): { seam: number; around: number; beyond: number }[] {
+export function seamSteps(read: Pick<FilmRead, 'first' | 'second' | 'last' | 'beforeLast'>, boxes: Box[], skip?: Box): { seam: number; around: number; beyond: number }[] {
   return boxes.map((box) => {
-    const seam = difference(read.last, read.first, box).meanMax;
-    const around = (difference(read.beforeLast, read.last, box).meanMax + difference(read.first, read.second, box).meanMax) / 2;
+    const seam = difference(read.last, read.first, box, skip).meanMax;
+    const around = (difference(read.beforeLast, read.last, box, skip).meanMax + difference(read.first, read.second, box, skip).meanMax) / 2;
     return { seam, around, beyond: Math.max(0, seam - around) };
   });
 }
@@ -1275,6 +1275,9 @@ export function nextAdded(read: Pick<FilmRead, 'rows' | 'mouthBox' | 'mouthYello
   return { most, from: reference.i };
 }
 
+/** Måtten för det lagda kortet och handen på det, som en väntan inte har (valuesOf). */
+const NOT_IN_WAIT = ['kortetsRorelse', 'kortetsMitt', 'kortetsYta', 'nastaKortFlyttar', 'handMotDockan', 'handBreddMotDockan', 'kortetLigger'];
+
 /**
  * Måtten för en tagning, med samma namn som gränserna i content/tagning.json (limits), och några till som bara visas.
  * `images` är första och sista bilden i beställningen; `doll` dockans film mätt på samma sätt.
@@ -1325,9 +1328,11 @@ export function valuesOf(read: FilmRead, film: Probe, sound: boolean, layout: La
   const filmOnCard = median(onCard.filter((row) => row.hand).map((row) => row.hand!.w));
   const dollOnCardWidth = median(dollOnCard);
 
-  // Skarven: sista rutan mot första, per region (seamSteps).
-  const seams = Object.values(layout.regions).map((box) => difference(last, first, box));
-  const steps = seamSteps(read, Object.values(layout.regions));
+  // Skarven: sista rutan mot första, per region (seamSteps), utom kortets ruta som i skarvMedel. Vid dealerns plats
+  // ligger kortplatsen inne i regionerna (rest, torso), och kortet som klippet lägger där är ingen skarv.
+  const outsideCard = grow(layout.cardBox, 10);
+  const seams = Object.values(layout.regions).map((box) => difference(last, first, box, outsideCard));
+  const steps = seamSteps(read, Object.values(layout.regions), outsideCard);
   const handA = rows[0]!.hand;
   const handB = end.hand;
   const heads = rows.map((row) => row.head).filter((value): value is number => typeof value === 'number');
@@ -1366,8 +1371,11 @@ export function valuesOf(read: FilmRead, film: Probe, sound: boolean, layout: La
     handenISkonMotDockan: delta(seconds.home, doll.seconds.home),
     handPaKortet: filmOnCard !== null && dollOnCardWidth !== null ? round(filmOnCard / dollOnCardWidth, 3) : null,
     huvudet: heads.length ? round(Math.max(...heads) - Math.min(...heads), 1) : null,
-    skarvMedel: round(difference(last, first, undefined, grow(layout.cardBox, 10)).mean, 2),
+    skarvMedel: round(difference(last, first, undefined, outsideCard).mean, 2),
   };
+  // En väntan lägger inget kort och handen går inte ut: måtten för det lagda kortet och handen på det går då inte att ta,
+  // och utelämnas som rörelsens mått som inte gäller (judge prövar bara det som finns), i stället för att stå som saknade.
+  if (layout.action === 'wait') for (const key of NOT_IN_WAIT) if (values[key] === null) delete values[key];
   return { values, times, seconds };
 }
 
