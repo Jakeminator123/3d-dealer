@@ -10,7 +10,7 @@ import { after, before, test } from 'node:test';
 import sharp from 'sharp';
 import { probe } from './matning.ts';
 import { about, createRegister, getEntry } from './registry.ts';
-import { cardWords, clipFile, forbered, matOm, nextTake, packageId, promptFor, readTagning, registrera, taEmot, type PostFile } from './tagning.ts';
+import { cardWords, clipFile, forbered, formatFor, matOm, nextTake, packageId, promptFor, readTagning, registrera, taEmot, type PostFile } from './tagning.ts';
 import { readScene } from '../scene/description.ts';
 import { viewEye } from '../scene/geometry.ts';
 
@@ -62,6 +62,15 @@ test('gränserna: granskarens alla mått, med källa, och dockans film i filmmod
   assert.deepEqual([content.limits.takt!.see, content.limits.takt!.most], [1.25, 1.6]);
   assert.equal(content.reference.fps, 24);
   assert.equal(content.order.model, 'kling-4');
+});
+
+test('formatets gräns följer beställningens längd: 5 s har 24 rutor fler än 4 s', () => {
+  const limits = { format: { what: 'format', is: '1920×1080 24/s 97', source: 'prov' }, takt: { what: 'takt', most: 1.6, source: 'prov' } };
+  assert.equal(formatFor(limits, 4, 4), limits);
+  assert.equal(formatFor(limits, 5, 4).format!.is, '1920×1080 24/s 121');
+  assert.equal(formatFor(limits, 3, 4).format!.is, '1920×1080 24/s 73');
+  assert.equal(formatFor(limits, 5, 4).takt, limits.takt);
+  assert.equal(limits.format.is, '1920×1080 24/s 97');
 });
 
 test('paketets namn, klippets namn i registret och nästa tagning', () => {

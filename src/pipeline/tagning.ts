@@ -566,6 +566,17 @@ const eyeOf = (eye: Eye): FilmEye => ({ position: [...eye.position] as [number, 
 type Measured = { values: Values; judged: Judged[]; summary: string; landsAt: number | null; proof: Proof | null };
 
 /**
+ * Formatets gräns (limits.format, "1920×1080 24/s 97") gäller beställningens vanliga längd (order.duration). En längre
+ * eller kortare beställning har lika många rutor fler eller färre per sekund: 5 s i stället för 4 ger 121 i stället för 97.
+ */
+export function formatFor(limits: Record<string, Limit>, duration: number, usual: number): Record<string, Limit> {
+  const format = limits.format;
+  const match = typeof format?.is === 'string' ? /^(\S+ (\d+)\/s )(\d+)$/.exec(format.is) : null;
+  if (!format || !match || duration === usual) return limits;
+  return { ...limits, format: { ...format, is: `${match[1]}${Number(match[3]) + Math.round((duration - usual) * Number(match[2]))}` } };
+}
+
+/**
  * Mäter klippet `clip` i paketet `dir` mot bilderna, dockan och scenen och prövar måtten mot gränserna: dockans film
  * först (docka.json), sedan klippet (ark.jpg) och beviset i scenen när kortet har landat. Skriver matning.json.
  * `heard` är om den nedladdade filmen hade ljud.
@@ -598,7 +609,7 @@ async function measureTake(root: string, dir: string, ordered: Ordered, clip: st
     values.bevisBlatt = proof.cyanMost;
     values.bevisHorn = proof.cornerError;
   }
-  const judged = judge(values, content.limits, doll.own);
+  const judged = judge(values, formatFor(content.limits, ordered.duration, content.order.duration), doll.own);
   const outside = judged.filter((entry) => entry.verdict !== 'inom');
   const summary = outside.length === 0 ? `alla ${judged.length} mått inom gränserna` : `${judged.length - outside.length} av ${judged.length} mått inom gränserna; ${outside.map((entry) => `${entry.key} ${shown(entry.value)} (${entry.verdict})`).join(', ')}`;
 
