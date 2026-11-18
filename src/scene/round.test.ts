@@ -9,8 +9,9 @@ import { readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { test } from 'node:test';
 import { readScene } from './description.ts';
+import { planOf, withPlan } from './plan.ts';
 import { flyingAt, lyingAt, makeReel } from './reel.ts';
-import { dealName, dealsOf, planRound, readRound, readyClip, roundFilm, spotPlace, type Deal, type Round, type RoundEntry, type RoundStep } from './round.ts';
+import { dealName, dealsOf, planPlace, planRound, readRound, readyClip, roundFilm, spotPlace, type Deal, type Round, type RoundEntry, type RoundStep } from './round.ts';
 
 const project = resolve(import.meta.dirname, '..', '..');
 const readJson = (file: string): unknown => JSON.parse(readFileSync(join(project, 'content', file), 'utf8'));
@@ -259,4 +260,22 @@ test('ett klipp som bär sitt öga, sin sko och var kortet landar spelas så, oc
   assert.deepEqual(spotPlace(scene, plan.clips[4]!.card!), scene.places.seats.find((entry) => entry.seat === 4)!.cards[2]);
   // Ett klipp utan öga i posten läggs genom vyns närbild i dag (inget eye i följden).
   assert.equal(roundFilm(planRound(dealsOf(STEPS), ENTRIES, 'paulina', { kind: 'spelaren' }, FALLBACK), round, { kind: 'spelaren' }).eye, undefined);
+});
+
+test('ett klipps kort landar där handen lade det, och har sin plats i dagens kortplan, som följer planen när den ställs om', () => {
+  const scene = readScene(readJson('scene.json'));
+  const old = { seat: 4, index: 0, face: '10♠', at: 1.9, place: [-0.019, -1.4468] as [number, number] };
+  const four = scene.places.seats.find((entry) => entry.seat === 4)!.cards;
+  assert.deepEqual(spotPlace(scene, old), old.place, 'där kortet landar');
+  assert.deepEqual(planPlace(scene, old), four[0], 'dit det går');
+  // Planen ställd om: tre centimeter närmare spelarna och större kort. Där handen lade kortet ändras inte.
+  const plan = planOf(scene)!;
+  const moved = withPlan(scene, { ...plan, arc: { ...plan.arc, depth: plan.arc.depth + 0.03 }, scale: 1.5 });
+  assert.deepEqual(spotPlace(moved, old), old.place);
+  const there = planPlace(moved, old)!;
+  assert.ok(Math.abs(there[0] - four[0]![0]) < 1e-9 && Math.abs(there[1] - four[0]![1] - 0.03) < 2e-4, `${there}`);
+  // En delad hand ligger ett kort längre mot spelaren, i kortens storlek på bordet.
+  assert.ok(Math.abs(planPlace(moved, { seat: 4, index: 0, hand: 1 })![1] - there[1] - 1.5 * scene.card.height) < 1e-9);
+  // Ett kort vars klipp är gjort med dagens plan landar där det ska ligga: det går ingenstans.
+  assert.deepEqual(spotPlace(scene, { ...old, place: four[0]! }), planPlace(scene, old));
 });

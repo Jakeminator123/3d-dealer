@@ -519,22 +519,51 @@ test('cykelns takt: 4,0 s, given ungefär dubbelt så fort som den lästa, vila 
   assert.equal(move.to, 'REDO');
 });
 
-test('cykelns giv är den hängda given i cykelns takt: samma kod och samma väg', () => {
+test('cykelns giv är den hängda given längs samma väg: samma kod, samma väg, och farten en klocka längs den', () => {
+  const grip = (pose: DollPose): Vec3 => pose.hands.left[4]!.map((value, k) => (value + pose.hands.left[8]![k]!) / 2) as Vec3;
   for (const seat of [4, 1, 7]) {
     const move = cycleTo(seat, 0);
     const give = moveTo(seat);
     assert.equal(move.swingDeg, give.swingDeg, `plats ${seat}: svängen`);
     assert.equal(move.bow, give.bow, `plats ${seat}: bågen`);
-    const ready = Math.round(cycle.parts.ready * move.fps);
-    for (let frame = 0; frame <= move.moments.rests; frame += 3) {
-      const a = poseAt(scene, doll, move, frame / move.fps);
-      const b = poseAt(scene, doll, give, (Math.max(0, frame - ready) * move.back!.pace) / give.fps);
-      near(far(a.card!.centre, b.card!.centre), 0, SAME, `plats ${seat}: kortet i ruta ${frame}`);
-      // Medan kortet fälls sänks handen mot filten. Ögonblicken är hela rutor i cykelns takt, så där skiljer det en bråkdel
-      // av en ruta i när handen sänks: högst en millimeter.
-      const folding = frame >= move.moments.folds - 1 && frame <= move.moments.rests;
-      a.hands.left.forEach((point, k) => near(far(point, b.hands.left[k]!), 0, folding ? 0.001 : SAME, `plats ${seat}: vänster hand punkt ${k} i ruta ${frame}`));
+    // Kortet går givens väg: i REDO och när kortet ligger exakt där given har det, och däremellan på givens väg, lugnad
+    // (cycle.life.calm) så att den ligger högst 1,5 cm från den lästa (där kortet vänds).
+    const path = Array.from({ length: give.moments.rests * 4 + 1 }, (_, k) => poseAt(scene, doll, give, k / 4 / give.fps).card!.centre);
+    for (let frame = 0; frame <= move.moments.rests; frame++) {
+      const centre = poseAt(scene, doll, move, frame / move.fps).card!.centre;
+      const off = Math.min(...path.map((point) => far(point, centre)));
+      assert.ok(off <= 0.015, `plats ${seat}, ruta ${frame}: kortet ${(off * 1000).toFixed(1)} mm från givens väg`);
     }
+    near(far(poseAt(scene, doll, move, 0).card!.centre, path[0]!), 0, SAME, `plats ${seat}: kortet i REDO`);
+    near(far(poseAt(scene, doll, move, move.moments.rests / move.fps).card!.centre, path.at(-1)!), 0, SAME, `plats ${seat}: kortet när det ligger`);
+    // Greppets fart på vägen ut: en topp, som en sträckning med minsta ryck, inte givens egna knyckar.
+    const speed: number[] = [];
+    for (let frame = 1; frame <= move.moments.rests; frame++) {
+      speed.push(far(grip(poseAt(scene, doll, move, frame / move.fps)), grip(poseAt(scene, doll, move, (frame - 1) / move.fps))) * move.fps);
+    }
+    const top = Math.max(...speed);
+    const peaks = speed.filter((value, k) => k > 0 && k < speed.length - 1 && value > speed[k - 1]! && value >= speed[k + 1]! && value > 0.1 * top);
+    assert.equal(peaks.length, 1, `plats ${seat}: greppets fart har ${peaks.length} toppar på vägen ut`);
+  }
+});
+
+test('cykelns kropp lever: ingen ruta är hela kroppen stilla, hon andas, och REDO är exakt REDO', () => {
+  for (const seat of [4, 1, 7]) {
+    const move = cycleTo(seat, 0);
+    const poses = Array.from({ length: move.frameCount }, (_, frame) => poseAt(scene, doll, move, frame / move.fps));
+    // Mellan två rutor rör sig något i kroppen minst 0,2 mm (6 mm/s): axlar, huvud, huvudets riktning eller handen.
+    for (let frame = 1; frame < poses.length; frame++) {
+      const [a, b] = [poses[frame - 1]!, poses[frame]!];
+      const moved = Math.max(far(a.arms.left.shoulder, b.arms.left.shoulder), far(a.arms.right.shoulder, b.arms.right.shoulder), far(a.head, b.head), far(a.face, b.face) * 0.1, far(a.hands.left[0]!, b.hands.left[0]!));
+      assert.ok(moved >= 0.0002, `plats ${seat}, ruta ${frame}: kroppen rör sig bara ${(moved * 1000).toFixed(2)} mm`);
+    }
+    // Bålen lutar sig mjukt: lutningen ändras högst lite mellan två rutor och ändrar sin ändring lite (inga knyckar).
+    const lean = move.tracks.lean!.amount;
+    const steps = lean.slice(1).map((value, k) => value - lean[k]!);
+    const most = Math.max(...steps.map(Math.abs));
+    const jolt = Math.max(...steps.slice(1).map((value, k) => Math.abs(value - steps[k]!)));
+    assert.ok(jolt <= 0.25 * most, `plats ${seat}: bålens lutning knyckar ${jolt.toFixed(4)} rad per ruta² mot största steg ${most.toFixed(4)}`);
+    assert.ok(Math.min(...lean.slice(1, -1)) >= 0 && lean[0] === 0 && lean.at(-1) === 0, `plats ${seat}: lutningen börjar och slutar i 0`);
   }
 });
 
@@ -564,6 +593,8 @@ for (const [seat, index] of CYCLES) {
     assert.deepEqual(throughShoe(scene, doll, move), []);
     assert.deepEqual(armHits(scene, doll, move), { shoe: [], restingHand: [], torso: [], table: [] });
     const { letsGo, home } = move.back!;
+    // Blicken går före: den lämnar kortet cycle.life.gazeLead innan handen gör det.
+    const looksAway = letsGo - Math.round(cycle.life.gazeLead * move.fps);
     for (let frame = 0; frame < move.frameCount; frame++) {
       const pose = poseAt(scene, doll, move, frame / move.fps);
       checkPose(pose, `ruta ${frame}`);
@@ -571,10 +602,8 @@ for (const [seat, index] of CYCLES) {
       near(handLength(pose.hands.right), HAND, 0.001, `ruta ${frame}: den vilande handens längd`);
       // Fingrarna ligger på kortet tills handen släpper det; sedan ligger det kvar och blicken går tillbaka till skon.
       assert.equal(pose.laid === null, frame <= letsGo, `ruta ${frame}: kortet är ${pose.laid ? 'släppt' : 'i handen'}`);
-      if (frame >= move.moments.rests && frame <= letsGo) {
-        assert.ok(nearestTip(pose) <= TOUCH, `ruta ${frame}: fingrarna på det lagda kortet`);
-        near(far(pose.gaze, pose.card!.centre), 0, SAME, `ruta ${frame}: blicken på kortet`);
-      }
+      if (frame >= move.moments.rests && frame <= letsGo) assert.ok(nearestTip(pose) <= TOUCH, `ruta ${frame}: fingrarna på det lagda kortet`);
+      if (frame >= move.moments.rests && frame <= looksAway) near(far(pose.gaze, pose.card!.centre), 0, 0.01, `ruta ${frame}: blicken på kortet`);
       if (frame > letsGo) near(far(pose.laid!.centre, last(move).laid!.centre), 0, SAME, `ruta ${frame}: kortet ligger kvar`);
       if (frame >= home) near(far(pose.gaze, pose.card!.centre), 0, SAME, `ruta ${frame}: blicken på nästa kort`);
     }
@@ -701,10 +730,9 @@ for (const [seat, index, action] of NEW) {
     assert.ok(nearestTip(end) <= TOUCH, 'handen på nästa kort');
   });
 
-  // Känt 2026-11-18, med skon och bågen 8,75 cm närmare spelarna: till plats 7, kort 2 måste armbågen vridas 125–130
-  // grader (fri med 7,5 cm, output/work/sko-flytt/alla-cykler.ts). Väntar på den omgjorda rörelsen.
-  const known = seat === 7 && index === 2 ? 'plats 7, kort 2: armbågen vrids 130 grader med skon och bågen 8,75 cm in (fri till 7,5 cm); väntar på den omgjorda rörelsen' : undefined;
-  test(`${what}: armen går fri från skon, bålen, den vilande handen och bordet, och handen håller sin storlek`, { skip: known }, () => {
+  // Plats 7, kort 2 krävde 125–130 graders armbåge med skon 8,75 cm närmare spelarna, när hon lutade sig bara där armen
+  // inte nådde; med bålens planerade lutning mot kortplatsen (planLean) räcker 85 (mätt 2026-11-18).
+  test(`${what}: armen går fri från skon, bålen, den vilande handen och bordet, och handen håller sin storlek`, () => {
     const move = actTo(seat, index, action);
     assert.deepEqual(throughShoe(scene, doll, move), []);
     assert.deepEqual(armHits(scene, doll, move), { shoe: [], restingHand: [], torso: [], table: [] });
@@ -785,7 +813,9 @@ test('vändningen: inget kort dras, hålkortet lyfts, vänds över sin plats och
   const reached = poseAt(scene, doll, move, arrives / move.fps);
   assert.ok(Math.min(...TIPS.map((k) => toCard(reached.hands.left[k]!, reached.card!))) <= TOUCH, 'fingrarna på hålkortet');
   near(far(poseAt(scene, doll, move, 0).gaze, mouth.centre), 0, SAME, 'blicken på kortet i mynningen i REDO');
-  near(far(reached.gaze, reached.card!.centre), 0, 0.005, 'blicken på hålkortet när handen når det');
+  // Blicken ligger cycle.life.gazeLead före: den är på hålkortet så långt innan handen når det.
+  const early = poseAt(scene, doll, move, arrives / move.fps - cycle.life.gazeLead);
+  near(far(early.gaze, reached.card!.centre), 0, 0.005, 'blicken på hålkortet före handen');
 });
 
 test('en vändning och ett hålkort som har sparats och lästs igen spelas som de var', () => {

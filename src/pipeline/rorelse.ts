@@ -5,21 +5,26 @@
 //
 // Måttens grund (antagen ur litteraturen, inte mätt här): en mänsklig sträckning följer i stort en klockformad fartkurva
 // med minsta möjliga ryck (Flash och Hogan 1985); jämnheten mäts som fartkurvans spektrala båglängd, SPARC
-// (Balasubramanian m.fl. 2012 och 2015), där minsta ryck ger cirka −1,6 och en hackig rörelse lägre tal. Blicken går före
-// handen till målet, huvudet följer blicken och stannar före handen, och bålen börjar med eller före armen och stannar
-// efter den. Ingenting står helt stilla: andning och små viktförskjutningar finns alltid.
+// (Balasubramanian m.fl. 2012 och 2015), där minsta ryck ger −1,40 med gränserna här (se testet) och en hackig rörelse
+// lägre tal. Blicken går före handen till målet, huvudet följer blicken och stannar före handen, och bålen börjar med
+// eller före armen och stannar efter den. Ingenting står helt stilla: andning och små viktförskjutningar finns alltid.
+// Gränserna för måtten är satta mot filmer, mätta med samma kod (output/work/rorelse/forslag.md).
 //
 // Ett spår är en följd av punkter med jämn takt (`fps`); en punkt som saknas i en ruta (null) fylls mellan grannarna.
 // Kommandot:
-//   node src/pipeline/rorelse.ts docka [cykel] <plats> [kort] [--fps n] [--giv]
-//   node src/pipeline/rorelse.ts film <film.mp4>
+//   node src/pipeline/rorelse.ts docka <plats> [kort] [--cykel namn] [--handling deal|hole|flip] [--fps n] [--giv] [--delar]
+//   node src/pipeline/rorelse.ts film <film.mp4> [--enkel] [--delar] [--spar spår.json]
+// Hur måtten tas och deras gränser står i content/tagning.json (motion, limits); tagning.ts prövar dem på dockan när ett
+// paket görs och på klippet när det tas emot.
 // Ingenting här avgör något i spelet.
 
+import { readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { Frame, Vec3 } from '../scene/description.ts';
-import { moveFor, poseAt, type Seat } from '../scene/dollPose.ts';
+import { moveFor, poseAt, type Action, type Seat } from '../scene/dollPose.ts';
 import { cycleMove, isSkin, readCycleParts, type CycleParts } from './cykel.ts';
-import { eachFrame, isBlue, isYellow, probe, type Picture } from './matning.ts';
+import { eachFrame, isBlue, isYellow, judge, probe, type Limit, type Picture } from './matning.ts';
 
 export class MotionError extends Error {}
 
@@ -121,7 +126,7 @@ export function segments(speed: number[], fps: number, share = 0.05, bridge = 0.
 /**
  * Jämnheten i en rörelses fartkurva: SPARC, den spektrala båglängden (Balasubramanian m.fl. 2015). Fartkurvans
  * normerade spektrum upp till `cutoff` Hz, där det är över `floor` av sitt största, mäts som en båglängd; ju fler
- * toppar och knyckar, desto längre båge och desto lägre (mer negativt) tal. En kurva med minsta ryck ger cirka −1,6.
+ * toppar och knyckar, desto längre båge och desto lägre (mer negativt) tal. En kurva med minsta ryck ger −1,40 (rorelse.test.ts).
  */
 export function sparc(speed: number[], fps: number, cutoff = 10, floor = 0.05, pad = 4): number {
   const n = 2 ** (Math.ceil(Math.log2(Math.max(2, speed.length))) + pad);
@@ -180,32 +185,58 @@ const MINIMUM_JERK_SNAP = 2.6;
  * ger tal långt över.
  */
 export function snap(speed: number[], fps: number, segment: Segment): number {
-  let most = 0;
-  for (let k = Math.max(1, segment.from); k <= Math.min(speed.length - 1, segment.to + 1); k++) most = Math.max(most, Math.abs(speed[k]! - speed[k - 1]!) * fps);
-  const seconds = (segment.to - segment.from + 1) / fps;
-  return segment.peak > 0 ? (most * seconds) / (segment.peak * MINIMUM_JERK_SNAP) : 0;
+  return Math.max(0, ...pieces(speed, segment).map((piece) => {
+    let most = 0;
+    for (let k = Math.max(1, piece.from); k <= Math.min(speed.length - 1, piece.to + 1); k++) most = Math.max(most, Math.abs(speed[k]! - speed[k - 1]!) * fps);
+    const seconds = (piece.to - piece.from + 1) / fps;
+    return piece.peak > 0 ? (most * seconds) / (piece.peak * MINIMUM_JERK_SNAP) : 0;
+  }));
 }
 
 /**
- * Tvära stopp och starter: rutor där farten går från minst `high` av rörelsens topp till under `low` av den, eller
- * tvärtom, på högst `within` rutor. En människa gör inte det; en docka vars del slutar räknas gör det.
+ * En rörelse delad i sina delrörelser: vid varje dal där farten sjunker under `deep` av den lägre av topparna på var sin
+ * sida. En kropp som aldrig står still (andning) blir annars en enda rörelse över hela cykeln, och knycken mäts mot fel
+ * längd.
  */
-export function abrupt(speed: number[], segment: Segment, high = 0.3, low = 0.08, within = 2): number {
-  let count = 0;
-  for (let k = segment.from; k <= Math.min(speed.length - 1, segment.to + within); k++) {
-    for (let j = 1; j <= within && k - j >= 0; j++) {
-      const before = speed[k - j]!;
-      const now = speed[k]!;
-      const stop = before >= high * segment.peak && now < low * segment.peak;
-      const start = before < low * segment.peak && now >= high * segment.peak;
-      if (stop || start) {
-        count++;
-        k += within;
-        break;
+export function pieces(speed: number[], segment: Segment, deep = 0.6): Segment[] {
+  const cuts: number[] = [];
+  for (let k = segment.from + 1; k < segment.to; k++) {
+    if (!(speed[k]! <= speed[k - 1]! && speed[k]! < speed[k + 1]!)) continue;
+    const left = Math.max(...speed.slice(segment.from, k));
+    const right = Math.max(...speed.slice(k + 1, segment.to + 1));
+    if (speed[k]! < deep * Math.min(left, right)) cuts.push(k);
+  }
+  const bounds = [segment.from, ...cuts, segment.to];
+  return bounds.slice(1).map((to, i) => {
+    const from = bounds[i]!;
+    let at = from;
+    for (let k = from; k <= to; k++) if (speed[k]! > speed[at]!) at = k;
+    return { from, to, peak: speed[at]!, at };
+  });
+}
+
+/**
+ * Tvära stopp och starter: rutor där farten går från minst `high` av delrörelsens topp till under `low` av den, eller
+ * tvärtom, på högst `within` rutor (en rörelse med minsta ryck kortare än cirka 0,5 s i 24 rutor/s når 31 % på två rutor). En människa gör inte det; en docka vars del slutar räknas gör det.
+ */
+export function abrupt(speed: number[], segment: Segment, high = 0.4, low = 0.08, within = 2): number {
+  // Varje delrörelse mot sin egen topp (pieces), så att en kort rörelse efter en lång inte mäts mot den långas fart.
+  const found = new Set<number>();
+  for (const piece of pieces(speed, segment)) {
+    for (let k = Math.max(1, piece.from - within); k <= Math.min(speed.length - 1, piece.to + within); k++) {
+      for (let j = 1; j <= within && k - j >= 0; j++) {
+        const before = speed[k - j]!;
+        const now = speed[k]!;
+        const stop = before >= high * piece.peak && now < low * piece.peak;
+        const start = before < low * piece.peak && now >= high * piece.peak;
+        if ((stop || start) && ![...found].some((at) => Math.abs(at - k) <= within)) {
+          found.add(k);
+          break;
+        }
       }
     }
   }
-  return count;
+  return found.size;
 }
 
 /** Hur stor del av tiden som bär `share` av hela vägen: de snabbaste rutorna först. Litet tal: rörelsen sker i stötar. */
@@ -290,49 +321,61 @@ export function lagBetween(leader: number[], follower: number[], fps: number, mo
 // Måtten
 
 /**
- * Vilka spår som är vad. `hand` är den givande handen (eller kortet den bär), `head` huvudet, `trunk` bålen eller axeln,
- * `gaze` blickens riktning i grader när den finns. `body` är alla spår som räknas när det mäts om hela kroppen står still.
+ * Vilka spår som är vad. `hand` är den givande handen (eller kortet den bär), `head` huvudet, `trunk` bålen, `gaze`
+ * blickens riktning i grader när den finns, `turn` huvudets riktning i grader när den finns. `body` är alla spår som räknas när det mäts om hela kroppen står still.
  */
-export type Roles = { hand: string; head: string; trunk: string; gaze?: string; body: string[] };
+export type Roles = { hand: string; head: string; trunk: string; gaze?: string; turn?: string; body: string[] };
 
 /** Ett mått: talet och vad det betyder. */
 export type Value = { value: number | null; what: string };
 
-/** Hur stilla en del är: under `still` av handens toppfart räknas den som stilla. */
-export type MotionOptions = { still: number; smooth: number; units: string };
+/**
+ * Hur måtten tas. `scale`: spårens enheter på en huvudbredd (håret med), så att docka och film mäts i samma mått.
+ * `still`: under så många huvudbredder per sekund står en del still. `moving`: en del vars toppfart i en rörelse är under
+ * så många huvudbredder per sekund gör bara småsaker (andning, sväng), och dess knyckar räknas inte. Vinklar (blicken)
+ * räknas inte om: `still` och `moving` gäller dem som grader per sekund gånger `degrees`. `smooth`: utjämningar av
+ * spåren (bildspår brusar). `cyclic`: rörelsen är en cykel som kedjas, så stillheten i slutet och i början är en.
+ */
+export type MotionOptions = { scale: number; still: number; moving: number; degrees: number; smooth: number; cyclic: boolean };
+
+const median = (values: number[]): number | null => {
+  if (!values.length) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  return sorted[Math.floor(sorted.length / 2)]!;
+};
 
 /**
- * Måtten för en rörelse. Allt i sekunder, andelar eller rena tal, så att de jämförs lika för docka och film. Rörelserna
- * räknas ur handens fart: den första är vägen ut, den sista vägen tillbaka.
+ * Måtten för en rörelse. Allt i sekunder, andelar, huvudbredder per sekund eller rena tal, så att de jämförs lika för
+ * docka och film. Rörelserna räknas ur handens fart: den första är vägen ut, den sista vägen tillbaka.
  */
 export function motionValues(tracks: Tracks, roles: Roles, options: MotionOptions): Record<string, Value> {
   const fps = tracks[roles.hand]!.fps;
-  const pointsOf = (name: string): number[][] => smoothed(filled(tracks[name]!), options.smooth);
+  const angles = [roles.gaze, roles.turn].filter((name): name is string => !!name);
+  const names = [...new Set([roles.hand, roles.head, roles.trunk, ...angles, ...roles.body])];
+  // Fart i huvudbredder per sekund; blicken i grader per sekund delat med `degrees`, så att samma gränser gäller.
   const speeds: Record<string, number[]> = {};
-  for (const name of new Set([roles.hand, roles.head, roles.trunk, ...(roles.gaze ? [roles.gaze] : []), ...roles.body])) speeds[name] = speedOf(pointsOf(name), fps);
+  for (const name of names) {
+    const per = angles.includes(name) ? options.degrees : options.scale;
+    speeds[name] = speedOf(smoothed(filled(tracks[name]!), options.smooth), fps).map((value) => value / per);
+  }
   const hand = speeds[roles.hand]!;
   const n = hand.length;
   const moves = segments(hand, fps);
-  const handTop = Math.max(...hand);
-
-  // Hela kroppen stilla: varje del under sin egen gräns, en andel av sin egen toppfart i cykeln, men aldrig under
-  // brusgolvet (still av handens toppfart).
-  const stillAt = (name: string): boolean[] => {
-    const speed = speeds[name]!;
-    const limit = Math.max(options.still * handTop, 0.02 * Math.max(...speed));
-    return speed.map((value) => value <= limit);
-  };
+  const stillAt = (name: string): boolean[] => speeds[name]!.map((value) => value <= options.still);
   const bodyStill = roles.body.map(stillAt);
   const frozen = hand.map((_, k) => bodyStill.every((still) => still[k]!));
+  const handStill = stillAt(roles.hand);
   const out = moves[0];
   const back = moves.length > 1 ? moves.at(-1)! : null;
 
   // Ordningen på vägen ut och tillbaka: när delarna börjar och slutar mot handen, i sekunder (positivt: före handen).
-  const window = (segment: Segment): [number, number] => [Math.max(0, segment.from - Math.round(0.6 * fps)), Math.min(n - 1, segment.to + Math.round(0.6 * fps))];
+  // En del börjar när den går över en tiondel av sin topp i fönstret och över stillhetens gräns.
   const order = (name: string, segment: Segment | null | undefined): { lead: number; trail: number } | null => {
     if (!segment) return null;
-    const [from, to] = window(segment);
-    const part = onsetOffset(speeds[name]!, from, to);
+    const from = Math.max(0, segment.from - Math.round(0.6 * fps));
+    const to = Math.min(n - 1, segment.to + Math.round(0.6 * fps));
+    const speed = speeds[name]!.map((value) => (value > options.still ? value : 0));
+    const part = onsetOffset(speed, from, to);
     const own = onsetOffset(hand, segment.from, segment.to);
     if (!part || !own) return null;
     return { lead: round((own.on - part.on) / fps), trail: round((part.off - own.off) / fps) };
@@ -340,35 +383,43 @@ export function motionValues(tracks: Tracks, roles: Roles, options: MotionOption
   const headOut = order(roles.head, out);
   const trunkOut = order(roles.trunk, out);
   const gazeOut = roles.gaze ? order(roles.gaze, out) : null;
+  const turnOut = roles.turn ? order(roles.turn, out) : null;
   const headBack = order(roles.head, back);
   const trunkBack = order(roles.trunk, back);
 
-  const perMove = (f: (segment: Segment) => number): number | null => (moves.length ? Math.min(...moves.map(f)) : null);
-  const worstSnap = Math.max(
-    ...Object.entries(speeds).map(([, speed]) => Math.max(0, ...segments(speed, fps).map((segment) => snap(speed, fps, segment)))),
-  );
-  const abrupts = Object.values(speeds).reduce((sum, speed) => sum + segments(speed, fps).reduce((s, segment) => s + abrupt(speed, segment), 0), 0);
-  const lock = lagBetween(hand, speeds[roles.head]!, fps);
+  // Knyckar och tvära stopp räknas bara i rörelser som är mer än småsaker.
+  // Ögonen får kasta (sackader); knyckar räknas i kroppens delar.
+  const parts = names.filter((name) => name !== roles.gaze);
+  const real = (speed: number[]): Segment[] => segments(speed, fps).filter((segment) => segment.peak >= options.moving);
+  const worstSnap = Math.max(0, ...parts.flatMap((name) => real(speeds[name]!).map((segment) => snap(speeds[name]!, fps, segment))));
+  const abrupts = parts.reduce((sum, name) => sum + real(speeds[name]!).reduce((s, segment) => s + abrupt(speeds[name]!, segment), 0), 0);
+  const quiet = hand.map((_, k) => k).filter((k) => handStill[k]);
+  const idle = (name: string): number | null => {
+    const values = quiet.map((k) => speeds[name]![k]!);
+    const middle = median(values);
+    return middle === null ? null : round(middle, 4);
+  };
 
   return {
-    stillaHelt: { value: round(frozen.filter(Boolean).length / n), what: 'andel av cykeln då hela kroppen står still' },
-    langstaStillhet: { value: round(longestRun(frozen, fps)), what: 'längsta tid hela kroppen står still, i sekunder, med cykeln kedjad' },
-    handStilla: { value: round(longestRun(stillAt(roles.hand), fps)), what: 'längsta tid handen står still, i sekunder, med cykeln kedjad' },
-    rorelser: { value: moves.length, what: 'handens rörelser i cykeln (fart över 5 % av toppen, glapp under 0,12 s överbryggade)' },
-    samlad: { value: round(busiest(hand, 0.8)), what: 'andel av tiden som bär 80 % av handens väg' },
-    jamnhet: { value: perMove((segment) => round(sparc(hand.slice(segment.from, segment.to + 1), fps), 2)), what: 'handens jämnhet, SPARC, sämsta rörelsen (minsta ryck cirka −1,6; lägre är hackigare)' },
+    stillaHelt: { value: round(frozen.filter(Boolean).length / n), what: 'andel av tiden då hela kroppen står still' },
+    langstaStillhet: { value: round(longestRun(frozen, fps, options.cyclic)), what: `längsta tid hela kroppen står still, i sekunder${options.cyclic ? ', med cykeln kedjad' : ''}` },
+    handStilla: { value: round(longestRun(handStill, fps, options.cyclic)), what: 'längsta tid handen står still, i sekunder' },
+    huvudetIVila: { value: idle(roles.head), what: 'huvudets fart medan handen står still, median, huvudbredder per sekund (andning och små rörelser; 0 är en docka)' },
+    balenIVila: { value: idle(roles.trunk), what: 'bålens fart medan handen står still, median, huvudbredder per sekund' },
+    rorelser: { value: moves.length, what: 'handens rörelser (fart över 5 % av toppen, glapp under 0,12 s överbryggade)' },
+    samlad: { value: round(busiest(hand, 0.8)), what: 'andel av tiden som bär 80 % av handens väg (litet: rörelsen sker i stötar)' },
+    jamnhet: { value: moves.length ? Math.min(...moves.map((segment) => round(sparc(hand.slice(segment.from, segment.to + 1), fps), 2))) : null, what: 'handens jämnhet, SPARC, sämsta rörelsen (minsta ryck −1,40; lägre är hackigare)' },
     toppar: { value: moves.length ? Math.max(...moves.map((segment) => peaksIn(hand, segment))) : null, what: 'flest fartoppar i en av handens rörelser (en är en klocka)' },
     knyck: { value: round(worstSnap, 2), what: 'största knyck i någon del: acceleration mot minsta ryck med samma toppfart och längd (1 är som minsta ryck)' },
-    tvara: { value: abrupts, what: 'tvära stopp och starter i alla delar: från 30 % av toppfarten till under 8 % (eller tvärtom) på två rutor' },
+    tvara: { value: abrupts, what: 'tvära stopp och starter i alla delar: från 40 % av delrörelsens toppfart till under 8 % (eller tvärtom) på två rutor' },
+    blickFore: { value: gazeOut?.lead ?? null, what: 'blicken börjar före handen på vägen ut, i sekunder (negativt: efter)' },
+    vridningFore: { value: turnOut?.lead ?? null, what: 'huvudet börjar vridas före handen på vägen ut, i sekunder (negativt: efter)' },
     huvudFore: { value: headOut?.lead ?? null, what: 'huvudet börjar före handen på vägen ut, i sekunder (negativt: efter)' },
+    balFore: { value: trunkOut?.lead ?? null, what: 'bålen börjar före handen på vägen ut, i sekunder (negativt: efter)' },
     huvudStannar: { value: headOut ? round(-headOut.trail) : null, what: 'huvudet stannar före handen på vägen ut, i sekunder (negativt: efter)' },
-    balFore: { value: trunkOut?.lead ?? null, what: 'bålen börjar före handen på vägen ut, i sekunder' },
-    balEfter: { value: trunkOut?.trail ?? null, what: 'bålen stannar efter handen på vägen ut, i sekunder' },
-    blickFore: { value: gazeOut?.lead ?? null, what: 'blicken börjar före handen på vägen ut, i sekunder' },
+    balEfter: { value: trunkOut?.trail ?? null, what: 'bålen stannar efter handen på vägen ut, i sekunder (negativt: före)' },
     huvudForeTillbaka: { value: headBack?.lead ?? null, what: 'huvudet börjar före handen på vägen tillbaka, i sekunder' },
     balEfterTillbaka: { value: trunkBack?.trail ?? null, what: 'bålen stannar efter handen på vägen tillbaka, i sekunder' },
-    samtakt: { value: lock.r, what: 'huvudets fart mot handens, största korrelation inom ±0,5 s (1: i takt som en maskin)' },
-    samtaktFordrojning: { value: lock.lag, what: 'fördröjningen där huvudets fart liknar handens mest, i sekunder (positivt: huvudet efter)' },
   };
 }
 
@@ -384,7 +435,7 @@ function aim(from: Vec3, to: Vec3): number[] {
 /** Dockans delar över en rörelse, `fps` prov per sekund: lägen i meter, blicken i grader. */
 export function dollTracks(parts: Pick<CycleParts, 'scene' | 'doll'>, move: Parameters<typeof poseAt>[2], fps: number): Tracks {
   const n = Math.round(move.seconds * fps) + 1;
-  const names = ['grepp', 'handled', 'armbage', 'axel', 'andraAxeln', 'huvud', 'bal', 'blick', 'vilandeHand', 'kort'] as const;
+  const names = ['grepp', 'handled', 'armbage', 'axel', 'andraAxeln', 'huvud', 'ansikte', 'bal', 'blick', 'vilandeHand', 'kort'] as const;
   const tracks = Object.fromEntries(names.map((name) => [name, { fps, points: [] as number[][] }])) as Record<(typeof names)[number], { fps: number; points: number[][] }>;
   for (let k = 0; k < n; k++) {
     const pose = poseAt(parts.scene, parts.doll, move, Math.min(move.seconds, k / fps));
@@ -397,13 +448,14 @@ export function dollTracks(parts: Pick<CycleParts, 'scene' | 'doll'>, move: Para
     tracks.huvud.points.push([...pose.head]);
     tracks.bal.points.push([...pose.torso]);
     tracks.blick.points.push(aim(pose.head, pose.gaze));
+    tracks.ansikte.points.push(aim(pose.head, pose.face));
     tracks.vilandeHand.points.push([...pose.arms.right.wrist]);
     tracks.kort.points.push([...(pose.laid ?? pose.card ?? pose.shoeCard).centre]);
   }
   return tracks;
 }
 
-export const DOLL_ROLES: Roles = { hand: 'grepp', head: 'huvud', trunk: 'axel', gaze: 'blick', body: ['grepp', 'armbage', 'axel', 'andraAxeln', 'huvud', 'bal', 'blick', 'vilandeHand'] };
+export const DOLL_ROLES: Roles = { hand: 'grepp', head: 'huvud', trunk: 'axel', gaze: 'blick', turn: 'ansikte', body: ['grepp', 'armbage', 'axel', 'andraAxeln', 'huvud', 'ansikte', 'bal', 'vilandeHand'] };
 
 // ---------------------------------------------------------------------------------------------------------------------
 // En film
@@ -572,7 +624,7 @@ const below = (mask: Uint8Array, width: number, row: number): Uint8Array => {
  * - `hand`: huden under axlarna som inte var hud i första rutan, utom vid skon där givhanden stod, närmast förra läget.
  * Rutorna läses en gång.
  */
-export async function filmTracks(path: string, screen: Screen): Promise<{ tracks: Tracks; fps: number; frames: number }> {
+export async function filmTracks(path: string, screen: Screen): Promise<{ tracks: Tracks; fps: number; frames: number; headWidth: number }> {
   const film = await probe(path);
   const frame: Frame = { width: film.width, height: film.height };
   type Start = { figure: Figure; staticSkin: Uint8Array; firstCard: Uint8Array; card: number[] };
@@ -686,20 +738,53 @@ export async function filmTracks(path: string, screen: Screen): Promise<{ tracks
   });
   const out: Tracks = {};
   for (const [name, points] of Object.entries(tracks)) if (points.some(Boolean)) out[name] = { fps, points };
-  return { tracks: out, fps, frames: film.frames };
+  return { tracks: out, fps, frames: film.frames, headWidth: start ? (start as Start).figure.width * STEP : 0 };
 }
 
 export const FILM_ROLES: Roles = { hand: 'hand', head: 'huvud', trunk: 'flank', body: ['hand', 'huvud', 'flank', 'brost'] };
 
 // ---------------------------------------------------------------------------------------------------------------------
-// Kommandot
+// Måtten för en tagning
 
-function print(title: string, values: Record<string, Value>): void {
-  console.log(title);
-  for (const [key, { value, what }] of Object.entries(values)) console.log(`  ${key.padEnd(20)} ${String(value).padStart(8)}   ${what}`);
+/** Hur rörelsens mått tas, så som det står i content/tagning.json (motion). Vad varje tal är står där. */
+export type MotionMeasure = { still: number; moving: number; degrees: number };
+
+/** Skärmen i dockans grå ateljé och Klings gröna (content/tagning.json, reference.studio; grönt känns igen utan tal). */
+export const screenOf = (studio: { screen: number[]; table: number[] }): Screen => ({ grey: [studio.screen, studio.table], tolerance: 14 });
+
+/** Talen ur måtten, som de prövas mot gränserna (matning.ts, judge). */
+const numbers = (values: Record<string, Value>): Record<string, number | null> => Object.fromEntries(Object.entries(values).map(([key, { value }]) => [key, value]));
+
+/** Dockans rörelse mätt i 3D, `fps` prov per sekund, i huvudbredder (2 × body.head.radius). */
+export function dollMotion(parts: Pick<CycleParts, 'scene' | 'doll'>, move: Parameters<typeof poseAt>[2], measure: MotionMeasure, fps = 24): Record<string, Value> {
+  return motionValues(dollTracks(parts, move, fps), DOLL_ROLES, { ...measure, scale: 2 * parts.doll.body.head.radius, smooth: 0, cyclic: !!move.back });
 }
 
-/** Varje del för sig: toppfart, rörelserna med knyck och tvära stopp, och farten ruta för ruta. */
+/** En film av en dealer på skärm mätt i bild, i huvudbredder. `cyclic`: filmen är en cykel som kedjas. */
+export async function filmMotion(path: string, measure: MotionMeasure, screen: Screen, cyclic = true): Promise<{ values: Record<string, Value>; tracks: Tracks; headWidth: number; frames: number; fps: number }> {
+  const { tracks, fps, frames, headWidth } = await filmTracks(path, screen);
+  return { values: motionValues(tracks, FILM_ROLES, { ...measure, scale: headWidth, smooth: 1, cyclic }), tracks, headWidth, frames, fps };
+}
+
+/** Rörelsens mått som tal, för gränserna i content/tagning.json (limits). */
+export const motionNumbers = numbers;
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Kommandot
+
+type Content = { motion: MotionMeasure; reference: { studio: { screen: number[]; table: number[] } }; limits: Record<string, Limit> };
+const content = (): Content => JSON.parse(readFileSync(join(import.meta.dirname, '..', '..', 'content', 'tagning.json'), 'utf8')) as Content;
+
+function print(title: string, values: Record<string, Value>, limits: Record<string, Limit>): void {
+  console.log(title);
+  const judged = new Map(judge(numbers(values), Object.fromEntries(Object.keys(values).filter((key) => limits[key]).map((key) => [key, limits[key]!]))).map((entry) => [entry.key, entry]));
+  for (const [key, { value, what }] of Object.entries(values)) {
+    const verdict = judged.get(key);
+    console.log(`  ${(verdict ? verdict.verdict : '').padEnd(9)} ${key.padEnd(18)} ${String(value).padStart(8)} ${(verdict ? verdict.limit : '').padEnd(14)} ${what}`);
+  }
+}
+
+/** Varje del för sig: toppfart, rörelserna med knyck och tvära stopp, och farten ruta för ruta i hundradelar av toppen. */
 export function partsReport(tracks: Tracks, smooth: number): string[] {
   const lines: string[] = [];
   for (const [name, track] of Object.entries(tracks)) {
@@ -719,32 +804,32 @@ async function main(args: string[]): Promise<void> {
     const k = rest.indexOf(name);
     return k >= 0 ? rest[k + 1] : undefined;
   };
-  const plain = rest.filter((word, k) => !word.startsWith('--') && !rest[k - 1]?.startsWith('--fps'));
+  const plain = rest.filter((word, k) => !word.startsWith('--') && !['--fps', '--spar', '--cykel', '--handling'].includes(rest[k - 1] ?? ''));
+  const { motion, reference, limits } = content();
   if (what === 'docka') {
-    const named = plain[0] && !/^(\d+|D)$/.test(plain[0]) ? plain.shift()! : 'cykel-nyp';
-    const parts = readCycleParts(named);
+    const parts = readCycleParts(flag('--cykel') ?? 'cykel-nyp');
     const seat: Seat = plain[0] === 'D' ? 'D' : Number(plain[0] ?? 4);
     const index = Number(plain[1] ?? 0);
-    const move = rest.includes('--giv') ? moveFor(parts.scene, parts.doll, parts.base, seat, { index }) : cycleMove(parts, { seat, index, action: 'deal' });
+    const one = rest.includes('--giv');
+    const action = (flag('--handling') ?? 'deal') as Action;
+    const move = one ? moveFor(parts.scene, parts.doll, parts.base, seat, { index }) : cycleMove(parts, { seat, index, action });
     const fps = Number(flag('--fps') ?? 24);
-    const tracks = dollTracks(parts, move, fps);
-    print(`${move.id}, ${round(move.seconds)} s, ${fps} prov/s, meter`, motionValues(tracks, DOLL_ROLES, { still: 0.01, smooth: 0, units: 'm' }));
-    if (rest.includes('--delar')) console.log(partsReport(tracks, 0).join('\n'));
+    print(`${move.id}, ${round(move.seconds)} s, ${fps} prov/s, huvudbredd ${round(2 * parts.doll.body.head.radius)} m`, dollMotion(parts, move, motion, fps), limits);
+    if (rest.includes('--delar')) console.log(partsReport(dollTracks(parts, move, fps), 0).join('\n'));
     return;
   }
   if (what === 'film') {
     const path = plain[0];
     if (!path) throw new MotionError('Skriv filmen: node src/pipeline/rorelse.ts film <film.mp4>');
-    const screen: Screen = { grey: [[118, 124, 128], [176, 176, 176]], tolerance: 14 };
-    const { tracks, fps, frames } = await filmTracks(path, screen);
+    const { values, tracks, headWidth, frames, fps } = await filmMotion(path, motion, screenOf(reference.studio), !rest.includes('--enkel'));
     const missing = Object.entries(tracks).map(([name, track]) => `${name} ${track.points.filter((p) => !p).length}`).join(', ');
-    print(`${path}: ${frames} rutor à ${fps}/s, bildpunkter; saknas: ${missing}`, motionValues(tracks, FILM_ROLES, { still: 0.03, smooth: 1, units: 'bp' }));
+    print(`${path}: ${frames} rutor à ${fps}/s, huvudbredd ${headWidth} bp; saknas: ${missing}`, values, limits);
     if (rest.includes('--delar')) console.log(partsReport(tracks, 1).join('\n'));
     const json = flag('--spar');
-    if (json) (await import('node:fs')).writeFileSync(json, JSON.stringify(tracks));
+    if (json) writeFileSync(json, JSON.stringify(tracks));
     return;
   }
-  throw new MotionError('Skriv docka [cykel] <plats> [kort] [--fps n] [--giv], eller film <film.mp4>');
+  throw new MotionError('Skriv docka <plats> [kort] [--cykel namn] [--handling deal|hole|flip] [--fps n] [--giv] [--delar], eller film <film.mp4> [--enkel] [--delar] [--spar spår.json]');
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {

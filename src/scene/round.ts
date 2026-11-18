@@ -160,7 +160,7 @@ type Take = { file: string; status: string; seat: number | 'D'; index: number; a
 
 const isPoint = (value: unknown, length: number): boolean => Array.isArray(value) && value.length === length && value.every(isNumber);
 /** Ögat, skon och landningsplatsen ur en post, när de har rätt form. */
-function madeWith(entry: RoundEntry): Pick<Take, 'eye' | 'shoe' | 'place'> {
+export function madeWith(entry: RoundEntry): Pick<Take, 'eye' | 'shoe' | 'place'> {
   const eye = entry.eye as FilmEye | undefined;
   const shoe = entry.shoe as FilmShoe | undefined;
   return {
@@ -326,15 +326,23 @@ export function readyClip(entries: RoundEntry[], dealer: string, view: SeatView)
 }
 
 /**
- * Kortplatsen på filten för ett kort: platsens kortplats `index` ur content/scene.json (dealerns ur `places.dealer`).
- * Ett kort bortom platsens sista kortplats ligger ett steg längre i samma riktning som de två sista, och en delad hand
- * (hand 2 och framåt) ligger ett kort längre mot spelaren per hand. Båda är räknade ur scenens tal, inte mätta. Null
- * när scenen inte har platsen.
+ * Var ett kort läggs på filten: där klippet lägger det (ClipCard.place, registrets `place`), också om scenens
+ * kortplatser har flyttats sedan klippet gjordes, och annars på dess plats i kortplanen (planPlace). Det är där kortet
+ * landar; sedan går det till planens plats (reel.ts, glideAt). Null när scenen inte har platsen.
  */
 export function spotPlace(scene: SceneDescription, spot: CardSpot & { place?: FeltPoint }): FeltPoint | null {
-  // Ett klipps kort ligger där klippet lägger det (ClipCard.place), också om scenens kortplatser har flyttats sedan.
   if (Array.isArray(spot.place) && spot.place.length === 2 && spot.place.every((value) => typeof value === 'number' && Number.isFinite(value))) return [spot.place[0], spot.place[1]];
-  const row =spot.seat === 'D' ? scene.places.dealer : scene.places.seats.find((entry) => entry.seat === spot.seat)?.cards;
+  return planPlace(scene, spot);
+}
+
+/**
+ * Kortplatsen på filten för ett kort i dagens kortplan: platsens kortplats `index` ur content/scene.json (dealerns ur
+ * `places.dealer`). Ett kort bortom platsens sista kortplats ligger ett steg längre i samma riktning som de två sista,
+ * och en delad hand (hand 2 och framåt) ligger ett kort längre mot spelaren per hand, med kortets storlek på bordet
+ * (card.onTable.scale). Båda är räknade ur scenens tal, inte mätta. Null när scenen inte har platsen.
+ */
+export function planPlace(scene: SceneDescription, spot: CardSpot): FeltPoint | null {
+  const row = spot.seat === 'D' ? scene.places.dealer : scene.places.seats.find((entry) => entry.seat === spot.seat)?.cards;
   if (!row || row.length === 0 || !Number.isInteger(spot.index) || spot.index < 0) return null;
   let place: FeltPoint;
   if (spot.index < row.length) place = row[spot.index]!;
@@ -344,7 +352,7 @@ export function spotPlace(scene: SceneDescription, spot: CardSpot & { place?: Fe
     place = [b[0] + steps * (b[0] - a[0]), b[1] + steps * (b[1] - a[1])];
   } else return null;
   const hand = spot.hand ?? 0;
-  return hand > 0 ? [place[0], place[1] + hand * scene.card.height] : place;
+  return hand > 0 ? [place[0], place[1] + hand * scene.card.height * scene.card.onTable.scale] : [place[0], place[1]];
 }
 
 /** Bakgrunden i en beställning: registrets fil och hur den visas. */

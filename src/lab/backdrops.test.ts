@@ -60,20 +60,22 @@ test('bakgrunderna har samma nummer som i Granska: registrets ordning inom grupp
   assert.deepEqual(backdropItems(registryOf([])), []);
 });
 
-test('dealerna att välja mellan är dealerns egna dealerfilmer, filmerna först, med vyn de är gjorda i', () => {
+test('dealerna att välja mellan är dealerns egna dealerfilmer, filmerna först, med vyn, ögat och kortets plats de är gjorda med', () => {
   const made = (file: string, group: string, more: Record<string, unknown>) => asset(file, group, { dealer: 'paulina', use: 'dealerfilm', ...more });
+  const eye = { position: [0.5, 0.6, -0.2], forward: [-0.3, -0.2, -0.9], focalPx: 1829, frame: { width: 1920, height: 1080 } };
+  const shoe = { at: [0.495, -1.8433], yawDeg: -74.6, length: 0.442 };
   const registry = registryOf([
     asset('dealers/paulina/anchors/prov-gammalt.png', 'anchors', { dealer: 'paulina', pose: 'vila', status: 'godkänd', title: 'VILA' }),
     made('dealers/paulina/anchors/spelaren-vila.png', 'anchors', { pose: 'vila', status: 'godkänd', title: 'VILA ur Spelaren', view: { kind: 'spelaren' } }),
-    made('dealers/paulina/clips/giv-4_plats-7.mp4', 'clips', { title: 'Giv 4 ur Plats 7', view: { kind: 'plats', seat: 7, close: true }, lands: { seat: 4, index: 0, at: 3 } }),
+    made('dealers/paulina/clips/giv-4_plats-7.mp4', 'clips', { title: 'Giv 4 ur Plats 7', view: { kind: 'plats', seat: 7, close: true }, lands: { seat: 4, index: 0, at: 3 }, eye, shoe, place: [-0.019, -1.4468] }),
     made('dealers/paulina/clips/utan-vy.mp4', 'clips', { title: 'Utan vy' }),
     made('dealers/paulina/clips/nej.mp4', 'clips', { status: 'utgår', view: { kind: 'spelaren' } }),
     made('dealers/pamela/clips/giv.mp4', 'clips', { dealer: 'pamela', title: 'Pamelas', view: { kind: 'spelaren' } }),
     asset('reference/prov-helfigur.png', 'reference', { use: 'helfigur', title: 'En helfigur' }),
   ]);
   assert.deepEqual(dealerChoices(registry, 'paulina'), [
-    { dealer: { kind: 'film', file: 'dealers/paulina/clips/giv-4_plats-7.mp4', view: { kind: 'plats', seat: 7 } }, label: 'Giv 4 ur Plats 7', film: true, lands: { seat: 4, index: 0, at: 3 } },
-    { dealer: { kind: 'film', file: 'dealers/paulina/anchors/spelaren-vila.png', view: { kind: 'spelaren' } }, label: 'VILA ur Spelaren', film: false },
+    { dealer: { kind: 'film', file: 'dealers/paulina/clips/giv-4_plats-7.mp4', view: { kind: 'plats', seat: 7 } }, label: 'Giv 4 ur Plats 7', film: true, lands: { seat: 4, index: 0, at: 3 }, made: { eye, shoe, place: [-0.019, -1.4468] } },
+    { dealer: { kind: 'film', file: 'dealers/paulina/anchors/spelaren-vila.png', view: { kind: 'spelaren' } }, label: 'VILA ur Spelaren', film: false, made: {} },
   ]);
   // Ett gammalt ankare och en helfigur är inga dealerfilmer, och ett tomt register ger inget val.
   assert.deepEqual(dealerChoices(registryOf([]), 'paulina'), []);

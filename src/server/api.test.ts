@@ -292,6 +292,52 @@ test('en förlaga tas emot ruta för ruta från Labbets egen sida och hamnar und
   assert.equal((await frame(name, 0, picture, { 'Content-Type': 'multipart/form-data' })).status, 403);
 });
 
+test('kortplanen sparas från Labbets egen sida: bara de tillåtna talen, inom sina gränser, och inget annat i scenen', async () => {
+  const folder = mkdtempSync(join(tmpdir(), 'api-kortplan-'));
+  mkdirSync(join(folder, 'content'));
+  const original = readFileSync(join(import.meta.dirname, '..', '..', 'content', 'scene.json'), 'utf8');
+  writeFileSync(join(folder, 'content', 'scene.json'), original);
+  const { running, base: there } = await serve(folder);
+  const send = (body: unknown, headers: Record<string, string> = { 'Content-Type': 'application/json' }) =>
+    fetch(`${there}/api/kortplan`, { method: 'POST', headers, body: JSON.stringify(body) });
+  try {
+    const whole = JSON.parse(original);
+    const plan = {
+      arc: { centreX: whole.places.arc.centreX, depth: whole.places.arc.depth + 0.03, width: 0.9, bend: 0, round: 2, step: whole.places.arc.step },
+      row: { first: whole.places.row.first, step: whole.places.row.step },
+      scale: 1.4,
+    };
+    const saved = await send(plan);
+    assert.equal(saved.status, 200);
+    assert.deepEqual((await saved.json()).plan, plan);
+    const written = JSON.parse(readFileSync(join(folder, 'content', 'scene.json'), 'utf8'));
+    assert.deepEqual([written.places.arc.width, written.places.arc.bend, written.places.arc.seats, written.card.onTable.scale], [0.9, 0, 7, 1.4]);
+    assert.equal(written.places.setInLab, 'Jakob i Labbet 2026-11-18 05:30');
+    // Allt utom kortplanen är som förut; scenen läses av sidorna som den står.
+    const { places: _p, card: _c, ...rest } = written;
+    const { places: _q, card: _d, ...was } = whole;
+    assert.deepEqual(rest, was);
+    assert.deepEqual({ ...written.card, onTable: undefined }, { ...whole.card, onTable: undefined });
+    assert.equal((await (await fetch(`${there}/content/scene.json`)).json()).card.onTable.scale, 1.4);
+
+    // Utanför gränserna, med ett tal till, eller med något annat än kortplanen: 400 med skälet, och filen är orörd.
+    const now = readFileSync(join(folder, 'content', 'scene.json'), 'utf8');
+    for (const wrong of [{ ...plan, scale: 9 }, { ...plan, arc: { ...plan.arc, cards: 5 } }, { ...plan, camera: { focalPx: 1 } }, { arc: plan.arc }, null]) {
+      const refused = await send(wrong);
+      assert.equal(refused.status, 400, JSON.stringify(wrong));
+      assert.match((await refused.json()).error, /^Kortplanen tas inte emot: /);
+    }
+    // En annan webbsida får inte spara, och inte heller ett formulär.
+    assert.equal((await send(plan, { 'Content-Type': 'application/json', Origin: 'https://ond.example' })).status, 403);
+    assert.equal((await send(plan, { 'Content-Type': 'text/plain' })).status, 403);
+    assert.equal((await fetch(`${there}/api/kortplan`)).status, 404, 'bara POST');
+    assert.equal(readFileSync(join(folder, 'content', 'scene.json'), 'utf8'), now);
+  } finally {
+    running.close();
+    rmSync(folder, { recursive: true, force: true });
+  }
+});
+
 test('ett ogiltigt omdöme avvisas med ett skäl', async () => {
   for (const body of [{ file: 'scene/bild.png', status: 'kanske' }, { file: 'finns/inte.png', status: 'utgår' }, { file: 1 }, null]) {
     const response = await post(body);

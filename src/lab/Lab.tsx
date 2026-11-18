@@ -4,10 +4,12 @@ import { routeTo, useRoute } from './route.ts';
 
 // Scenen drar in three och läses därför först när steget öppnas.
 const SceneStep = lazy(() => import('./SceneStep.tsx'));
+const PlanStep = lazy(() => import('./PlanStep.tsx'));
 
 // Stegen står i docs/architecture.md. Ett steg utan vy är inte byggt än.
 const STEPS = [
   { key: 'scen', label: 'Scen', built: true },
+  { key: 'kortplan', label: 'Kortplan', built: true },
   { key: 'dealer', label: 'Dealer', built: false },
   { key: 'klipp', label: 'Klipp', built: false },
   { key: 'granska', label: 'Granska', built: true },
@@ -53,6 +55,10 @@ export function Lab() {
       {current === 'scen' ? (
         <Suspense fallback={<main className="notice">Läser scenen …</main>}>
           <SceneStep route={rest} />
+        </Suspense>
+      ) : current === 'kortplan' ? (
+        <Suspense fallback={<main className="notice">Läser kortplanen …</main>}>
+          <PlanStep />
         </Suspense>
       ) : (
         <Review route={rest} />

@@ -1,12 +1,14 @@
 // Följden: dealerns klipp efter varandra på en tidslinje. Här räknas vilket klipp och vilken tid i det som visas vid en
-// tid i följden, vilka kort som ligger, vilket kort som är på väg, och om klippets märkkort har landat. Ingen bild läses
-// här: film.ts spelar följden, och scenbygget (build.ts) lägger korten efter den.
+// tid i följden, vilka kort som ligger, vilket kort som är på väg, om klippets märkkort har landat, och hur långt ett lagt
+// kort har gått från där handen lade det till kortplanen (glideAt). Ingen bild läses här: film.ts spelar följden, och
+// scenbygget (build.ts) lägger korten efter den.
 // Följden avgör ingenting i spelet: vilka kort som läggs och var står i beställningen.
 //
 // En del utan film (`from` satt) är spelkärnans fallback för ett kort som saknar klipp: dealern står i REDO medan
 // scenens kort glider från skon, flyttas från en annan kortplats eller vänds där det ligger, och ligger från `card.at`.
 
 import { spotKey, type CardSpot, type ClipCard } from './dealer.ts';
+import type { FeltPoint } from './description.ts';
 
 /**
  * En del av följden: dess längd i sekunder och kortet den lägger. `from` finns bara på en del utan film: varifrån
@@ -105,6 +107,48 @@ export function flyingAt(reel: Reel, time: number): { part: number; progress: nu
   // Det som låg på kortplatsen när delen började: alla delar före den, hela.
   const left = from === 'skon' || index === 0 ? null : (lying(reel, index - 1, Infinity).get(spotKey(from)) ?? null);
   return { part: index, progress: part.card.at > 0 ? Math.min(1, Math.max(0, local / part.card.at)) : 1, left };
+}
+
+/**
+ * Hur ett lagt kort går från där handen lade det till sin plats i kortplanen och sin storlek på bordet
+ * (content/scene.json, card.onTable.glide): det börjar `after` sekunder efter att kortet har landat och tar `seconds`.
+ */
+export type Glide = { after: number; seconds: number };
+
+// Två lägen på filten närmare än så här, i meter, är samma plats: kortplanen och registrets place står på 0,1 mm.
+const SAME_PLACE = 0.00005;
+
+/** Mjukt i början och slutet, som GLSL:s smoothstep mellan 0 och 1. */
+const ease = (t: number): number => t * t * (3 - 2 * t);
+
+/**
+ * Hur långt delen `index`s kort har gått vid tiden `time`, från där handen lade det (0) till sin plats i kortplanen och
+ * sin storlek på bordet (1), mjukt i början och slutet. Det börjar `glide.after` sekunder efter att kortet har landat
+ * (card.at), alltså när handen har släppt kortet och lyft, och kan fortsätta in i nästa del. Före det, och när följden
+ * har börjat om, är det 0. En del utan film lägger kortet direkt på planens plats (build.ts, carry): där är det 1.
+ */
+export function glideAt(reel: Reel, index: number, time: number, glide: Glide): number {
+  const part = reel.parts[index];
+  if (!part?.card) return 0;
+  if (isStill(part)) return 1;
+  const start = reel.starts[index]! + part.card.at + Math.max(0, glide.after);
+  const t = Math.max(0, time) - start;
+  if (glide.seconds <= 0) return t >= 0 ? 1 : 0;
+  return ease(Math.min(1, Math.max(0, t / glide.seconds)));
+}
+
+/**
+ * Var delen `index`s kort ligger på filten vid tiden `time`, och hur stort det är: från `from` (där handen lade det, i
+ * filmens storlek) till `to` (planens plats) och storleken `scale`, så långt som glideAt säger. `still` är sant när
+ * kortet inte är på väg: före och efter glidningen. Är `from` och `to` samma och `scale` 1 rör sig ingenting, och kortet
+ * är stilla hela tiden.
+ */
+export function laidAt(reel: Reel, index: number, time: number, glide: Glide, from: FeltPoint, to: FeltPoint, scale: number): { place: FeltPoint; scale: number; still: boolean } {
+  if (Math.hypot(to[0] - from[0], to[1] - from[1]) < SAME_PLACE && Math.abs(scale - 1) < 1e-9) return { place: [from[0], from[1]], scale: 1, still: true };
+  const g = glideAt(reel, index, time, glide);
+  if (g <= 0) return { place: [from[0], from[1]], scale: 1, still: true };
+  if (g >= 1) return { place: [to[0], to[1]], scale, still: true };
+  return { place: [from[0] + (to[0] - from[0]) * g, from[1] + (to[1] - from[1]) * g], scale: 1 + (scale - 1) * g, still: false };
 }
 
 /**

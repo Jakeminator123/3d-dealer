@@ -215,7 +215,7 @@ export function createDoll(scene: SceneDescription, doll: DollDescription, move:
     yoke(right, left);
     neck(pose.neck, [pose.head[0], pose.head[1] - doll.body.head.radius * shape.head.neckAt, pose.head[2]]);
     head.position.set(...pose.head);
-    head.lookAt(...pose.gaze);
+    head.lookAt(...pose.face);
     for (const arm of arms) {
       const { shoulder, elbow, wrist } = pose.arms[arm.side];
       arm.shoulder.position.set(...shoulder);

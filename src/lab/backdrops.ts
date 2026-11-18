@@ -2,7 +2,7 @@
 
 import type { SeatView } from '../scene/build.ts';
 import type { FilmNote, OneClipNote } from '../scene/dealer.ts';
-import { dealsOf, planRound, roundFilm, type DealtRound, type Plan, type Round } from '../scene/round.ts';
+import { dealsOf, madeWith, planRound, roundFilm, type DealtRound, type Plan, type Round } from '../scene/round.ts';
 import { kindOf, sectionsOf, type Asset, type Item, type Registry } from './registry.ts';
 
 /**
@@ -55,10 +55,12 @@ export const backdropKind = (asset: Asset): '360' | 'platt' => (asset.kind === '
 /**
  * En dealer att välja i steget Scen: en dealerfilm ur registret, och vad valet heter. Dockan väljs inte här.
  * `lands` är var och när ett klipp lägger sitt kort (postens `lands`): platsen, vilket av platsens kort, och tiden i
- * filmen då det ligger. Från den tiden visar scenen sitt eget kort där.
+ * filmen då det ligger. Från den tiden visar scenen sitt eget kort där. `made` är ögat filmen är gjord genom, skon den
+ * bär och var kortet landar på filten, när posten säger det (registrets eye, shoe och place): filmen läggs genom det
+ * ögat, och kortet landar där och går sedan till kortplanen, som i hela given.
  */
 type Landing = { seat: number; index: number; at: number };
-type DealerChoice = { dealer: OneClipNote; label: string; film: boolean; lands?: Landing };
+type DealerChoice = { dealer: OneClipNote; label: string; film: boolean; lands?: Landing; made: ReturnType<typeof madeWith> };
 
 /** Vyn en dealerfilm är gjord i, så som posten bär den (`view`). Null när posten inte säger en vy som går att använda. */
 function madeIn(asset: Asset): SeatView | null {
@@ -86,7 +88,7 @@ export function dealerChoices(registry: Registry, dealer: string): DealerChoice[
     if (!asset.present || asset.status === 'utgår') return [];
     const view = asset.use === 'dealerfilm' && asset.dealer === dealer ? madeIn(asset) : null;
     const lands = landing(asset);
-    return view ? [{ dealer: { kind: 'film', file: asset.file, view }, label: asset.title, film: kindOf(asset.file) === 'film', ...(lands ? { lands } : {}) }] : [];
+    return view ? [{ dealer: { kind: 'film', file: asset.file, view }, label: asset.title, film: kindOf(asset.file) === 'film', ...(lands ? { lands } : {}), made: madeWith(asset) }] : [];
   });
   return [...made.filter((choice) => choice.film), ...made.filter((choice) => !choice.film)];
 }

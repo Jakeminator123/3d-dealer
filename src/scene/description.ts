@@ -89,6 +89,13 @@ export type SceneDescription = {
     colours: { face: [number, number, number]; edge: [number, number, number]; back: [number, number, number] };
     /** Skuggan mot filten där kortet ligger (cards.ts): hur långt ut den når och hur mycket mot spelaren, i meter, och hur mörk. */
     shadow: { reach: number; strength: number; offset: number };
+    /**
+     * Kortet på bordet i uppspelningen (build.ts, reel.ts glideAt). `scale` är scenens kort på bordet mot kortets mått
+     * ovan, som filmens märkkort har: 1 är samma storlek. `glide` är hur kortet går från där handen lade det, i filmens
+     * storlek, till sin plats i kortplanen och sin storlek: `after` sekunder efter att det har landat (registrets
+     * lands.at) börjar det, och det tar `seconds` sekunder. Gäller också filmer som redan är gjorda.
+     */
+    onTable: Marked & { scale: number; glide: { after: number; seconds: number } };
   };
   /**
    * Kortplatser: kortets mitt på filten, för dealern och för varje spelarplats, i den ordning korten läggs. I
@@ -121,6 +128,12 @@ export function placesOf(arc: PlaceArc, row: PlaceRow): { dealer: FeltPoint[]; s
   const dealer = Array.from({ length: row.cards }, (_, i): FeltPoint => [tenth(row.first[0] + i * row.step[0]), tenth(row.first[1] + i * row.step[1])]);
   return { dealer, seats };
 }
+
+/**
+ * Kortens storlek på bordet (card.onTable.scale) som minst och mest: hälften och dubbla filmens kort. Labbet ställer den
+ * inom samma gränser (plan.ts).
+ */
+export const CARD_SCALE = [0.5, 2] as const;
 
 const isNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
 const isPoint = (value: unknown, length: number): boolean =>
@@ -211,6 +224,10 @@ export function readScene(value: unknown): SceneDescription {
   need([card?.colours?.face, card?.colours?.edge, card?.colours?.back].every(isRgb), 'card.colours');
   need(isNumber(card?.shadow?.reach) && card.shadow.reach > 0 && share(card?.shadow?.strength) && isNumber(card?.shadow?.offset), 'card.shadow');
   marked(card, 'card');
+  const onTable = card?.onTable;
+  need(isNumber(onTable?.scale) && onTable.scale >= CARD_SCALE[0] && onTable.scale <= CARD_SCALE[1], `card.onTable.scale: ${CARD_SCALE.join('–')}`);
+  need(isNumber(onTable?.glide?.after) && onTable.glide.after >= 0 && isNumber(onTable?.glide?.seconds) && onTable.glide.seconds >= 0, 'card.onTable.glide: after och seconds, noll eller mer');
+  marked(onTable, 'card.onTable');
   need(Array.isArray(places?.dealer) && places.dealer.every((point) => isPoint(point, 2)), 'places.dealer');
   need(
     Array.isArray(places?.seats) &&

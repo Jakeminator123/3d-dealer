@@ -9,14 +9,14 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { createBackdrop, type Background } from './backdrop.ts';
-import { createCard, type Card } from './cards.ts';
-import { sameSpot, type FilmNote, type Rgb, type Studio } from './dealer.ts';
-import type { Frame, SceneDescription } from './description.ts';
+import { createCard, lyingCentre, type Card } from './cards.ts';
+import { sameSpot, type ClipCard, type FilmNote, type Rgb, type Studio } from './dealer.ts';
+import type { FeltPoint, Frame, SceneDescription } from './description.ts';
 import { createDoll } from './doll.ts';
 import { pickUpCard, type DollDescription, type DollMove } from './dollPose.ts';
 import { createFilm } from './film.ts';
-import { flyingAt, lyingAt, markerDown, type Reel } from './reel.ts';
-import { spotName, spotPlace } from './round.ts';
+import { flyingAt, laidAt, lyingAt, markerDown, type Reel } from './reel.ts';
+import { planPlace, spotName, spotPlace } from './round.ts';
 import {
   cardCorners,
   dealerEdge,
@@ -107,8 +107,17 @@ export type SceneHandle = {
    * tonar scenens in (se placeShoe).
    */
   setShoe(shown: boolean): void;
-  /** Visar eller döljer kortplatserna: konturen av ett kort på var och en av beskrivningens platser, på filten. */
+  /**
+   * Visar eller döljer kortplatserna: konturen av ett kort på var och en av kortplanens platser, på filten, i kortens
+   * storlek på bordet.
+   */
   setPlaces(shown: boolean): void;
+  /**
+   * Ställer kortplanen efter `next`: kortplatserna (places) och kortens storlek och glidning på bordet (card.onTable).
+   * Lagda kort går dit från där handen lade dem, så som följden står; dealerns film, ögat och allt annat i scenen står
+   * kvar som det byggdes. Så ställs planen i Labbet medan given spelar.
+   */
+  setPlan(next: SceneDescription): void;
   /** Ytans storlek på sidan. Hela vyns ruta visas alltid, inpassad på höjden eller bredden. */
   resize(width: number, height: number): void;
   /** Ritar en ruta nu. Annars ritas scenen bara när något har ändrats. */
@@ -370,20 +379,33 @@ export function buildScene(host: HTMLElement, scene: SceneDescription, options: 
     dress();
   });
 
-  // Kortplatserna som konturer på filten, en halv millimeter över den. De visas bara när någon ber om dem.
+  // Kortplanen: kortplatserna och kortens storlek på bordet (places och card.onTable), som de står i beskrivningen eller
+  // som setPlan har ställt dem. Allt annat i scenen står kvar som det byggdes.
+  let plan = scene;
+
+  // Kortplatserna som konturer på filten, en halv millimeter över den, i kortens storlek på bordet. De visas bara när
+  // någon ber om dem.
   const places = new THREE.Group();
   places.visible = false;
   const outline = new THREE.LineBasicMaterial({ color: 0xffffff, toneMapped: false });
-  for (const place of [...scene.places.dealer, ...scene.places.seats.flatMap((seat) => seat.cards)]) {
-    const corners = cardCorners(scene, place).map((corner) => new THREE.Vector3(corner[0], corner[1] + 0.0005, corner[2]));
-    places.add(new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(corners), outline));
+  function outlinePlaces(): void {
+    for (const line of places.children) (line as THREE.LineLoop).geometry.dispose();
+    places.clear();
+    const size = plan.card.onTable.scale;
+    for (const place of [...plan.places.dealer, ...plan.places.seats.flatMap((seat) => seat.cards)]) {
+      const middle = new THREE.Vector3(...placeOnTable(plan, place));
+      const corners = cardCorners(plan, place).map((corner) => new THREE.Vector3(...corner).sub(middle).multiplyScalar(size).add(middle).add(new THREE.Vector3(0, 0.0005, 0)));
+      places.add(new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(corners), outline));
+    }
   }
+  outlinePlaces();
   world.add(places);
 
-  // Scenens kort, ett för varje del som lägger ett, på sin kortplats (spotPlace i round.ts). Vilka som syns, och var ett
-  // kort som går självt är på väg, avgörs för varje ritad ruta av var dealerns följd står. Kortets mitt är dess läge, så
-  // att det går att flytta och vända kring mitten.
-  type Laid = { part: number; card: Card; centre: THREE.Vector3 };
+  // Scenens kort, ett för varje del som lägger ett. Kortet landar där klippet lägger det (`from`, spotPlace i round.ts),
+  // i filmens storlek, och går när handen har släppt det till sin plats i kortplanen (`to`, planPlace) och sin storlek
+  // på bordet (reel.ts, laidAt). Vilka som syns, var de ligger och var ett kort som går självt är på väg avgörs för varje
+  // ritad ruta av var dealerns följd står.
+  type Laid = { part: number; note: ClipCard; card: Card; from: FeltPoint; to: FeltPoint };
   const laid = new Map<number, Laid>();
   if (chosen?.kind === 'film') {
     chosen.clips.forEach((clip, part) => {
@@ -392,13 +414,9 @@ export function buildScene(host: HTMLElement, scene: SceneDescription, options: 
       const place = spotPlace(scene, note);
       if (!place) return problem(`Scenen har ingen kortplats för ${spotName(note)}`);
       const card = createCard(scene, { place, face: note.face, index: note.index }, anisotropy);
-      card.mesh.geometry.computeBoundingBox();
-      const centre = card.mesh.geometry.boundingBox!.getCenter(new THREE.Vector3());
-      card.mesh.geometry.translate(-centre.x, -centre.y, -centre.z);
-      card.mesh.position.copy(centre);
       card.mesh.visible = false;
       world.add(card.mesh);
-      laid.set(part, { part, card, centre });
+      laid.set(part, { part, note, card, from: place, to: planPlace(plan, note) ?? place });
     });
   }
   // Där ett kort som går självt börjar: kortet i skons mynning (hämtstället), eller skons fot utan dockans mått.
@@ -447,25 +465,29 @@ export function buildScene(host: HTMLElement, scene: SceneDescription, options: 
     if (moved || stale) draw();
   });
 
-  /** Ställer korten och märkkortet efter följdens tid. En stillbild står i slutet: dess kort ligger. Görs före varje ritad ruta. */
+  /**
+   * Ställer korten och märkkortet efter följdens tid: varje lagt kort där handen lade det, på väg till kortplanen eller
+   * framme där (laidAt). En stillbild står i slutet: dess kort ligger. Görs före varje ritad ruta.
+   */
   function settle(): void {
     const reel = film?.reel() ?? null;
     if (!film || !reel) return;
     const time = film.clip ? film.clip.time() : reel.seconds;
     const lying = new Set(lyingAt(reel, time));
-    for (const { part, card, centre } of laid.values()) {
+    const { scale, glide } = plan.card.onTable;
+    for (const { part, note, card, from, to } of laid.values()) {
+      const pose = laidAt(reel, part, time, glide, from, to, scale);
       card.mesh.visible = lying.has(part);
-      card.mesh.position.copy(centre);
-      card.mesh.scale.setScalar(1);
+      card.lay(lyingCentre(scene, pose.place, note.index), pose.scale, pose.still);
     }
     carry(reel, time);
     film.setMarker(markerDown(reel, time));
   }
 
   /**
-   * Kortet som går självt, utan dealerns rörelse (spelkärnans fallback): från skons mynning till sin kortplats, från en
-   * kortplats till en annan när en hand delas, eller vänt där det ligger (det nedvända kortet smalnar till en kant och
-   * det uppvända breddas ut).
+   * Kortet som går självt, utan dealerns rörelse (spelkärnans fallback): från skons mynning, i filmens storlek, till sin
+   * plats i kortplanen och sin storlek på bordet, från en kortplats till en annan när en hand delas, eller vänt där det
+   * ligger (det nedvända kortet smalnar till en kant och det uppvända breddas ut). Korten står redan där settle lade dem.
    */
   function carry(reel: Reel, time: number): void {
     const flying = flyingAt(reel, time);
@@ -476,12 +498,18 @@ export function buildScene(host: HTMLElement, scene: SceneDescription, options: 
     const eased = THREE.MathUtils.smoothstep(flying.progress, 0, 1);
     if (from !== 'skon' && sameSpot(from, reel.parts[flying.part]!.card!)) {
       const shown = eased < 0.5 && left ? left : moving;
+      const size = shown.card.mesh.scale.y;
       shown.card.mesh.visible = true;
-      shown.card.mesh.scale.x = Math.max(0.001, Math.abs(1 - 2 * eased));
+      shown.card.lay(shown.card.mesh.position.clone(), size, false);
+      shown.card.mesh.scale.x = size * Math.max(0.001, Math.abs(1 - 2 * eased));
       return;
     }
+    const start = from === 'skon' ? shoeMouth : (left ?? moving).card.mesh.position;
+    const startSize = from === 'skon' ? 1 : (left ?? moving).card.mesh.scale.y;
+    const end = moving.card.mesh.position.clone();
+    const endSize = moving.card.mesh.scale.y;
     moving.card.mesh.visible = true;
-    moving.card.mesh.position.lerpVectors(from === 'skon' ? shoeMouth : (left?.centre ?? moving.centre), moving.centre, eased);
+    moving.card.lay(new THREE.Vector3().lerpVectors(start, end, eased), startSize + (endSize - startSize) * eased, false);
   }
 
   /**
@@ -558,6 +586,12 @@ export function buildScene(host: HTMLElement, scene: SceneDescription, options: 
       places.visible = shown;
       changed();
     },
+    setPlan(next) {
+      plan = { ...scene, places: next.places, card: { ...scene.card, onTable: next.card.onTable } };
+      for (const entry of laid.values()) entry.to = planPlace(plan, entry.note) ?? entry.from;
+      outlinePlaces();
+      changed();
+    },
     resize(width, height) {
       if (!(width > 0 && height > 0)) return;
       size = { width, height };
@@ -615,6 +649,7 @@ export function buildScene(host: HTMLElement, scene: SceneDescription, options: 
       grid.geometry.dispose();
       gridLines.dispose();
       for (const line of places.children) (line as THREE.LineLoop).geometry.dispose();
+      places.clear();
       outline.dispose();
       // Delarna får tillbaka sina egna material, så att de städas med modellen.
       for (const [mesh, material] of own) mesh.material = material;

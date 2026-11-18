@@ -60,6 +60,23 @@ test('en beskrivning med hål i tas inte emot', () => {
   assert.throws(() => readScene({ ...whole, studio: { ...whole.studio, grid: { step: 0 } } }), /studio\.grid/);
   // Scenens kort ligger under dealerfilmens liggande del, så att handen ritas över det.
   assert.throws(() => readScene({ ...whole, card: { ...whole.card, lift: 0.002 } }), /card\.lift, under film\.lift/);
+  // Kortet på bordet: storleken inom sina gränser, glidningen med tider som inte är negativa, och märkningen.
+  const onTable = whole.card!.onTable as Record<string, unknown>;
+  const withTable = (next: unknown) => ({ ...whole, card: { ...whole.card, onTable: next } });
+  assert.throws(() => readScene(withTable({ ...onTable, scale: 0.3 })), /card\.onTable\.scale: 0\.5–2/);
+  assert.throws(() => readScene(withTable({ ...onTable, scale: '1' })), /card\.onTable\.scale/);
+  assert.throws(() => readScene(withTable({ ...onTable, glide: { after: -1, seconds: 0.5 } })), /card\.onTable\.glide/);
+  assert.throws(() => readScene(withTable({ ...onTable, glide: { after: 1 } })), /card\.onTable\.glide/);
+  assert.throws(() => readScene(withTable({ ...onTable, basis: undefined })), /card\.onTable: basis och source/);
+  assert.throws(() => readScene(withTable(undefined)), /card\.onTable\.scale/);
+});
+
+test('kortet på bordet: storleken inom sina gränser, och glidningen börjar när handen har lyft och är klar innan klippet slutar', () => {
+  const scene = readScene(readJson('scene.json'));
+  const { scale, glide } = scene.card.onTable;
+  assert.ok(scale >= 0.5 && scale <= 2);
+  // Glidningen börjar när handen har släppt kortet och lyft, och är klar innan klippet slutar (4,04 s, lands.at 1,83–1,92 s).
+  assert.ok(glide.after >= 0.9 && glide.seconds > 0 && 1.92 + glide.after + glide.seconds < 4.04, `${glide.after} + ${glide.seconds} s`);
 });
 
 test('rummet och förlagan bär de tal som är avgjorda', () => {
@@ -104,19 +121,26 @@ test('kortplatserna: tre för varje spelarplats och fyra för dealern, lagda som
   near(d2[0] - d1[0], d1[0] - d0[0], 'dealerns kort');
 });
 
-test('spelarnas kortplatser är en rund båge ur några tal: mitten nästan lika djupt, ytterplatserna böjda tillbaka', () => {
+test('spelarnas kortplatser är en båge ur några tal: med round 2 rund, mitten nästan lika djupt och ytterplatserna böjda tillbaka', () => {
   const whole = readJson('scene.json') as { places: { arc: PlaceArc; row: PlaceRow } };
   const { arc, row } = whole.places;
   const scene = readScene(readJson('scene.json'));
   assert.deepEqual(placesOf(arc, row), { dealer: scene.places.dealer, seats: scene.places.seats });
-  const first = (seat: number) => scene.places.seats.find((entry) => entry.seat === seat)!.cards[0]!;
+  // Bågens form prövas med fasta tal: Jakob ställer dagens i Labbet (steget Kortplan, src/scene/plan.ts).
+  const shaped = { ...arc, bend: 0.16, round: 2 };
+  const seats = placesOf(shaped, row).seats;
+  const first = (seat: number) => seats.find((entry) => entry.seat === seat)!.cards[0]!;
   // Symmetrisk kring bågens mitt, och djupast (närmast spelarna) vid plats 4.
   for (const [a, b] of [[1, 7], [2, 6], [3, 5]] as const) assert.ok(Math.abs(first(a)[1] - first(b)[1]) < 1e-9 && Math.abs(first(a)[0] + first(b)[0] - 2 * arc.centreX) < 1e-3);
   // Rund, inte ett V: plats 3 och 5 ligger mindre än hälften så långt tillbaka som ett V skulle lägga dem (en tredjedel
   // av ytterplatsernas), och ytterplatserna ligger bend tillbaka.
   const back = (seat: number) => first(4)[1] - first(seat)[1];
   assert.ok(back(3) > 0 && back(3) < back(1) / 3 / 2, `plats 3 ligger ${(back(3) * 100).toFixed(1)} cm bakom plats 4, plats 1 ${(back(1) * 100).toFixed(1)} cm`);
-  assert.ok(Math.abs(back(1) - arc.bend) < 1e-4);
+  assert.ok(Math.abs(back(1) - shaped.bend) < 1e-4);
+  // Med round 1 är det ett V, och utan böjning en rak linje.
+  const vee = placesOf({ ...shaped, round: 1 }, row).seats.map((seat) => seat.cards[0]![1]);
+  assert.ok(Math.abs(vee[3]! - vee[2]! - shaped.bend / 3) < 2e-4);
+  assert.ok(placesOf({ ...shaped, bend: 0 }, row).seats.every((seat) => Math.abs(seat.cards[0]![1] - shaped.depth) < 1e-4));
   // Ett tal flyttar hela bågen: djupet.
   const moved = placesOf({ ...arc, depth: arc.depth + 0.01 }, row);
   moved.seats.forEach((entry, k) => entry.cards.forEach((card, i) => assert.ok(Math.abs(card[1] - scene.places.seats[k]!.cards[i]![1] - 0.01) < 2e-4)));

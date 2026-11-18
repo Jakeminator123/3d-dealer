@@ -1,5 +1,6 @@
-// Serverns egna vägar: registret, filerna i assets/ och deras förhandsbilder, förlagorna som scenen sparar, och
-// spelsessionen (game.ts): Casinots runda mot spelkärnan, och rundan som Labbet och runda.ts visar.
+// Serverns egna vägar: registret, filerna i assets/ och deras förhandsbilder, förlagorna som scenen sparar, kortplanen
+// som Labbet ställer (kortplan.ts), och spelsessionen (game.ts): Casinots runda mot spelkärnan, och rundan som Labbet
+// och runda.ts visar.
 // Allt annat lämnas vidare (till Vite, som sköter sidorna).
 
 import { readFileSync } from 'node:fs';
@@ -7,6 +8,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { join } from 'node:path';
 import { SessionError } from '../engine/session.ts';
 import { ForlagaError, saveFrame, startForlaga } from '../pipeline/forlaga.ts';
+import { PlanError, savePlan } from '../pipeline/kortplan.ts';
 import { assetsDir, RegistryError, setStatus, setWords, stamp, viewRegistry } from '../pipeline/registry.ts';
 import { readRound, RoundError } from '../pipeline/runda.ts';
 import { pathInside, sendFile, sendJson, sendText } from './files.ts';
@@ -80,7 +82,7 @@ function decodeName(part: string): string {
 
 /** Ett fel i en ändring som den som frågade kan rätta. Andra fel är serverns egna. */
 const askersFault = (error: unknown): error is Error =>
-  error instanceof RegistryError || error instanceof ForlagaError || error instanceof RequestError || error instanceof RoundError;
+  error instanceof RegistryError || error instanceof ForlagaError || error instanceof RequestError || error instanceof RoundError || error instanceof PlanError;
 
 /** Ett fröord i en adress eller ett kommando: 1–200 tecken, eller inget. */
 function seedOf(value: unknown): string | undefined {
@@ -149,6 +151,11 @@ export function createApi(root: string, now: () => string = stamp, gameOptions: 
       if (typeof body?.file !== 'string' || typeof body?.comment !== 'string') throw new RequestError('Förfrågan ska bära file och comment');
       setWords(root, body.file, 'comment', body.comment, now());
       sendJson(response, 200, viewRegistry(root));
+    } else if (path === '/api/kortplan' && request.method === 'POST') {
+      // Kortplanen som Labbet ställer (steget Kortplan): bara bågens, radens och kortens storleks tal, inom sina gränser,
+      // sparade i content/scene.json. Svaret är planen som den står efteråt.
+      if (!sentByOwnPage(request)) return sendText(response, 403, 'Kortplanen tas bara emot från Labbets egen sida');
+      sendJson(response, 200, { plan: savePlan(root, await readJson(request), now()) });
     } else if (path.startsWith('/api/forlaga/') && request.method === 'POST') {
       // Förlagor som scenen i Labbet sparar: först beställningen, sedan rutorna en i taget. De hamnar bara i output/forlagor/.
       const [first, second, ...more] = path.slice('/api/forlaga/'.length).split('/');

@@ -37,6 +37,7 @@ import { readScene } from '../scene/description.ts';
 import { ACTIONS, cardPlace, poseAt, type Action, type Seat } from '../scene/dollPose.ts';
 import { viewEye, type Eye, type SeatView } from '../scene/geometry.ts';
 import { closeView, cycleMove, paintedPicture, placeWords, readCycleParts, type CycleCard, type CycleParts } from './cykel.ts';
+import { dollMotion, filmMotion, MotionError, motionNumbers, screenOf, type MotionMeasure } from './rorelse.ts';
 import {
   countIn,
   cornerError,
@@ -88,6 +89,8 @@ export type TagningContent = {
   prompt: { text: string; source: string; actions: Record<Exclude<Action, 'deal'>, { replace: [string, string][]; source: string }> };
   proof: { background: { file: string; kind: '360' | 'platt'; turn: number; blur: number; exposure: number; mirror: boolean }; face: string; fps: number };
   measure: Measure;
+  /** Hur rörelsens mått tas (rorelse.ts): stillhet, rörelse och grader per huvudbredd. */
+  motion: MotionMeasure;
   limits: Record<string, Limit>;
 };
 
@@ -97,12 +100,13 @@ export function readTagning(root = ROOT): TagningContent {
   const need = (ok: boolean, what: string) => {
     if (!ok) wrong.push(what);
   };
-  for (const group of ['order', 'reference', 'redo', 'prompt', 'proof', 'measure', 'limits'] as const) {
+  for (const group of ['order', 'reference', 'redo', 'prompt', 'proof', 'measure', 'motion', 'limits'] as const) {
     const marked = read[group] as { basis?: unknown; source?: unknown } | undefined;
     need((marked?.basis === 'mätt' || marked?.basis === 'antaget') && typeof marked?.source === 'string', `${group}: basis och source`);
   }
   need(typeof read.order?.model === 'string' && Number.isFinite(read.order?.duration), 'order: model och duration');
   need(Number.isFinite(read.reference?.fps) && read.reference.fps > 0, 'reference.fps');
+  need([read.motion?.still, read.motion?.moving, read.motion?.degrees].every((value) => Number.isFinite(value) && value! > 0), 'motion: still, moving och degrees över 0');
   need(typeof read.prompt?.text === 'string' && !/[{}]/.test(read.prompt.text), 'prompt.text, utan platshållare');
   for (const action of ACTIONS.filter((entry): entry is Exclude<Action, 'deal'> => entry !== 'deal')) {
     const given = read.prompt?.actions?.[action];
@@ -365,6 +369,9 @@ async function prepare(spec: Spec, options: PrepareOptions, made: { dir?: string
 
   const wrist = dollWrist(parts, card);
   const checks = content.limits.dockansHandled ? [judgeOne('dockansHandled', wrist, content.limits.dockansHandled)] : [];
+  // Dockans rörelse mot rörelsens gränser (rorelse.ts), innan något beställs: en stel docka ger ett stelt klipp.
+  const motion = motionNumbers(dollMotion(parts, cycleMove(parts, card), content.motion, content.reference.fps));
+  for (const [key, value] of Object.entries(motion)) if (content.limits[key]) checks.push(judgeOne(key, value, content.limits[key]!));
   const pkg = posix(relative(root, dir));
   const order = {
     about: 'Beställningen av en tagning, gjord av src/pipeline/tagning.ts forbered. Allt Runways generate_video behöver: modell, upplösning, längd, text och vilka filer som är startFrame, endFrame och referenceVideos. Filerna ligger i paketet; source säger var de kommer ifrån.',
@@ -382,7 +389,8 @@ async function prepare(spec: Spec, options: PrepareOptions, made: { dir?: string
     anchor: anchorFile,
     model: content.order.model,
     resolution: content.order.resolution,
-    duration: content.order.duration,
+    // Filmen är lika lång som cykeln, i hela sekunder (Kling 4 tar 3–30 s); content/tagning.json säger längden för cykeln på 4,0 s.
+    duration: Math.max(content.order.duration, Math.ceil(parts.cycle.seconds - 1e-9)),
     ratio: content.order.ratio,
     tool: content.order.tool,
     promptFile: `${pkg}/text.txt`,
@@ -573,6 +581,14 @@ async function measureTake(root: string, dir: string, ordered: Ordered, clip: st
   const read = await readFilm(clip, film.fps, { layout, measure: content.measure, key, start: images.first, shoeFree }, (picture, index) => sheet.take(picture, index));
   await makeSheet(await Promise.all(sheet.tiles), at('ark.jpg'));
   const { values, times, seconds } = valuesOf(read, film, film.audio, layout, content.measure, images, doll);
+  // Rörelsen i klippet (rorelse.ts): stillhet, knyckar och ordningen mellan huvud, bål och hand. Går den inte att spåra
+  // (ingen dealer i bild) saknas måtten, och det syns i omdömet.
+  try {
+    Object.assign(values, motionNumbers((await filmMotion(clip, content.motion, screenOf(content.reference.studio))).values));
+  } catch (error) {
+    if (!(error instanceof MotionError)) throw error;
+    say(`Rörelsen gick inte att mäta: ${error.message}`);
+  }
   const landsAt = seconds.lands;
 
   // Beviset i scenen, när kortet har landat.
@@ -938,7 +954,7 @@ export async function prova(options: { root?: string; registry?: string; say?: (
 // Kommandoraden
 
 const USAGE = `Använd:
-  node src/pipeline/tagning.ts forbered <dealer> <vy> <plats> <kort> [deal|hole|flip]
+  node src/pipeline/tagning.ts forbered <dealer> <vy> <plats> <kort> [deal|hole|flip] [--cykel <namn>] [--text <fil>]
   node src/pipeline/tagning.ts ta-emot <id> <film> --task <taskId> --krediter <n> --saldo-fore <n> --saldo-efter <n> [--tid "ÅÅÅÅ-MM-DD TT:MM"]
   node src/pipeline/tagning.ts mät-om <id>
   node src/pipeline/tagning.ts pröva
@@ -954,9 +970,13 @@ const seatOf = (word: string): Seat => (word === 'D' || word === 'd' ? 'D' : /^\
 if (import.meta.main) {
   const [word, ...args] = process.argv.slice(2);
   try {
-    if (word === 'forbered' && (args.length === 4 || args.length === 5)) {
-      const [dealer, view, seat, index, action] = args;
-      await forbered({ dealer: dealer!, view: view!, seat: seatOf(seat!), index: Number(index), action: (action ?? 'deal') as Action });
+    const words = args.filter((arg, k) => !arg.startsWith('--') && !args[k - 1]?.startsWith('--'));
+    if (word === 'forbered' && (words.length === 4 || words.length === 5)) {
+      const [dealer, view, seat, index, action] = words;
+      // --cykel: en annan cykel i content/moves/ än cykel-nyp; --text: texten till filmmodellen ur en fil i stället för content/tagning.json.
+      const textFile = flag(args, '--text');
+      const text = textFile ? readFileSync(join(ROOT, textFile), 'utf8').trim() : undefined;
+      await forbered({ dealer: dealer!, view: view!, seat: seatOf(seat!), index: Number(index), action: (action ?? 'deal') as Action, cycle: flag(args, '--cykel') }, { text });
     } else if (word === 'ta-emot' && args.length >= 2) {
       const number = (name: string): number => {
         const value = flag(args, name);

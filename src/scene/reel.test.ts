@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { ClipCard } from './dealer.ts';
-import { flyingAt, lyingAt, makeReel, markerDown, placeIn, reelEnd } from './reel.ts';
+import { flyingAt, glideAt, laidAt, lyingAt, makeReel, markerDown, placeIn, reelEnd } from './reel.ts';
 
 const SECONDS = 97 / 24;
 const card = (seat: number, index: number, face: string, at = 1.92): ClipCard => ({ seat, index, face, at });
@@ -111,4 +111,66 @@ test('ett senare kort på samma kortplats tar det tidigares plats', () => {
   assert.deepEqual(lyingAt(reel, SECONDS + 1.91), [0]);
   assert.deepEqual(lyingAt(reel, SECONDS + 1.92), [1]);
   assert.deepEqual(lyingAt(reel, reel.seconds), [2]);
+});
+
+// Glidningen som content/scene.json har den (card.onTable.glide): en sekund efter att kortet har landat, på en halv.
+const GLIDE = { after: 1, seconds: 0.5 };
+
+test('ett lagt kort börjar glida när handen har släppt det och lyft, mjukt, och kan fortsätta in i nästa klipp', () => {
+  const reel = makeReel([
+    { seconds: SECONDS, card: card(1, 0, 'A♠') },
+    { seconds: SECONDS, card: card(2, 0, 'K♥', 3.6) },
+    { seconds: SECONDS, card: card(3, 0, '7♦') },
+  ]);
+  // Medan kortet är i luften och medan fingrarna vilar på det står det där handen lade det.
+  for (const time of [0, 1.91, 1.92, 2.5, 1.92 + GLIDE.after]) assert.equal(glideAt(reel, 0, time, GLIDE), 0, `${time} s`);
+  // Sedan går det mjukt: långsamt i början och slutet, halvvägs mitt i tiden.
+  const start = 1.92 + GLIDE.after;
+  const early = glideAt(reel, 0, start + 0.05, GLIDE);
+  assert.ok(early > 0 && early < 0.05, `${early}`);
+  close(glideAt(reel, 0, start + GLIDE.seconds / 2, GLIDE), 0.5);
+  assert.equal(glideAt(reel, 0, start + GLIDE.seconds, GLIDE), 1);
+  // Framme ligger det kvar resten av följden, också när följden står på sista rutan.
+  for (const time of [SECONDS + 1, reel.seconds, reel.seconds + 5]) assert.equal(glideAt(reel, 0, time, GLIDE), 1);
+  // Ett kort som landar sent i sitt klipp glider i nästa del; tiden räknas från dess egen del.
+  const late = reel.starts[1]! + 3.6 + GLIDE.after;
+  assert.equal(placeIn(reel, late).index, 2);
+  assert.equal(glideAt(reel, 1, late - 0.01, GLIDE), 0);
+  close(glideAt(reel, 1, late + GLIDE.seconds / 2, GLIDE), 0.5);
+  // En följd som börjar om lägger kortet där handen lade det igen.
+  assert.equal(glideAt(reel, 0, 0, GLIDE), 0);
+  // Utan tid för glidningen hoppar kortet när tiden har kommit.
+  assert.deepEqual([glideAt(reel, 0, start - 1e-6, { after: 1, seconds: 0 }), glideAt(reel, 0, start, { after: 1, seconds: 0 })], [0, 1]);
+});
+
+test('ett kort utan klipp ligger direkt på planens plats, och en del utan kort glider inte', () => {
+  const reel = makeReel([{ seconds: 1.2, card: { seat: 'D', index: 1, face: null, at: 1.2 }, from: 'skon' }, { seconds: SECONDS }]);
+  assert.equal(glideAt(reel, 0, 0, GLIDE), 1);
+  assert.equal(glideAt(reel, 1, SECONDS, GLIDE), 0);
+  assert.equal(glideAt(reel, 7, 1, GLIDE), 0);
+});
+
+test('kortet går från där handen lade det till planens plats och sin storlek, och slutar precis där', () => {
+  const reel = makeReel([{ seconds: SECONDS, card: card(4, 0, 'A♠') }]);
+  const from: [number, number] = [-0.019, -1.4468];
+  const to: [number, number] = [-0.0157, -1.3593];
+  const start = 1.92 + GLIDE.after;
+  // Före glidningen: där handen lade det, i filmens storlek, och stilla (kortets skugga syns).
+  assert.deepEqual(laidAt(reel, 0, 2.5, GLIDE, from, to, 1.4), { place: from, scale: 1, still: true });
+  // På väg: mellan de två, och mellan storlekarna, lika långt; ingen skugga.
+  const halfway = laidAt(reel, 0, start + GLIDE.seconds / 2, GLIDE, from, to, 1.4);
+  close(halfway.place[0], (from[0] + to[0]) / 2);
+  close(halfway.place[1], (from[1] + to[1]) / 2);
+  close(halfway.scale, 1.2);
+  assert.equal(halfway.still, false);
+  // Framme: på planens plats och i sin storlek, exakt.
+  for (const time of [start + GLIDE.seconds, reel.seconds]) assert.deepEqual(laidAt(reel, 0, time, GLIDE, from, to, 1.4), { place: to, scale: 1.4, still: true });
+});
+
+test('ett kort vars plan är densamma som när filmen gjordes, i samma storlek, rör sig aldrig', () => {
+  const reel = makeReel([{ seconds: SECONDS, card: card(4, 0, 'A♠') }, { seconds: SECONDS, card: card(4, 1, 'K♥') }], 1.5);
+  const place: [number, number] = [-0.019, -1.4468];
+  for (let time = 0; time <= reel.seconds + 1; time += 1 / 24) {
+    for (const index of [0, 1]) assert.deepEqual(laidAt(reel, index, time, GLIDE, place, place, 1), { place, scale: 1, still: true }, `del ${index}, ${time.toFixed(3)} s`);
+  }
 });
