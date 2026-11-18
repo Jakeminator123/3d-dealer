@@ -24,6 +24,10 @@ const BLUE = [0.1, 0.2];
 const YELLOW = [0.33, 0.48];
 // Minsta skillnad i märkets tecken mellan kortet och dealern bredvid, när kortets andel i en kantpunkt räknas.
 const SIGN_SPAN = 0.1;
+// Hur nära linjen mellan skärmen och märkkortets blå en punkt ska ligga för att vara en blandning av dem, och hur mycket
+// blått den minst ska ha. Mätt 2026-11-18 i pilotens ruta 27: den turkosa spetsen ligger 0,08 från linjen, med 0,69 blått.
+const SCREEN_MIX = 0.1;
+const SMEAR_LEAST = 0.15;
 // En punkt som är så här mycket kort ritas över det som står framför den vikta ytan.
 const FRONT = 0.3;
 
@@ -79,12 +83,17 @@ vec4 markCard(vec2 uv, vec3 c, vec3 colour, float alpha, float range, out float 
   vec2 My0 = markOf(texture2D(map, uv - vec2(0.0, four.y)).rgb);
   vec2 own = markOf(c);
   vec2 beside = max(max(max(mx1, mx0), max(my1, my0)), max(max(Mx1, Mx0), max(My1, My0)));
-  if (max(max(own.x, own.y), max(beside.x, beside.y)) < 0.01) return vec4(colour, alpha);
+  // Märkkortets blå utsmetat mot skärmen när kortet vänds: en blandning av det blå och skärmens gröna (turkos), som
+  // nyckeln inte tar som skärm. Den ligger på linjen mellan skärmen och det blå, också längre från kortet än proven når.
+  vec3 spanB = MARK_FACE - key;
+  float partB = clamp(dot(c - key, spanB) / max(dot(spanB, spanB), 1e-4), 0.0, 1.0);
+  bool smear = own.x < 0.99 && partB > ${SMEAR_LEAST} && length(c - key - partB * spanB) < ${SCREEN_MIX};
+  if (!smear && max(max(own.x, own.y), max(beside.x, beside.y)) < 0.01) return vec4(colour, alpha);
 
   // Dealerns färg utan täckningen, och vilket märke punkten hör till: det som är mest här eller intill.
   vec3 u = colour / max(alpha, 0.004);
   vec2 which = max(own, beside);
-  bool face = which.x > which.y;
+  bool face = smear || which.x > which.y;
   vec3 nominal = face ? MARK_FACE : MARK_BACK;
   vec2 keyed = markOf(u);
   float share = face ? max(own.x, keyed.x) : max(own.y, keyed.y);
@@ -115,15 +124,11 @@ vec4 markCard(vec2 uv, vec3 c, vec3 colour, float alpha, float range, out float 
       O = u;
     }
   }
-  // Kortets kant mot skärmen, utsmetad när kortet vänds: en blandning av märkkortet och skärmen som nyckeln inte tar
-  // som skärm (blått och grönt blir turkos). Skärmens del blir genomskinlig och resten kort.
-  if (share < 0.99) {
-    vec3 span = nominal - key;
-    float part = clamp(dot(c - key, span) / max(dot(span, span), 1e-4), 0.0, 1.0);
-    if (length(c - key - part * span) < ${SCREEN_MIX}) {
-      alpha = min(alpha, part);
-      share = 1.0;
-    }
+  // I det utsmetade blå är skärmens del genomskinlig och resten kort.
+  if (smear) {
+    alpha = min(alpha, partB);
+    share = 1.0;
+    O = u;
   }
   if (share < 0.004) return vec4(colour, alpha);
 
