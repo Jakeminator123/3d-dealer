@@ -36,6 +36,7 @@ Läs [README.md](README.md) och [docs/status.md](docs/status.md) först. Orden s
 - En agent skriver omdömen och svar med `npm run reg -- status <fil> <status> "<vem och varför>"` och `npm run reg -- reply <fil> "<svar>"`, aldrig med Labbets knappar eller motiveringsruta: de bär Jakobs namn.
 - Fråga inte Jakob om det en agent kan avgöra. Avgör inom logiska ramar, skriv vad som avgjordes och varför, och låt honom ändra det.
 - Underagenter körs med Opus 5.5 på extra hög ansträngning.
+- Om en rörelse ser mänsklig ut avgör Jakob med ögat. Inför en ny rörelse, dealer eller vy får han provklipp att välja mellan innan en serie beställs, och resultat skickas till honom när de finns (han följer ofta arbetet från mobilen, där Labbet inte går att nå).
 - Gamla Dealer (`C:\Users\jakem\dev\super-feature-sg\dealer`) är Codex arbetsyta: den läses inte utan Jakobs ord, och dess grenar, arbetsträd och `D:\dealer-scratch` rörs aldrig. En gren eller ett arbetsträd med opushade commits tas aldrig bort utan Jakobs ja för just den, och aldrig i ett annat repo än det här.
 - Ingenting pushas utan Jakobs ord. Publicering, lipsync och ljud väntar tills han säger till.
 
@@ -66,3 +67,4 @@ Läs [README.md](README.md) och [docs/status.md](docs/status.md) först. Orden s
 
 - Registret skrivs av Labbet och av flera agenter samtidigt. Skriv det bara genom `npm run reg` (och Labbet genom servern): varje skrivning är en transaktion, och `sql` öppnar databasen skrivskyddad. `npm run` skriver en rubrik på standard ut; `node src/pipeline/registry.ts <ord>` gör samma sak utan den.
 - Skriv skript till fil, inte som `node -e` eller här-dokument: PowerShell tolkar grav accent och dollartecken, och Bash-verktyget förstör omvända snedstreck och vissa citattecken.
+- Skriv aldrig till `nul` i Bash: det blir en fil med det namnet i repots rot, som Git inte kan läsa in. Använd `/dev/null` i Bash och `$null` i PowerShell.

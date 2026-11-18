@@ -63,19 +63,23 @@ Med cykeln behövs ett ankare per vy: REDO. Sista bilden är REDO med märkkorte
 
 ## Filmen
 
-1. `node src/pipeline/tagning.ts forbered <dealer> <vy> <plats> <kort>` gör paketet i `output/tagningar/<id>/`: första bilden (vyns REDO), sista bilden, dockans film, texten och `bestallning.json`.
+1. `node src/pipeline/tagning.ts forbered <dealer> <vy> <plats|D> <kort> [deal|hole|flip] [--cykel <namn>] [--text <fil>]` gör paketet i `output/tagningar/<id>/`: första bilden (vyns REDO), sista bilden, dockans film, texten och `bestallning.json`. `D` är dealern: kort 0 är det öppna kortet, kort 1 hålkortet (`hole`, baksidan upp) som sedan vänds (`flip`).
 2. Agenten laddar upp filerna och beställer med `generate_video` exakt som `bestallning.json` säger: Kling 4, 1080p, 4 s, `startFrame`, `endFrame` och dockans film som `referenceVideos`. 85 krediter (mätt).
 3. `node src/pipeline/tagning.ts ta-emot <id> <film> --task <taskId> --krediter <n> --saldo-fore <n> --saldo-efter <n>` tar bort ljudet, mäter klippet, gör ark och bevis i scenen, och för in klippet (`att granska`), beställningen och måtten i registret.
 
 - Texten, gränsvärdena, vyernas ankare och bildfrekvensen står i `content/tagning.json`. Gränsvärdena är den oberoende granskarens, satta efter piloten.
 - `ta-emot` mäter bland annat takten, skarven (klippet två gånger i rad), när och var kortet ligger (`lands`), handen utan handled mot dockans, skons rörelse och det gröna. Ett mått utanför sin gräns underkänner inte klippet, men det syns direkt.
 - `node src/pipeline/tagning.ts mät-om <id>` mäter om ett mottaget klipp och gör om beviset i scenen, utan att röra filen, beställningen eller omdömet. Används när mätningen eller scenen har ändrats.
+- Rörelsens dynamik mäts för sig (`src/pipeline/rorelse.ts`), på dockans film vid `forbered` och på klippet vid `ta-emot`: hur länge hon står helt stilla, huvudets rörelse i vila, tvära stopp, knyck mot minsta ryck, att huvudet går före handen och att bålen landar efter. Kling kopierar dockans dynamik nästan exakt (mätt), så det som ska bli mjukt i filmen görs mjukt i dockan.
+- Inför en ny rörelse, dealer eller vy görs provklipp som Jakob väljer mellan med ögat, innan en serie beställs.
 - En serie beställs i omgångar: ytterlägena först, och en oberoende granskare dömer dem innan resten beställs.
 
 ## Spela
 
 - `node src/pipeline/runda.ts <dealer> <vy> [--nara] [--plan]` tar cykelklippen ur registret i ordningen i `content/runda.json`, säger vilka kort som saknar klipp, och sparar hela given som film och ark i `output/forlagor/`.
-- I Labbet: steget Scen, där dealern "Hela given ur Spelaren" är förvald och spelar. Närbild visar närbilden, och Börja om tar den från början.
+- `runda.ts` spelar en runda som spelkärnan har delat, och `--fro <ord>` gör den möjlig att göra om. Varje kort väljer sitt klipp efter `seat`, `index` och `action`; saknas klippet läggs kortet utan dealerns rörelse, och utskriften säger vilka som saknades. En följd håller sig till klipp ur ett och samma REDO-ankare.
+- Casinot, http://localhost:5310/casino/, spelar en runda mot spelkärnan i servern.
+- I Labbet: steget Scen, där dealern "Hela given ur Spelaren" är förvald och spelar, och steget Kortplan, där bågen, dealerns rad och kortens storlek ställs med reglage. Kortet landar där handen lade det och glider sedan till sin plats i dagens plan (`card.onTable` i `content/scene.json`); var handen lägger kortet ändras bara av nya filmer.
 - Uppspelningen är en följd (`src/scene/reel.ts`): klippen spelas utan glapp, scenens kort ligger kvar från att det landat, och mellan klippen hålls filmens sista ruta. `src/scene/round.ts` väljer klippen, lika för `runda.ts` och Labbet.
 
 ## Runway
