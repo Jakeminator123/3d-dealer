@@ -397,7 +397,7 @@ function nextSteps(id: string, dealer: Dealer | null, identity: IdentityState[],
     if (lacking.length === first.length) {
       steps.push({ what: `${view.view}: inga klipp ur ankaret än. Gör provklipp som Jakob väljer mellan innan serien beställs (docs/production.md, Filmen).`, commands: [`node src/pipeline/tagning.ts forbered ${id} ${view.view} 4 0`] });
     } else if (lacking.length > 0) {
-      steps.push({ what: `${view.view}: ${lacking.length} av seriens ${first.length} kort saknar klipp${waiting('tagning').length ? ` (${waiting('tagning').length} paket väntar på beställning)` : ''}. Ytterlägena först.`, commands: lacking.slice(0, 3).map((card) => `node src/pipeline/tagning.ts forbered ${id} ${view.view} ${seat(card)}`) });
+      steps.push({ what: `${view.view}: ${lacking.length} av seriens ${first.length} kort saknar klipp${waiting('tagning').filter((one) => one.id.startsWith(`${id}_${view.view}_`)).length ? ` (${waiting('tagning').filter((one) => one.id.startsWith(`${id}_${view.view}_`)).length} paket ur vyn väntar på beställning)` : ''}. Ytterlägena först.`, commands: lacking.slice(0, 3).map((card) => `node src/pipeline/tagning.ts forbered ${id} ${view.view} ${seat(card)}`) });
     } else if (view.playable) {
       steps.push({ what: `${view.view}: spelbar. Se rundan.`, commands: [`node src/pipeline/runda.ts ${id} ${view.view} --plan`] });
     }

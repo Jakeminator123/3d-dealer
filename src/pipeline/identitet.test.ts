@@ -31,11 +31,13 @@ test('mallen: ett slag per bild linjen behöver, och referenser bara bakåt', ()
 });
 
 test('från en bild: dealerns fil, källan, beställningarna, och bilderna tagna emot under dealern', async () => {
-  await ny('anna', 'Anna', ['foto.jpg'], { root: dir, say: quiet });
+  await ny('anna', 'Anna', [join(dir, 'foto.jpg')], { root: dir, say: quiet });
   const dealer = readDealer(dir, 'anna');
   assert.deepEqual(dealer.identity.images, [{ file: 'dealers/anna/identity/kalla.png', shows: 'källa' }]);
   assert.equal(getEntry(dir, 'dealers/anna/identity/kalla.png')?.status, 'att granska');
-  await assert.rejects(ny('anna', 'Anna', ['foto.jpg'], { root: dir, say: quiet }), /finns redan/);
+  await assert.rejects(ny('anna', 'Anna', [join(dir, 'foto.jpg')], { root: dir, say: quiet }), /finns redan/);
+  await assert.rejects(ny('berit', 'Berit', [join(dir, 'saknas.jpg')], { root: dir, say: quiet }), /finns inte/);
+  assert.ok(!existsSync(join(dir, 'content', 'dealers', 'berit.json')), 'ingen fil utan bild');
 
   const made = await forbered('anna', { root: dir, say: quiet });
   assert.deepEqual(made.roles, ['ansikte', 'helkropp', 'händer']);

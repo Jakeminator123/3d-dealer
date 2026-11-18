@@ -565,7 +565,8 @@ async function anchorSheet(out: string, guide: Picture, stallning: Picture, likh
 
 export type ReceiveOptions = { root?: string; out?: string; register?: boolean; say?: (text: string) => void };
 
-const fileOf = (root: string, given: string): string => (isAbsolute(given) ? given : resolve(root, given));
+/** En fil som den ges på kommandoraden eller i kvitto.json: räknad från mappen kommandot körs i. */
+const fileOf = (_root: string, given: string): string => (isAbsolute(given) ? given : resolve(given));
 
 /** Tar emot bildmodellernas bilder till ett paket. Se överst i filen. */
 export async function taEmot(id: string, files: { stallning?: string; likhet?: string } = {}, options: ReceiveOptions = {}): Promise<{ made: Made; post: Post; registered: string[] }> {

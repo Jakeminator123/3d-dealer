@@ -62,7 +62,8 @@ export function readIdentitet(root = studioRoot(), mall: Mall = readMall(root)):
 
 const posix = (path: string): string => path.replaceAll('\\', '/');
 const write = (path: string, value: unknown): void => writeFileSync(path, `${JSON.stringify(value, null, 1)}\n`);
-const fileOf = (root: string, given: string): string => (isAbsolute(given) ? given : resolve(root, given));
+/** En fil som den ges på kommandoraden eller i kvitto.json: räknad från mappen kommandot körs i. */
+const fileOf = (_root: string, given: string): string => (isAbsolute(given) ? given : resolve(given));
 
 /** Ett ledigt namn under assets/dealers/<dealer>/identity/: <namn>.png, sedan <namn>-2.png och framåt. */
 export function freeName(root: string, dealer: string, name: string): string {
@@ -109,6 +110,7 @@ export async function ny(id: string, name: string, images: string[], options: { 
   if (!ID.test(id)) throw new IdentitetError(`Ogiltigt id: ${id} (små bokstäver, siffror och bindestreck)`);
   if (existsSync(dealerPath(root, id))) throw new IdentitetError(`${dealerFile(id)} finns redan; fler bilder: node src/pipeline/identitet.ts källa ${id} <bild>`);
   if (images.length === 0) throw new IdentitetError('Ge minst en bild av personen');
+  for (const image of images) if (!existsSync(fileOf(root, image))) throw new IdentitetError(`${image} finns inte`);
   const at = stamp();
   const dealer: Dealer = {
     schemaVersion: 1,

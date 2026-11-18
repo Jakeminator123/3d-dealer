@@ -34,6 +34,22 @@ Varje vy som ska visa dealern går igenom Förlaga, Ankare och Film för sig. Do
 - Identiteten avgör vad som ska synas på dealern. För Paulina: tatueringar på hals, bröst och båda händerna.
 - Takten står i `content/moves/cykel-nyp.json`: cykeln är 4,0 s.
 
+## Identitet
+
+En dealer är en fil, `content/dealers/<id>.json`: namnet, orden om henne som texterna fylls med (hår, kläder, det som alltid ska synas, till exempel tatueringar), hennes identitetsbilder med vad var och en visar, och vyernas REDO-ankare. Formen och det som gäller när filen inte säger något (kläderna, pronomenet) står i `content/dealer.json`; ingen kod eller mall nämner en viss dealer. Var hon står: `node src/pipeline/dealer.ts <id>`, eller Labbets steg Dealer.
+
+Vägen i ett stycke, för en ny dealer:
+
+1. En bild av en person: `node src/pipeline/identitet.ts ny <id> "<Namn>" <bild> [<bild>] [--han]` skriver hennes fil och för in bilden som hennes källa. Skriv orden om henne i filen (`looks`) när de är kända.
+2. Identitetsbilderna: `node src/pipeline/identitet.ts förbered <id>` gör beställningarna av ansikte, helkropp i dealerns kläder och händernas ovansida ur `content/identitet.json`. Agenten beställer dem i ordning genom Runways MCP-server (cirka 60 krediter), skriver `kvitto.json` och kör `node src/pipeline/identitet.ts ta-emot <paket>`. En oberoende granskare dömer dem (`npm run reg -- status`).
+3. Ankaret ur Spelaren: `node src/pipeline/ankare.ts förbered <id> spelaren`, beställ de två bildstegen (cirka 30 krediter), `node src/pipeline/ankare.ts ta-emot <paket>`. En oberoende granskare dömer det, och `node src/pipeline/ankare.ts använd <id> spelaren <fil>` pekar ut det.
+4. Provklipp: `node src/pipeline/tagning.ts forbered <id> spelaren 4 0`, beställ, `ta-emot`. Jakob väljer med ögat.
+5. Serien (`content/dealer.json`, `series`): `tagning.ts forbered` för varje kort, ytterlägena först, och en oberoende granskare dömer varje omgång.
+6. Spelbar: `node src/pipeline/runda.ts <id> spelaren --plan` säger att inget kort saknar klipp; Casinot spelar henne.
+
+- Identitetsbilderna görs med Nano Banana Pro i 2K, i ordningen ansikte, helkropp, händer: helkroppen med ansiktet som referens och händerna med helkroppen, så att de är samma person. Inte prövat för en ny dealer.
+- Texterna fungerar för en dealer utan tatueringar och för en man: det som gäller henne står som platshållare (`{handMarks?…}`, `{Her}`), fyllda ur hennes fil.
+
 ## Förlagan
 
 - `node src/pipeline/shoot.ts <beställning.json>` sparar dockans ställningar som bilder och rörelsen som film ur en vys närbild. En webbläsare utan fönster ritar scenen, och en egen server startas på en ledig port. `tagning.ts forbered` gör det åt en tagning.
@@ -43,23 +59,24 @@ Varje vy som ska visa dealern går igenom Förlaga, Ankare och Film för sig. Do
 
 ## Ankaret, steg för steg
 
-Med cykeln behövs ett ankare per vy: REDO. Sista bilden är REDO med märkkortet målat på kortplatsen, och den görs av `tagning.ts`.
+Med cykeln behövs ett ankare per vy: REDO. Sista bilden är REDO med märkkortet målat på kortplatsen, och den görs av `tagning.ts`. Vägen är `src/pipeline/ankare.ts`, talen och texterna står i `content/ankare.json`, och de lokala stegen i `src/pipeline/ankarbild.ts`.
 
 | Steg | Modell | Indata | Varför |
 | --- | --- | --- | --- |
-| Ställning | Nano Banana Pro, 2K (från sidan: Nano Banana 2.1) | dockans bild + identitetsbilderna (ansikte, helkropp, händer) | Håller underlagets geometri: sko, bordskant och kort inom 4 bildpunkter. Pro vände henne mot kameran i fyra försök av fyra från sidan. |
-| Likhet | GPT Image 2.6 Sunburst, 2K | förra bilden + ansiktsbilden: "ändra bara huvudet" | Nano Banana gav slätare ansikte och fel hårfärg. Från sidan klistras bara huvudet ur retuschen in. |
-| Händer | lokalt, `krymp-hand.ts` | bilden | Händerna skalas 0,82 kring ärmen eller kortet. |
-| Skärm | lokalt, `platta-gront.ts` | bilden | Bakgrund, bord och rutnät blir en grön. |
+| Underlag | scenen (`ankare.ts förbered`) | dockans REDO ur vyns närbild i ateljén | Ögat och dockans punkter (grepp, kort, händer, bordskant) räknas genom det och står i paketet. |
+| Ställning | Nano Banana Pro, 2K (från sidan: Nano Banana 2.1) | underlaget + identitetsbilderna (ansikte, helkropp, händer) | Håller underlagets geometri: sko, bordskant och kort inom 4 bildpunkter. Pro vände henne mot kameran i fyra försök av fyra från sidan. |
+| Likhet | GPT Image 2.6 Sunburst, 2K | ställningens bild + ansiktsbilden: "ändra bara huvudet" | Nano Banana gav slätare ansikte och fel hårfärg. Har likheten flyttat sko eller bordskant läggs bara dess huvud på ställningen. |
+| Lokalt | `ankare.ts ta-emot` | bildmodellernas två bilder | Händerna krymps till dockans hudyta (givhanden läggs där dockans fingrar rör kortet), bildmodellens kort tas bort och märkkortet målas där dockans står, allt grönt blir skärmens gröna, kläderna förs ned till bordskanten och det minsta lagas. Sedan mäts bilden mot underlaget. |
 
+- `ta-emot` mäter skon, kortet, bordskanten, händernas hudyta bortom handleden mot dockans, det gröna, glipan vid bordskanten, hål i dealern och lösa fläckar mot gränserna i `content/ankare.json`, gör arket och för in ankaret (`att granska`, med ögat och skons läge), beställningarna ur `kvitto.json` och måtten. Ett mått utanför sin gräns underkänner inte ankaret, men det syns direkt.
+- Prövat på råbilderna bakom `spelaren-redo-2.png` (`output/work/mall/prova-ankare-2.ts`): skon, bordskanten, det gröna, glipan och den vilande handen som i det godkända; givhandens skala 0,69 mot 0,71 för hand. Det som skiljer är lagningen, ett tredje betalt steg (Sunburst, 7 krediter) som `ta-emot` inte gör: utan den blir ärmen en klump ovanför den krympta givhanden och skon kring handen utsmetad, och måtten slår ut på skons silhuett och givhandens yta.
+- När kortplanen ändras och närbilden räknas om står ögat kvar på samma plats: `node src/pipeline/ankare.ts öga <id> <vy>` för över vyns ankare till dagens öga med en homografi (mätt till 0,04 bildpunkter på dockan) och plattar skärmen, eftersom omsamplingen lämnar gröna ringar kring silhuetten (10 028 bildpunkter för `spelaren-redo-2.png`, 0 efter). Har dockans REDO ändrats, som blicken, görs huvudet om med likhetssteget (`output/work/ankare-3/`).
 - Mätt 2026-11-18: Sunburst ensam flyttade bord och sko 30 bildpunkter och ritade händerna 1,2–1,3 gånger dockans, i tre försök med olika underlag. Ideogram 4.5 Precise Edit ritade om ansiktet till en annan person.
 - Skriv "blonde" om håret. "Warm golden-blonde" gav orange hår i två modeller.
-- Ge inte Nano Banana en identitetsbild som själv har bord och sko i bild, till exempel `identity/sida-kavaj-tatuerad.png`: den kopierade den bildens uppställning i stället för underlagets. Med handnärbilden som referens har den också lagt händerna som spökbilder över bakgrunden; se efter i varje bild.
+- Ge inte Nano Banana en identitetsbild som själv har bord och sko i bild (slaget `sida`): den kopierade den bildens uppställning i stället för underlagets. Med handnärbilden som referens har den också lagt händerna som spökbilder över bakgrunden; se efter i varje bild.
 - Kavajen ska gå ned till bordskanten i ankaret. En glipa där visar rummet under kroppen i scenen.
-- De lokala skripten ligger i `output/work/giv-4/` (också `passa-ankare.ts`, som flyttar bilden så att skon hamnar där scenens sko står, och `flytta-ruta.mjs`, som flyttar en del av bilden). De hör hemma i `src/pipeline` när ett ankare görs för en dealer till.
 - Tatueringar på en hand i en färdig bild: receptet står i den borttagna posten för `dealers/paulina/anchors/redo-nyp-tatuerad.png` (`npm run reg -- show`), och skripten i `output/work/nyp/`.
 - Kostnad för ett ankare när receptet följs: cirka 30 krediter (20 + 9).
-- Ankaret förs in med `npm run reg -- import <post.json>`, med `use: "dealerfilm"` och vyn det är gjort i, och pekas ut som vyns REDO i `content/tagning.json`.
 
 ## Filmen
 

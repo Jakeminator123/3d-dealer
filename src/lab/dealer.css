@@ -1,0 +1,176 @@
+/* Steget Dealer */
+
+.dealer h1 code {
+  margin-left: 8px;
+  font-size: 12px;
+}
+
+.dealer .chooser {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.dealer .chooser a {
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--dim);
+}
+
+.dealer .chooser a[aria-current='page'] {
+  background: var(--raised);
+  color: var(--text);
+}
+
+.dealer .badge {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-size: 12px;
+  background: #343842;
+  color: var(--dim);
+  white-space: nowrap;
+}
+
+.dealer .badge.yes {
+  background: var(--yes);
+  color: #06200f;
+}
+
+.dealer .badge.wait {
+  background: var(--warn);
+  color: #2a1c02;
+}
+
+.dealer .badge.no {
+  background: var(--no);
+  color: #2a0606;
+}
+
+.dealer .next {
+  margin: 0;
+  padding-left: 22px;
+}
+
+.dealer .next li {
+  margin-bottom: 12px;
+}
+
+.dealer .next p {
+  margin: 0 0 6px;
+}
+
+.dealer .command {
+  margin: 0 0 4px;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel);
+  font: 12px/1.4 ui-monospace, Consolas, monospace;
+  color: var(--text);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
+.dealer .tiles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.dealer .tile {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 200px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.dealer a.tile:hover {
+  border-color: var(--accent);
+}
+
+.dealer .tile:has(.wide) {
+  width: 300px;
+}
+
+.dealer .thumb {
+  display: grid;
+  place-items: center;
+  height: 180px;
+  border-radius: 5px;
+  background: var(--ground);
+  overflow: hidden;
+  color: var(--dim);
+}
+
+.dealer .thumb.wide {
+  height: 160px;
+}
+
+.dealer .thumb img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.dealer .tile .meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+}
+
+.dealer .tile p {
+  margin: 0;
+  font-size: 12px;
+  color: var(--dim);
+}
+
+.dealer .tile .note {
+  color: var(--warn);
+}
+
+.dealer .cards {
+  border-collapse: collapse;
+  margin-top: 4px;
+  font-size: 12px;
+}
+
+.dealer .cards th,
+.dealer .cards td {
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.dealer .cards th {
+  font-weight: 500;
+  color: var(--dim);
+}
+
+.dealer .cards td.yes {
+  background: rgba(79, 180, 119, 0.25);
+}
+
+.dealer .cards td.wait {
+  background: rgba(224, 176, 92, 0.25);
+}
+
+.dealer .cards td.no {
+  background: rgba(224, 108, 108, 0.25);
+}
+
+.dealer .cards td.none {
+  color: #5d616b;
+}
+
+.dealer .cards td.later {
+  opacity: 0.55;
+}
