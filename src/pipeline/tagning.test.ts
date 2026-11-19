@@ -318,6 +318,83 @@ test('ta-emot med ett klipp som referens: posten säger vilket klipp som skickad
   assert.ok(order.inputs!.includes('"role":"referenceVideo"'));
 });
 
+test('forbered och ta-emot utan referensfilm: bara bilderna skickas, dockans film mäts, och posten säger det', async () => {
+  const made = await forbered({ ...spec, variant: 'fri' }, { root: project, reference: 'docka.mp4', noReference: true, textName: 'fri', say: quiet });
+  const order = JSON.parse(readFileSync(join(made.dir, 'bestallning.json'), 'utf8'));
+  assert.deepEqual(Object.keys(order.inputs), ['startFrame', 'endFrame'], 'ingen film skickas');
+  assert.deepEqual([order.noReference, order.doll.sent, order.doll.film.file], [true, false, `output/tagningar/${made.id}/referens.mp4`]);
+  assert.ok(existsSync(join(made.dir, 'docka.json')), 'dockans film är mätt');
+  assert.equal(readFileSync(join(made.dir, 'text.txt'), 'utf8'), namedText(content, 'fri', 'deal', words));
+  const { variant: _variant, ...plain } = spec;
+  await assert.rejects(forbered(plain, { root: project, reference: 'docka.mp4', noReference: true, say: quiet }), /utan referensfilm har en egen variant/);
+  await assert.rejects(forbered({ ...spec, variant: 'fri' }, { root: project, reference: 'docka.mp4', noReference: true, fromClip: { file: fromFile, role: 'referenceVideos' }, say: quiet }), /inte båda/);
+  const result = await taEmot(made.id, join(project, 'nedladdad.mp4'), { taskId: 'task-3', credits: 64, before: 1000, after: 936 }, { root: project, proof: false, register: false, say: quiet });
+  const references = (result.post.post.source as { references: { role: string }[] }).references;
+  assert.deepEqual(references.map((entry) => entry.role), ['startFrame', 'endFrame']);
+  assert.ok(String(result.post.post.note).includes('utan referensfilm'));
+});
+
+test('en annan modell med bilderna som referens: paketet säger vad som skickas, och en film i en annan upplösning mäts skalad', async () => {
+  const register = join(project, 'register-klipp');
+  const options = { root: project, registry: register, say: quiet };
+  const made = await forbered({ ...spec, variant: 'annan' }, { ...options, fromClip: { file: fromFile, role: 'referenceVideos' }, textName: 'fri-referens', model: 'prov-modell', resolution: '480p', frames: 'referens', duration: 4 });
+  const order = JSON.parse(readFileSync(join(made.dir, 'bestallning.json'), 'utf8'));
+  assert.deepEqual(Object.keys(order.inputs), ['referenceImages', 'referenceVideos'], 'ingen första eller sista bild');
+  assert.deepEqual([order.model, order.resolution, order.duration, order.framesAs, order.inputs.referenceImages[0].asset], ['prov-modell', '480p', 4, 'referens', redoAnchor]);
+  assert.ok(existsSync(join(made.dir, 'forsta.png')) && existsSync(join(made.dir, 'sista.png')), 'bilderna står kvar att mäta mot');
+  const { variant: _variant, ...plain } = spec;
+  await assert.rejects(forbered(plain, { root: project, reference: 'docka.mp4', model: 'prov-modell', say: quiet }), /annan modell, upplösning eller roll för bilderna har en egen variant/);
+
+  execFileSync('ffmpeg', ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'color=c=0x02b630:s=854x480:r=24:d=0.5', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', join(project, 'liten.mp4')]);
+  writeFileSync(join(made.dir, 'uppladdat.json'), JSON.stringify([{ role: 'referenceImages', url: 'https://d2jqrm6oza8nb6.cloudfront.net/datasets/bild.png?_jwt=x', assetId: 'b1', at: '2026-11-19 12:00' }]));
+  const result = await taEmot(made.id, join(project, 'liten.mp4'), { taskId: 'task-5', credits: 82, before: 1000, after: 918 }, { root: project, proof: false, register: false, say: quiet });
+  assert.ok(existsSync(join(made.dir, 'matkopia.mp4')), 'en kopia i rutans upplösning mäts');
+  assert.equal(result.judged.find((entry) => entry.key === 'format')?.verdict, 'utanför', 'formatet mäts på filmen som den kom');
+  const references = (result.post.post.source as { references: { role: string }[] }).references;
+  assert.deepEqual(references.map((entry) => entry.role), ['referenceImages[0]', 'referenceVideos[0]']);
+  assert.deepEqual(result.post.uploads, [{ file: redoAnchor, url: 'https://d2jqrm6oza8nb6.cloudfront.net/datasets/bild.png', assetId: 'b1', at: '2026-11-19 12:00' }]);
+});
+
+test('en följd: två kort i samma tagning, bilderna mellan givarna, och en post som rundan aldrig tar för ett kort', async () => {
+  const sequence = { ...spec, index: 0, variant: 'foljd', then: [{ seat: 5, index: 0 }] };
+  const made = await forbered(sequence, { root: project, noReference: true, textName: 'foljd-2', duration: 4, say: quiet });
+  assert.equal(made.id, 'paulina_spelaren_cykel-nyp-foljd_4-0-5-0_t1');
+  const order = JSON.parse(readFileSync(join(made.dir, 'bestallning.json'), 'utf8'));
+  assert.deepEqual(Object.keys(order.inputs), ['startFrame', 'endFrame']);
+  assert.deepEqual([order.duration, order.noReference, order.doll, order.clip], [4, true, null, 'dealers/paulina/clips/cykel-nyp-foljd-4-0-5-0_spelaren_t1.mp4']);
+  assert.deepEqual(order.cards.map((card: { seat: number; index: number }) => `${card.seat}-${card.index}`), ['4-0', '5-0']);
+  assert.equal(order.middle.length, 1);
+  assert.ok(!existsSync(join(made.dir, 'referens.mp4')), 'ingen dockfilm');
+  // Mellanbilden har det första kortet, sista bilden båda: de skiljer bara där det andra kortet ligger.
+  const middle = await sharp(join(made.dir, 'mitt-1.png')).raw().toBuffer();
+  const last = await sharp(join(made.dir, 'sista.png')).raw().toBuffer();
+  const first = await sharp(join(made.dir, 'forsta.png')).raw().toBuffer();
+  const differ = (a: Buffer, b: Buffer): number => {
+    let n = 0;
+    for (let p = 0; p < a.length; p += 3) if (a[p] !== b[p] || a[p + 1] !== b[p + 1] || a[p + 2] !== b[p + 2]) n++;
+    return n;
+  };
+  // En kantpunkt som täcks lite kan få samma färg som förut: målad men inte ändrad.
+  assert.ok(Math.abs(differ(first, middle) - order.inputs.endFrame.painted[0]) <= 2, 'mellanbilden har det första kortet');
+  assert.ok(Math.abs(differ(middle, last) - order.inputs.endFrame.painted[1]) <= 2, 'sista bilden har också det andra');
+  // Det som vägras: en följd med referensfilm, och en följd utan text.
+  await assert.rejects(forbered(sequence, { root: project, reference: 'docka.mp4', say: quiet }), /utan referensfilm/);
+  await assert.rejects(forbered(sequence, { root: project, noReference: true, say: quiet }), /ingen text i mallen/);
+
+  film(join(project, 'foljd.mp4'), '0x02b630', 1, true);
+  const result = await taEmot(made.id, join(project, 'foljd.mp4'), { taskId: 'task-4', credits: 72, before: 1000, after: 928 }, { root: project, proof: false, register: false, say: quiet });
+  const { post } = result.post;
+  assert.ok(!('seat' in post) && !('index' in post) && !('lands' in post), 'inget enskilt kort');
+  assert.deepEqual((post.cards as { seat: number }[]).map((card) => card.seat), [4, 5]);
+  assert.match(String(post.title), /^Följd: plats 4, kort 0, sedan plats 5, kort 0/);
+  assert.equal(post.pose, 'redo → kortet lagt → redo → kortet lagt → redo');
+  const matning = JSON.parse(readFileSync(join(made.dir, 'matning.json'), 'utf8'));
+  assert.equal(matning.pieces.length, 2);
+  assert.deepEqual(matning.seams.map((seam: { from: number; to: number }) => `${seam.from}-${seam.to}`), ['1-1', '2-1', '2-2']);
+  for (const file of ['bit-1.mp4', 'bit-2.mp4', 'baklanges.mp4', 'ark.jpg']) assert.ok(existsSync(join(made.dir, file)), file);
+  assert.ok(result.judged.some((entry) => entry.key === 'mittRutan1') && result.judged.some((entry) => entry.key === 'skarvBit2Bit1'));
+});
+
 let received: PostFile | null = null;
 let clip = '';
 
