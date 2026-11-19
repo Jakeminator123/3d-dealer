@@ -74,23 +74,34 @@ Prövat med film som referens: ingen modell som Runway når gör en naturligare 
 
 ### Spåret Figuren
 
-Målet: Paulinas kropp och rörelse i 3D, så att samma naturliga giv går att visa ur vilken vy som helst. Filerna: `src/scene/doll.ts`, `dollPose.ts`, `content/doll.json`, `content/moves/`, nya filer i `src/pipeline` för fångsten, `glb/` och `output/work/figur/`. Inga krediter utan att Jakob har sett kostnaden. Koden skrivs på grenen `figuren` i arbetsträdet `C:/Users/jakem/Desktop/3d-dealer-figur` ([decisions.md](decisions.md), Arbetssättet); media, registret, arbetsmaterialet och det här stycket ligger kvar i huvudmappen.
+Målet: samma naturliga giv ur fler vyer än Spelaren. Filerna: `src/scene/doll.ts`, `dollPose.ts`, `content/doll.json`, `content/moves/`, nya filer i `src/pipeline` för fångsten, `glb/` och `output/work/figur/`. Inga krediter utan att Jakob har sett kostnaden. Arbetet görs i huvudmappen: grenen `figuren` fördes in i `main` 2026-11-19 ([decisions.md](decisions.md), Arbetssättet).
 
-Det som finns att börja med:
+Jakob 2026-11-19, efter dagens prov: arbetet ska vara enhetligt och inte spreta ("Vad ska vi ha allt till?"). Spåret har därför en fråga i taget, och den som gäller nu är punkt 1.
 
-- SAM 3D Body (Meta) är installerat av Jakob 2026-11-19 i `C:/Users/jakem/dev/sam-3d-body`, och fungerar på datorns grafikkort: en bild in, en 3D-kropp med händer ut, i kamerans koordinater. Hur det körs, vad det lämnar och vad som inte är prövat (film, export till 3D-fil) står i `PROJEKT-GUIDE.md` där. Mappen är ett eget projekt: det körs och läses, och ändras inte härifrån.
-- Två kroppar ur SAM 3D Body ligger i `C:/Users/jakem/Desktop/body` (`keystone-hel` och `keystone-sittande`, var och en `person_0.glb`), gjorda ur identitetsbilderna `helkropp-staende.png` och `sittande-vid-bord.png`. Mätt: ett nät med 18 439 hörn och skelettet som lösa stavar; ingen rigg, ingen textur och ingen rörelse; den stående är 1,66 m lång. De är alltså hennes form och ställning, inte en färdig figur. Meshy-figuren i `glb/paow/` har textur men saknar fingerleder.
-- Dagens fynd som spåret bygger på: en fri film utan referens rör sig naturligt (Jakob: "faktiskt mycket bra"), och Kling kopierar en referensfilm nästan ruta för ruta. MediaPipe klarade inte nypet eller djupet (`output/work/mansklig-docka/prov-a/resultat.md`), och utredningen om vad som gör dockan stel står i `output/work/mansklig-docka/rapport.md`.
+Underlaget:
 
-- Vyprovet (`output/work/figur/vyprov/`): dockan, Meshy-figuren och dagens film ur Spelaren, Plats 1, Plats 4 och Plats 7. Dockan ritas ur alla vyer; Meshy-figurens rigg slutar i handleden och har bara gång och löpning; filmen är platt ur en annan vy än sin egen.
-- Jämförelsen med PAOW i gamla Dealer, läst på Jakobs ord 2026-11-19 (`output/work/figur/jamforelse-paow/jamforelse.md`, med två filmer sida vid sida). Också hon är en platt film i en 3D-scen. Gamla Dealer har ett vinkelprov som tonar över mellan en film framifrån och en från sidan, där sidofilmen är gjord ur en färdig film med Runways `edit_video`; det är inte prövat här.
+- SAM 3D Body (Meta) är installerat av Jakob i `C:/Users/jakem/dev/sam-3d-body` och går på datorns grafikkort: en bild in, en 3D-kropp med händer ut, i kamerans koordinater. Hur det körs står i `PROJEKT-GUIDE.md` där. Mappen är ett eget projekt: det körs och läses, och ändras inte härifrån.
+- Två kroppar ur SAM 3D Body ligger i `C:/Users/jakem/Desktop/body`, gjorda ur identitetsbilderna `helkropp-staende.png` och `sittande-vid-bord.png`: hennes form och ställning som nät, utan rigg, textur och rörelse. Meshy-figuren i `glb/paow/` har textur, men riggen slutar i handleden och har bara gång och löpning.
 
-1. Fångsten, utan krediter, på den fria cykeln Jakob tyckte om (`dealers/paulina/clips/cykel-nyp-rask-fri-4-0_spelaren_t1.mp4`), med gränserna satta före mätningen: handen inom 2 cm från sin plats i scenen, och fingrarna rätt i minst 90 % av rutorna i nypet. SAM 3D Body ensamt höll inte (Var vi står). Nu prövas en passning (`output/work/figur/fangst-2/`): lederna läggs på strålarna genom sina bildpunkter från klippets öga, med fasta benlängder och scenens villkor (greppet vid kortet i mynningen och på kortplatsen, ingen hand under filten), och fingrarna i nypet tas ur dockans grepp.
-2. Håller fångsten: dockan spelar den fångade rörelsen som en ny rörelse i `content/moves/`, synlig i Labbets steg Dockan ur alla vyer, och Jakob dömer den med ögat.
-3. En REDO i tvåhandsställningen, det Jakob kallar A2.3: vänd mot skon, vänsterhanden vid kortet i mynningen och högerhanden på filten intill skon. Den finns i dockan på grenen `figuren` (`cykel-tva-hander` börjar och slutar i den), godkänd av en oberoende granskare efter en rättning, och är inte i `main` än. Underlaget till ankaret, arket mot A2.1, filmerna och omdömet ligger i `output/work/figur/tvahand-redo/`. Jakob har inte sett ställningen: högerhanden ligger bredvid mynningen och hon vrider sig mindre än i ankarvarianten `a2-3`. För att använda den behöver spåret Filmen ett val av rörelse i `ankare.ts förbered`, ett beslut om gränserna `redoMotSkon` och `huvudMotSkon` i `content/tagning.json` (A2.3 ser mot skon, och gränserna säger att hon aldrig gör det), och hålkortet, vändningen och väntan ur samma REDO.
-4. Dockans mått passas mot hennes kropp ur den stående och den sittande kroppen (axelbredd, armarnas längd, sitthöjd), i `content/doll.json`.
-5. Samma giv ur en annan vy: dockans film ur Plats 7 som referens till Kling, med ett ankare ur den vyn. Betalt, och visas för Jakob först.
-6. Filmen på figuren, det första steget mot en dealer som håller när kameran dras runt (Jakobs ursprungliga tanke, [decisions.md](decisions.md), Projektet): filmen projiceras från klippets öga på den rörliga kroppen, och kameran flyttas några tiotal grader. Inte prövat.
+Prövat 2026-11-19, utan krediter, vart och ett i sin mapp under `output/work/figur/` med `resultat.md`:
+
+- `fangst-1/`: SAM 3D Body ensamt höll inte gränserna (Var vi står).
+- `vyprov/`: dockan, Meshy-figuren och dagens film ur Spelaren, Plats 1, Plats 4 och Plats 7. Dockan ritas ur alla vyer, och filmen är platt ur en annan vy än sin egen. Dockan lagd över filmen i samma vy sammanfaller med henne i händer, axlar och ansikte (`docka-over-film_spelaren.jpg`, sett och inte mätt): filmen är gjord genom scenens kamera.
+- `jamforelse-paow/`: PAOW i gamla Dealer mot Paulina, läst på Jakobs ord (`jamforelse.md` och två filmer sida vid sida). Också hon är en platt film i en 3D-scen. Gamla Dealer har ett vinkelprov som tonar över mellan en film framifrån och en från sidan, där sidofilmen är gjord ur en färdig film med Runways `edit_video`.
+- `tvahand-redo/`: dockans REDO i tvåhandsställningen, A2.3. `cykel-tva-hander` börjar och slutar i den; godkänd av en oberoende granskare efter en rättning (`granskning/omdome.md`). Underlaget till ankaret är `a23-redo-spelaren.png`. Spåret Filmens punkt 4 väntar alltså inte längre på dockan, utan på ett val av rörelse i `ankare.ts förbered`, på beslutet nedan om blicken, och på hålkortet, vändningen och väntan ur samma REDO.
+
+Näst, en sak i taget:
+
+1. Passningen (`fangst-2/`, pågår): samma fångst, men lederna läggs på strålarna genom sina bildpunkter från klippets öga, med fasta benlängder och scenens villkor (greppet vid kortet i mynningen och på kortplatsen, ingen hand under filten), och fingrarna i nypet tas ur dockans grepp. Gränserna är desamma som förut: handen inom 2 cm från sin plats i scenen och fingrarna rätt i minst 90 % av rutorna i nypet. Håller den, spelar dockan rörelsen som en ny rörelse i `content/moves/`, synlig i Labbets steg Dockan ur alla vyer, och Jakob dömer den med ögat. Håller den inte, läggs fångst ur film ned och punkt 2 görs utan den.
+2. Samma giv ur en annan vy, betalt och visat för Jakob först: dockans film ur Plats 7 som referens till Kling, med ett ankare ur den vyn; eller gamla Dealers väg, en sidofilm ur en färdig film med `edit_video`. Ett klipp och ett ankare räcker för att se om vägen håller.
+3. Dockans mått mot hennes kropp ur den stående och den sittande kroppen (armarnas längd, sitthöjd), i `content/doll.json`. I fångsten är armarna 13–15 % längre än dockans, med fångstens egen skala.
+4. Filmen på figuren, så att kameran kan flyttas några tiotal grader ([decisions.md](decisions.md), Projektet): filmen projiceras från klippets öga på den rörliga kroppen. Inte prövat, och väntar på punkt 1.
+
+Väntar på Jakob:
+
+- Ställningen A2.3 (`output/work/figur/tvahand-redo/a23-mot-a21.jpg`, och rörelsen `cykel-tva-hander` i Labbets steg Dockan): högerhanden ligger bredvid mynningen och hon vrider sig mindre än i ankarvarianten `a2-3`.
+- Om hon ser på skon i tvåhandsgiven. A2.3 vänder henne mot skon, och gränserna `redoMotSkon` och `huvudMotSkon` i `content/tagning.json` säger att hon aldrig gör det.
+- Om arbetsträdet `C:/Users/jakem/Desktop/3d-dealer-figur` och grenen `figuren` får tas bort. Allt på grenen finns i `main`; i arbetsträdets `output/` ligger bara agenternas arbetskopior.
 
 ### Väntar
 
