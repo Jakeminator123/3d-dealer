@@ -1153,7 +1153,8 @@ test('en vändning och ett hålkort som har sparats och lästs igen spelas som d
 
 // ---------------------------------------------------------------------------------------------------------------------
 // Tvåhandsgiven (content/moves/cykel-tva-hander.json, hands): vänster hand drar kortet ur skon till handbytet, höger hand
-// bär, vänder och lägger det. REDO och kortplatsen som i E, armarna fria, och båda händerna arbetar.
+// bär, vänder och lägger det. Den börjar och slutar i sitt eget REDO, A2.3 (hands.ready), kortet läggs där E lägger det,
+// armarna går fria, och båda händerna arbetar.
 
 const two: DollCycle = readCycle(read('moves/cykel-tva-hander.json'));
 const twos = new Map<string, DollMove>();
@@ -1171,14 +1172,111 @@ test('tvåhandsgiven läses, och fel i den sägs på svenska', () => {
   assert.throws(() => readCycle({ ...whole, hands: { ...whole.hands!, parts: { ...whole.hands!.parts, carry: 1 } } }), /hands\.parts/);
   assert.throws(() => readCycle({ ...whole, hands: { ...whole.hands!, handoff: { ...whole.hands!.handoff, edge: 0 } } }), /hands\.handoff/);
   assert.throws(() => moveFor(scene, doll, base, 4, { cycle: { ...two, hands: { ...two.hands!, handoff: { ...two.hands!.handoff, from: {} } } } }), /handbytet är för plats 4/);
+  const { ready: _ready, ...noReady } = whole.hands!;
+  assert.throws(() => readCycle({ ...whole, hands: noReady }), /hands\.ready/);
+  assert.throws(() => readCycle({ ...whole, hands: { ...whole.hands!, ready: { ...whole.hands!.ready, look: 1.5 } } }), /hands\.ready/);
+  assert.throws(() => readCycle({ ...whole, hands: { ...whole.hands!, ready: { ...whole.hands!.ready, leanDeg: -5 } } }), /hands\.ready/);
+});
+
+// Bålens vridning kring lodlinjen (axellinjen mot rakt fram) och lutning (ryggen mot lodlinjen), i grader.
+const turnOf = (pose: DollPose): number => angleBetween([1, 0, 0], [pose.arms.left.shoulder[0] - pose.arms.right.shoulder[0], 0, pose.arms.left.shoulder[2] - pose.arms.right.shoulder[2]]);
+const leanOf = (pose: DollPose): number => angleBetween([0, 1, 0], sub(mid(pose.arms.left.shoulder, pose.arms.right.shoulder), pose.hip));
+const mid = (a: Vec3, b: Vec3): Vec3 => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2];
+/** Det kortaste avståndet mellan två händer, led mot led med ledernas radier. */
+const handsApart = (a: Vec3[], b: Vec3[]): number => {
+  const radius = handSkeleton(doll).radius;
+  return Math.min(...a.flatMap((p, k) => b.map((q, j) => far(p, q) - radius[k]! - radius[j]!)));
+};
+
+test('tvåhandsgivens REDO (A2.3): vänster hand nyper kortet som i E, höger hand vilar på filten intill skon, bålen och huvudet vända mot skon', () => {
+  const move = twoTo(4, 0);
+  const redo = poseAt(scene, doll, move, 0);
+  const e = poseAt(scene, doll, base, 0);
+  const ready = two.hands!.ready;
+  // Vänster hand och kortet: E:s REDO, så att nypet börjar där det börjar i E.
+  redo.hands.left.forEach((point, k) => near(far(point, e.hands.left[k]!), 0, SAME, `vänster hand punkt ${k}`));
+  redo.card!.corners.forEach((corner, k) => near(far(corner, e.card!.corners[k]!), 0, SAME, `kortets hörn ${k}`));
+  assert.ok(nearestTip(redo) <= TOUCH, 'vänster hand på kortet i mynningen');
+  // Höger hand ligger på filten: dess lägsta led vilar i filtens plan.
+  const radius = handSkeleton(doll).radius;
+  near(Math.min(...redo.hands.right.map((point, k) => over(point) - radius[k]!)), 0, EXACT, 'höger hand vilar på filten');
+  near(handLength(redo.hands.right), HAND, 0.001, 'höger hands längd');
+  // Intill skon: långfingrets spets inom 10 cm från nosen, och fri från skon, vänster hand, bålen och bordet.
+  const nose = tilted(scene, [scene.shoe.at[0] + (Math.sin((scene.shoe.yawDeg * Math.PI) / 180) * scene.shoe.length) / 2, 0, scene.shoe.at[1] + (Math.cos((scene.shoe.yawDeg * Math.PI) / 180) * scene.shoe.length) / 2]);
+  assert.ok(far(redo.hands.right[12]!, nose) < 0.1, `långfingrets spets ${(far(redo.hands.right[12]!, nose) * 100).toFixed(1)} cm från nosen`);
+  assert.ok(handsApart(redo.hands.right, redo.hands.left) > 0.05, `händerna ${(handsApart(redo.hands.right, redo.hands.left) * 100).toFixed(1)} cm från varandra`);
+  const hits = armHits(scene, doll, move);
+  for (const [what, frames] of Object.entries(hits)) assert.ok(!frames.includes(0), `REDO går in i ${what}`);
+  assert.ok(redo.arms.right.reached && redo.arms.left.reached, 'armarna räcker');
+  // Bålen vänd och lutad mot skon som hands.ready säger, inom dockans gränser (doll.arm.mostTwist och mostLean).
+  near(turnOf(redo), ready.turnDeg, 0.5, 'bålens vridning');
+  near(leanOf(redo), ready.leanDeg, 0.5, 'bålens lutning');
+  assert.ok(ready.turnDeg <= (doll.arm.mostTwist * 180) / Math.PI && ready.leanDeg <= (doll.arm.mostLean * 180) / Math.PI, 'inom dockans gränser');
+  assert.ok(redo.arms.left.shoulder[2] < e.arms.left.shoulder[2] && redo.arms.right.shoulder[2] > e.arms.right.shoulder[2], 'höger axel fram och vänster bak: vänd mot skon');
+  // Huvudet vänt mot skon: mot kortet i mynningen inom 15°, där E:s REDO är mer än 30° därifrån.
+  const toShoe = angleBetween(sub(redo.face, redo.head), sub(pickUpCard(scene, doll).centre, redo.head));
+  assert.ok(toShoe < 15, `huvudet ${toShoe.toFixed(1)}° från kortet i mynningen`);
+  near(angleBetween(sub(redo.face, redo.head), sub(redo.gaze, redo.head)), 0, 0.01, 'huvudet vänt mot blickens punkt');
+  // Samma REDO för varje plats och kortplats, och sista rutan som första.
+  for (const [seat, index] of [[1, 0], [2, 1], [4, 1], [5, 0], [6, 0], [7, 0], ['D', 0]] as const) {
+    const other = twoTo(seat, index);
+    samePose(poseAt(scene, doll, other, 0), redo, `REDO vid ${seat}-${index}`);
+    samePose(last(other), redo, `sista rutan vid ${seat}-${index}`);
+  }
+});
+
+// Hindren tvåhandsgiven hade före A2.3, när den började i E:s REDO: rutorna där armHits fann skon, den andra handen,
+// bålen eller bordet, mätta 2026-11-19 i koden före ändringen (git show HEAD, commit b10906b). De är den olösta delen av
+// tvåhandsserien (docs/status.md, Finns inte än). Enhandscyklerna går fria överallt (proven ovan). Ingenting genom skon.
+const TWO_HAND_KNOWN: Record<string, Partial<Record<'shoe' | 'restingHand' | 'torso' | 'table', number[]>>> = {
+  '1-1': { table: [35, 36] },
+  '2-1': { table: [35, 36] },
+  '3-0': { table: [34] },
+  '3-1': { table: [35] },
+  '5-0': { torso: [34] },
+  '5-1': { restingHand: [40, 41], torso: [34] },
+  '5-2': { restingHand: [40, 41, 42], torso: [34] },
+  '6-0': { restingHand: [39, 40, 41], torso: [34] },
+  '6-1': { restingHand: [39, 40, 41], torso: [34] },
+  '6-2': { restingHand: [39, 40], torso: [34] },
+  '7-0': { shoe: [43, 44, 45, 46], torso: [33, 34] },
+  '7-1': { shoe: [42, 43, 44, 45, 46], torso: [33, 34, 35] },
+  '7-2': { shoe: [42, 43, 44, 45, 46], torso: [33, 34, 35] },
+  'D-0': { restingHand: [37, 40, 41, 42] },
+  'D-1': { restingHand: [37, 40, 41, 42] },
+  'D-2': { restingHand: [37, 41, 42, 43] },
+  'D-3': { restingHand: [37, 41, 42, 43, 44] },
+};
+
+test('tvåhandsgiven ur A2.3: vid ingen plats och inget kort går armar, händer eller kort in i något som de inte gick in i förut', () => {
+  const all: [Seat, number, Action][] = [
+    ...seatsOf(scene).flatMap((seat) => [0, 1, 2].map((index): [Seat, number, Action] => [seat, index, 'deal'])),
+    ...[0, 1, 2, 3].map((index): [Seat, number, Action] => ['D', index, 'deal']),
+    ['D', 1, 'hole'],
+    ['D', 1, 'flip'],
+    ['D', 0, 'wait'],
+  ];
+  const fresh: string[] = [];
+  for (const [seat, index, action] of all) {
+    const key = `${seat}-${index}`;
+    const move = twoTo(seat, index, action);
+    const known = action === 'deal' ? (TWO_HAND_KNOWN[key] ?? {}) : {};
+    for (const [what, frames] of Object.entries(armHits(scene, doll, move)) as ['shoe' | 'restingHand' | 'torso' | 'table', number[]][]) {
+      const added = frames.filter((frame) => !(known[what] ?? []).includes(frame));
+      if (added.length > 0) fresh.push(`${key} ${action}: ${what} i ruta ${added.join(', ')}`);
+    }
+    const through = throughShoe(scene, doll, move);
+    if (through.length > 0) fresh.push(`${key} ${action}: genom skon i ruta ${through.join(', ')}`);
+  }
+  assert.deepEqual(fresh, [], 'nya hinder');
 });
 
 for (const [seat, index] of [[4, 0], [1, 0]] as const) {
-  test(`tvåhandsgiven till plats ${seat}, kort ${index}: REDO som E, kortet där E lägger det, armarna fria och båda händerna arbetar`, () => {
+  test(`tvåhandsgiven till plats ${seat}, kort ${index}: ur A2.3 och tillbaka, kortet där E lägger det, armarna fria och båda händerna arbetar`, () => {
     const move = twoTo(seat, index);
     assert.equal(move.carry, 'right');
     near(move.seconds, two.seconds, 1e-9, 'cykelns längd');
-    const redo = poseAt(scene, doll, base, 0);
+    const redo = poseAt(scene, doll, twoTo(4, 0), 0);
     samePose(poseAt(scene, doll, move, 0), redo, 'första rutan');
     const end = last(move);
     samePose(end, redo, 'sista rutan');
@@ -1223,5 +1321,7 @@ test('en tvåhandsgiv som har sparats och lästs igen spelas som den var', () =>
   const kept = twoTo(4, 0);
   const again = readMove(JSON.parse(JSON.stringify(kept)));
   assert.equal(again.carry, 'right');
+  assert.ok(again.tracks.ready, 'bålens vändning i REDO följer med');
+  assert.throws(() => readMove({ ...kept, tracks: { ...kept.tracks, ready: { ...kept.tracks.ready!, share: [1] } } }), /tracks\.ready/);
   for (const time of [0, 0.5, 1, 1.5, 2, 2.5, kept.seconds]) samePose(poseAt(scene, doll, again, time), poseAt(scene, doll, kept, time), `vid ${time} s`);
 });
