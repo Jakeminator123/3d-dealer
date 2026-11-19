@@ -6,13 +6,14 @@ import { routeTo, useRoute } from './route.ts';
 const SceneStep = lazy(() => import('./SceneStep.tsx'));
 const PlanStep = lazy(() => import('./PlanStep.tsx'));
 const DealerStep = lazy(() => import('./DealerStep.tsx'));
+const ClipStep = lazy(() => import('./ClipStep.tsx'));
 
 // Stegen står i docs/architecture.md. Ett steg utan vy är inte byggt än.
 const STEPS = [
   { key: 'scen', label: 'Scen', built: true },
   { key: 'kortplan', label: 'Kortplan', built: true },
   { key: 'dealer', label: 'Dealer', built: true },
-  { key: 'klipp', label: 'Klipp', built: false },
+  { key: 'klipp', label: 'Klipp', built: true },
   { key: 'granska', label: 'Granska', built: true },
   { key: 'spela', label: 'Spela', built: false },
 ];
@@ -64,6 +65,10 @@ export function Lab() {
       ) : current === 'dealer' ? (
         <Suspense fallback={<main className="notice">Läser dealern …</main>}>
           <DealerStep route={rest} />
+        </Suspense>
+      ) : current === 'klipp' ? (
+        <Suspense fallback={<main className="notice">Läser tagningarna …</main>}>
+          <ClipStep route={rest} />
         </Suspense>
       ) : (
         <Review route={rest} />

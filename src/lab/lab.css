@@ -110,6 +110,92 @@ code {
   color: var(--dim);
 }
 
+/* Ett omdöme eller läge som ett märke, och lägenas färger i kartan och i steget Klipp: godkänd, att granska,
+   underkänd, paket väntar, saknas. */
+
+.badge {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-size: 12px;
+  background: #343842;
+  color: var(--dim);
+  white-space: nowrap;
+}
+
+.badge.yes {
+  background: var(--yes);
+  color: #06200f;
+}
+
+.badge.wait {
+  background: var(--warn);
+  color: #2a1c02;
+}
+
+.badge.no {
+  background: var(--no);
+  color: #2a0606;
+}
+
+.badge.pkg {
+  background: var(--accent);
+  color: #0a1630;
+}
+
+.badge.none {
+  background: transparent;
+  border: 1px dashed var(--line);
+}
+
+.st-ok {
+  --c: var(--yes);
+}
+
+.st-rev {
+  --c: var(--warn);
+}
+
+.st-fail {
+  --c: var(--no);
+}
+
+.st-pkg {
+  --c: var(--accent);
+}
+
+.st-none {
+  --c: #5d616b;
+}
+
+/* En smal skärm: stegen rullar i sidled, och sidorna får mindre luft. */
+
+@media (max-width: 720px) {
+  .top {
+    gap: 12px;
+    padding: 0 10px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .brand span {
+    display: none;
+  }
+
+  .brand,
+  .step {
+    flex: none;
+  }
+
+  .step {
+    padding: 12px 10px;
+  }
+
+  .main {
+    padding: 12px 12px 48px;
+  }
+}
+
 /* Granska */
 
 .review {

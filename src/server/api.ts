@@ -14,6 +14,7 @@ import { assetsDir, RegistryError, setStatus, setWords, stamp, viewRegistry } fr
 import { readRound, RoundError } from '../pipeline/runda.ts';
 import { pathInside, sendFile, sendJson, sendText } from './files.ts';
 import { createGame, dealRound, type GameOptions } from '../game/game.ts';
+import { listTakes, takeFile } from './tagningar.ts';
 import { canThumbnail, thumbnail } from './thumbs.ts';
 
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
@@ -116,7 +117,7 @@ export function createApi(root: string, now: () => string = stamp, gameOptions: 
   return async (request, response) => {
     const url = new URL(request.url ?? '/', 'http://localhost');
     const path = url.pathname;
-    const own = ['/api/', '/media/', '/thumb/', '/content/'].find((prefix) => path.startsWith(prefix));
+    const own = ['/api/', '/media/', '/thumb/', '/content/', '/tagning/'].find((prefix) => path.startsWith(prefix));
     if (!own) return false;
     try {
       await answer(request, response, url, own);
@@ -145,6 +146,16 @@ export function createApi(root: string, now: () => string = stamp, gameOptions: 
       const entries = viewRegistry(root).assets;
       const mall = join(root, 'content', 'dealer.json');
       sendJson(response, 200, existsSync(mall) ? listDealers(root).map((id) => dealerState(root, id, entries)) : []);
+    } else if (path === '/api/tagningar' && reading) {
+      // Tagningarna med sina paket i output/tagningar/, de arkiverade underkända och paketen som väntar (tagningar.ts):
+      // Labbets steg Klipp och kartan i steget Dealer.
+      sendJson(response, 200, listTakes(root));
+    } else if (own === '/tagning/' && reading) {
+      // En fil ur en tagnings paket: dockans förlaga, arket, beviset, eller det arkiverade klippet. Inget annat.
+      const [id, name, ...more] = path.slice(own.length).split('/');
+      const file = id && name && more.length === 0 ? takeFile(root, decodeName(id), decodeName(name)) : null;
+      if (file) sendFile(request, response, file);
+      else sendText(response, 404, 'Filen finns inte');
     } else if (path === '/api/registry/status' && request.method === 'POST') {
       if (!sentByOwnPage(request)) return sendText(response, 403, 'Ändringar tas bara emot från Labbets egen sida');
       const body = (await readJson(request)) as { file?: unknown; status?: unknown };

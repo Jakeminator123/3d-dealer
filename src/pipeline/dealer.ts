@@ -261,8 +261,8 @@ const viewWord = (view: unknown): string | null => {
   return null;
 };
 const shown = (entry: Entry): Shown => ({ file: entry.file, status: entry.status, present: entry.present !== false, title: String(entry.title ?? '') });
-/** REDO-ankaret ett klipp är gjort ur, som rundan läser det (src/scene/round.ts, anchorOf). */
-const clipAnchor = (entry: Entry): string | null => anchorOf(entry);
+/** REDO-ankaret ett klipp är gjort ur, som rundan läser det (src/scene/round.ts, anchorOf). Servern läser det härifrån. */
+export const clipAnchor = (entry: Entry): string | null => anchorOf(entry);
 
 /** Paketen i output/ för dealern: identitet, ankare och tagningar, och om de väntar på att tas emot. */
 function packagesOf(root: string, id: string): DealerState['packages'] {

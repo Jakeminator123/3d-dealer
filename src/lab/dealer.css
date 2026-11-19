@@ -23,31 +23,6 @@
   color: var(--text);
 }
 
-.dealer .badge {
-  display: inline-block;
-  padding: 1px 8px;
-  border-radius: 10px;
-  font-size: 12px;
-  background: #343842;
-  color: var(--dim);
-  white-space: nowrap;
-}
-
-.dealer .badge.yes {
-  background: var(--yes);
-  color: #06200f;
-}
-
-.dealer .badge.wait {
-  background: var(--warn);
-  color: #2a1c02;
-}
-
-.dealer .badge.no {
-  background: var(--no);
-  color: #2a0606;
-}
-
 .dealer .next {
   margin: 0;
   padding-left: 22px;
@@ -136,41 +111,178 @@
   color: var(--warn);
 }
 
-.dealer .cards {
-  border-collapse: collapse;
-  margin-top: 4px;
+/* Kartan: Identitet → REDO-ankaret → serien, en kedja per vy */
+
+.dealer .names {
+  max-width: 90ch;
+}
+
+.dealer .legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin: 4px 0 16px;
   font-size: 12px;
 }
 
-.dealer .cards th,
-.dealer .cards td {
-  padding: 4px 8px;
-  border: 1px solid var(--line);
-  text-align: center;
-  white-space: nowrap;
+.dealer .legendrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
-.dealer .cards th {
-  font-weight: 500;
+.dealer .mapstage {
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--ground);
+}
+
+.dealer .mapstage h3 {
+  margin: 0 0 10px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.dealer .mapstage h3 .empty {
+  margin-left: 6px;
+  font-weight: 400;
+  font-size: 12px;
+}
+
+.dealer .mapview h2 {
+  margin: 4px 0 10px;
+}
+
+.dealer .arrow {
+  display: flex;
+  justify-content: center;
+  padding: 6px 0;
+  color: var(--dim);
+  font-size: 18px;
+  line-height: 1;
+}
+
+.dealer .seriesmap {
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.dealer .nodegrid {
+  display: grid;
+  gap: 6px;
+  min-width: 300px;
+  max-width: 720px;
+}
+
+.dealer .dealergrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+  gap: 6px;
+  min-width: 300px;
+  max-width: 720px;
+}
+
+.dealer .seriesmap h4 {
+  margin: 12px 0 6px;
+  font-size: 12px;
+  font-weight: 600;
   color: var(--dim);
 }
 
-.dealer .cards td.yes {
-  background: rgba(79, 180, 119, 0.25);
+.dealer .colhead,
+.dealer .rowhead {
+  align-self: center;
+  font-size: 12px;
+  color: var(--dim);
 }
 
-.dealer .cards td.wait {
-  background: rgba(224, 176, 92, 0.25);
+.dealer .rowhead {
+  font-weight: 600;
+  color: var(--text);
 }
 
-.dealer .cards td.no {
-  background: rgba(224, 108, 108, 0.25);
+.dealer .colhead.later {
+  opacity: 0.7;
 }
 
-.dealer .cards td.none {
-  color: #5d616b;
+.dealer .node {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1px;
+  min-width: 0;
+  min-height: 56px;
+  padding: 6px 8px;
+  border: 1px solid var(--c);
+  border-left-width: 4px;
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--c) 16%, var(--panel));
+  font-size: 12px;
+  line-height: 1.3;
 }
 
-.dealer .cards td.later {
-  opacity: 0.55;
+.dealer .node.st-none {
+  border-style: dashed;
+  border-left-style: dashed;
+  background: transparent;
+  color: var(--dim);
+}
+
+.dealer .node.later {
+  opacity: 0.72;
+}
+
+.dealer a.node:hover {
+  background: color-mix(in srgb, var(--c) 28%, var(--panel));
+}
+
+.dealer a.node::after {
+  content: 'öppna ›';
+  font-size: 11px;
+  color: var(--dim);
+}
+
+.dealer .node b {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.dealer .node .word {
+  color: var(--c);
+  font-weight: 600;
+}
+
+.dealer .node.st-none .word {
+  font-weight: 400;
+}
+
+.dealer .node small {
+  color: var(--dim);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.dealer .missing {
+  margin-top: 20px;
+}
+
+@media (max-width: 720px) {
+  .dealer .tiles {
+    gap: 8px;
+  }
+
+  .dealer .tile,
+  .dealer .tile:has(.wide) {
+    width: calc(50% - 4px);
+  }
+
+  .dealer .thumb,
+  .dealer .thumb.wide {
+    height: 110px;
+  }
+
+  .dealer .mapstage {
+    padding: 10px 8px;
+  }
 }
