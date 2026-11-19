@@ -9,6 +9,7 @@ Ett beslut per rad, med datum och skälet i korthet; citat är Jakobs ord. Ett b
 - 2026-11-18. Målet är så många bra filmer av Paulina att hon kan dela ut kort till alla sju platser och komma tillbaka, med minst två kort per plats. (09:35)
 - 2026-11-19. Riktningen bortom en vy är Jakobs ursprungliga tanke: en animerad 3D-figur som bär 2D-filmerna, så att kameran kan dras runt med mjuka övergångar. Det är inte byggt: dealern är i dag en film per vy. Vägen dit står i [status.md](status.md), Näst. ("skulle inte detta projekt skapa en 3d-animerad meshy … som skulle få typ 2d-filmer … om man skulle dra omkring kameran så skulle smidigare övergångar göras?")
 - 2026-11-18. Paulina är visningsnamnet (förut Pau och Paow); id är `paulina`.
+- 2026-11-19. 3D utvecklas både här och i gamla Dealer, åtskilt: varje agent håller sig till sin mapp, och det enda som delas är Runways saldo. Ingenting slås ihop eller fryses; en del kopieras in med ursprung när Jakob säger till. ("Jag vill kunna utveckla 3d i båda, men separerat"; "varför kan du bara inte hålla dig till din arbetsmapp och den till sin")
 - 2026-11-18. Gamla Dealer är Codex arbetsyta och rörs inte, och en gren med opushade commits tas aldrig bort utan Jakobs ja. Regeln står i [AGENTS.md](../AGENTS.md).
 
 ## Scenen
@@ -31,6 +32,8 @@ Ett beslut per rad, med datum och skälet i korthet; citat är Jakobs ord. Ett b
 
 ## Dealern och filmen
 
+- 2026-11-19. Labbet visar korten som C1, C2, C3 och aldrig ett nollindex, och ankarna med koder bredvid orden: A1 är VILA, A2.1 REDO (A2.2 och A2.3 är tänkta som andra REDO-ställningar med var sin serie), A3P1–A3P7 och A3D REDO med kortet lagt. Filer, poster och fält behåller sina namn. (Jakob: "i alla fall temporärt såhär"; "Skulle vilja ha bort det där indexet om vi har typ 0")
+- 2026-11-19. Greppet: tummen på kortets ena sida och fingrarna på den andra genom hela vändningen, och handleden vrider kortet. Kravet gäller dockan och granskarna. (Jakob om dagens klipp: kortet "svävar framför handen"; om gamla Dealers tvåhandsgiv 2026-11-18: "Hon flippar korten lixom utanpå fingrarna")
 - 2026-11-18. Dealerns filmer görs på grön skärm i vyns närbild och nycklas in i scenen genom samma öga; bord, sko, kort och rum bakas inte in. Ersätter nattens försök med allt inbakat ("skit"). (Jakobs val: "Dealern på grönt".)
 - 2026-11-18. Samma giv ses ur flera vinklar: en film per vy, alla efter samma rörelse. Att byta vy ändrar aldrig var kortet läggs. ("utan att hon för den delen dealar till olika positioner")
 - 2026-11-18. Dockan är standarden för rörelsen, lika för alla dealers: hon bär Pamelas nyp-giv ur gamla Dealer, hämtar kortet i scenens sko och lägger det på platsens första kortplats. Ersätter helfiguren som förlaga. ("Det måste finnas en standard.")
