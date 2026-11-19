@@ -72,6 +72,7 @@ Ett beslut per rad, med datum och skälet i korthet; citat är Jakobs ord. Ett b
 - 2026-11-18. Omdömen sätts av agenten efter oberoende granskning; Jakob är tredje åsikt och ändrar dem i Labbet. ("om du säger ngt är bra så är det det, eller låt en automatisk extern granskare se på allt. Jag kan ha en third opinion")
 - 2026-11-18. Statusen `granska igen` ligger mellan `godkänd` och `utgår` och är en kö till agenten; Jakob kan skriva varför, och svaret syns i Labbet.
 - 2026-11-18. Underagenter körs som standard med Opus 5.5 på extra hög ansträngning.
+- 2026-11-19. Spåret Figuren arbetar på grenen `figuren` i ett eget arbetsträd, `C:/Users/jakem/Desktop/3d-dealer-figur`, tills dockan spelar en fångad rörelse som går att visa i Labbet; då förs grenen in i `main`. Media, arbetsmaterial och registret finns bara i huvudmappen: arbetsträdet skriver aldrig i `content/register.db`, som är en binär fil och inte går att slå ihop. Spårets läge skrivs i huvudmappens `docs/status.md`. ("kanske ska vi här jobba i eget workltree och branch så vi är heltfristående för tillfället")
 
 ## Tekniken
 

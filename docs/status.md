@@ -67,7 +67,7 @@ Målet: Paulina spelbar ur Spelaren med den fria rörelsen. Filerna: `src/pipeli
 5. Mätfelen som granskarna har pekat ut (`output/work/granskning-e-2/omdome.json`, "matten") rättas i `src/pipeline/matning.ts` och `rorelse.ts`.
 ### Spåret Figuren
 
-Målet: Paulinas kropp och rörelse i 3D, så att samma naturliga giv går att visa ur vilken vy som helst. Filerna: `src/scene/doll.ts`, `dollPose.ts`, `content/doll.json`, `content/moves/`, nya filer i `src/pipeline` för fångsten, `glb/` och `output/work/figur/`. Inga krediter utan att Jakob har sett kostnaden.
+Målet: Paulinas kropp och rörelse i 3D, så att samma naturliga giv går att visa ur vilken vy som helst. Filerna: `src/scene/doll.ts`, `dollPose.ts`, `content/doll.json`, `content/moves/`, nya filer i `src/pipeline` för fångsten, `glb/` och `output/work/figur/`. Inga krediter utan att Jakob har sett kostnaden. Koden skrivs på grenen `figuren` i arbetsträdet `C:/Users/jakem/Desktop/3d-dealer-figur` ([decisions.md](decisions.md), Arbetssättet); media, registret, arbetsmaterialet och det här stycket ligger kvar i huvudmappen.
 
 Det som finns att börja med:
 
