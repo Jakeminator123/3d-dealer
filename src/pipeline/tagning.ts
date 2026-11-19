@@ -9,6 +9,13 @@
 //     behöver. Skriver ut vad agenten gör härnäst. Platsen är 1–7, eller D för dealern. Handlingen är deal (kortet läggs
 //     med framsidan upp, utan den), hole (hålkortet läggs med baksidan upp) eller flip (hålkortet vänds där det ligger);
 //     hole och flip gäller dealerns kort. Slaget är cykeln med handlingen: cykel-nyp, cykel-nyp-hole, cykel-nyp-flip.
+//     [--cykel <namn>] en annan cykel i content/moves/; [--text <fil>] eller [--textnamn <namn>] en annan text än
+//     mallens: ur en fil, eller en namngiven text ur content/tagning.json (prompt.named).
+//     [--referensklipp <klipp> [--roll referenceVideos|referenceVideo]] skickar ett godkänt klipp ur registret i stället
+//     för dockans film: som rörelsereferens (referenceVideos, om inget sägs) eller som filmen som görs om
+//     (referenceVideo, video till video). Klippet ska göra samma kort ur samma ankare. Dockans film bakom klippet (dess
+//     paket) står kvar i paketet som referens.mp4 och mäts som förut, men skickas inte. Ett sådant paket ska ha en egen
+//     [--variant <ord>], som står efter slaget i namnen (cykel-nyp-rask-<ord>), så att tagningen skiljs från serien.
 //   node src/pipeline/tagning.ts ta-emot <id> <nedladdad film> --task <taskId> --krediter <n> --saldo-fore <n> --saldo-efter <n> [--tid "ÅÅÅÅ-MM-DD TT:MM"]
 //     Tar bort ljudet utan omkodning, mäter klippet mot bilderna, dockan och scenen och prövar måtten mot gränserna,
 //     gör ark och beviset i scenen, skriver matning.json och post.json, och för in klippet, beställningen och måtten
@@ -65,7 +72,8 @@ import {
   type Probe,
   type Values,
 } from './matning.ts';
-import { about, addMeasurement, addOrder, addUpload, dropMeasurements, getEntry, importAsset, registerPath, sha256Of, stamp, studioRoot, unsigned, type Order, type Post } from './registry.ts';
+import { anchorOf as clipAnchorOf, type RoundEntry } from '../scene/round.ts';
+import { about, addMeasurement, addOrder, addUpload, dropMeasurements, getEntry, importAsset, registerPath, sha256Of, stamp, studioRoot, unsigned, type Order, type Post, type RegistryEntry } from './registry.ts';
 import { shootAll } from './shoot.ts';
 
 export class TagningError extends Error {}
@@ -87,7 +95,13 @@ export type TagningContent = {
    * `text` är texten för en giv. `actions` säger vad som byts i den för de andra handlingarna: varje par är en mening ur
    * `text` och den mening som står i stället, så att det som är lika står på ett ställe.
    */
-  prompt: { text: string; source: string; actions: Record<Exclude<Action, 'deal' | 'wait'>, { replace: [string, string][]; source: string }> & { wait: { text: string; source: string } } };
+  prompt: {
+    text: string;
+    source: string;
+    actions: Record<Exclude<Action, 'deal' | 'wait'>, { replace: [string, string][]; source: string }> & { wait: { text: string; source: string } };
+    /** Namngivna texter i stället för mallens (forbered --textnamn), var och en för en handling och med sin källa. */
+    named?: Record<string, { text: string; action: Action; source: string }>;
+  };
   proof: { background: { file: string; kind: '360' | 'platt'; turn: number; blur: number; exposure: number; mirror: boolean }; face: string; fps: number };
   measure: Measure;
   /** Hur rörelsens mått tas (rorelse.ts): stillhet, rörelse och grader per huvudbredd. */
@@ -119,6 +133,9 @@ export function readTagning(root = ROOT): TagningContent {
     const pairs = Array.isArray(given?.replace) && given.replace.every((pair) => Array.isArray(pair) && pair.length === 2 && pair.every((part) => typeof part === 'string' && part !== ''));
     need(pairs && typeof given?.source === 'string' && given.source !== '', `prompt.actions.${action}: replace (par av meningar) och source`);
   }
+  for (const [name, named] of Object.entries(read.prompt?.named ?? {})) {
+    need(WORD.test(name) && typeof named?.text === 'string' && named.text !== '' && !unknown(named.text) && ACTIONS.includes(named.action) && typeof named.source === 'string' && named.source !== '', `prompt.named.${name}: text med bara dealerns ord som platshållare, action (${ACTIONS.join(', ')}) och source`);
+  }
   const limits = Object.fromEntries(Object.entries(read.limits ?? {}).filter(([key]) => key !== 'basis' && key !== 'source')) as Record<string, Limit>;
   for (const [key, limit] of Object.entries(limits)) {
     need(typeof limit.what === 'string' && typeof limit.source === 'string' && (limit.is !== undefined || limit.least !== undefined || limit.most !== undefined), `limits.${key}: what, source och en gräns`);
@@ -146,6 +163,17 @@ export function promptFor(content: TagningContent, action: Action = 'deal', word
   return fillText(text, words);
 }
 
+/**
+ * En namngiven text ur content/tagning.json (prompt.named) med dealerns ord ifyllda. Den gäller den handling den är
+ * skriven för: för en annan är den ett fel, eftersom den då talar om fel kort.
+ */
+export function namedText(content: TagningContent, name: string, action: Action = 'deal', words: Words = {}): string {
+  const named = content.prompt.named?.[name];
+  if (!named) throw new TagningError(`content/tagning.json har ingen text som heter ${name} (prompt.named: ${Object.keys(content.prompt.named ?? {}).join(', ') || 'inga'})`);
+  if (named.action !== action) throw new TagningError(`Texten ${name} är skriven för ${named.action}, inte för ${action}`);
+  return fillText(named.text, words);
+}
+
 /** Dealerns ord för texten (dealer.ts, wordsOf), eller inga när hennes fil inte går att läsa. */
 function wordsFor(root: string, dealer: string): Words {
   try {
@@ -159,12 +187,18 @@ function wordsFor(root: string, dealer: string): Words {
 // ---------------------------------------------------------------------------------------------------------------------
 // Paketets namn
 
-/** En tagning: dealer, vy, plats (1–7 eller D), kortplats, handling (deal om inget sägs) och cykel (cykel-nyp om inget sägs). */
-export type Spec = { dealer: string; view: string; seat: Seat; index: number; action?: Action; cycle?: string };
+/**
+ * En tagning: dealer, vy, plats (1–7 eller D), kortplats, handling (deal om inget sägs), cykel (cykel-nyp om inget
+ * sägs) och variant: ett ord som skiljer tagningar som görs på ett annat sätt än serien (till exempel med ett färdigt
+ * klipp som referens) från seriens, i paketets och klippets namn.
+ */
+export type Spec = { dealer: string; view: string; seat: Seat; index: number; action?: Action; cycle?: string; variant?: string };
 
 const WORD = /^[a-z0-9][a-z0-9-]{0,39}$/;
-/** Slaget i ett namn: cykeln, och handlingen efter den när den inte är deal: cykel-nyp, cykel-nyp-hole, cykel-nyp-flip. */
-const kindOf = (spec: Spec, cycle: string): string => `${cycle}${(spec.action ?? 'deal') === 'deal' ? '' : `-${spec.action}`}`;
+/** Cykeln och handlingen efter den när den inte är deal: cykel-nyp, cykel-nyp-hole, cykel-nyp-flip. */
+const moveKind = (spec: Spec, cycle: string): string => `${cycle}${(spec.action ?? 'deal') === 'deal' ? '' : `-${spec.action}`}`;
+/** Slaget i ett namn: cykeln med handlingen, och varianten sist när den finns: cykel-nyp-rask, cykel-nyp-rask-klippref. */
+const kindOf = (spec: Spec, cycle: string): string => `${moveKind(spec, cycle)}${spec.variant ? `-${spec.variant}` : ''}`;
 /** Platsen i ett filnamn, med små bokstäver som registrets namn: 1–7, eller d för dealern. */
 const seatName = (seat: Seat): string => (seat === 'D' ? 'd' : String(seat));
 const prefixOf = (spec: Spec, cycle: string): string => `${spec.dealer}_${spec.view}_${kindOf(spec, cycle)}_${seatName(spec.seat)}-${spec.index}`;
@@ -355,18 +389,68 @@ async function measureDoll(root: string, dir: string, layout: Layout, measure: M
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
+// Ett färdigt klipp som referens
+
+/** Klippet som det skickas: registrets namn, filen i assets/, omdömet, hur det skickas, och dockans film bakom det. */
+type ClipSent = { file: string; path: string; status: string; role: ClipRole; dollFilm: string | null };
+const GOOD = 'godkänd';
+
+/** Klippets post i registret, när det är ett godkänt klipp och tagningen har en egen variant. Annars ett fel som säger vad. */
+function clipEntry(registry: string, from: FromClip, spec: Spec): RegistryEntry {
+  if (!(CLIP_ROLES as readonly string[]).includes(from.role)) throw new TagningError(`--roll ska vara ${CLIP_ROLES.join(' eller ')}, inte ${from.role}`);
+  if (!spec.variant) throw new TagningError('En tagning med ett klipp som referens har en egen variant, så att den skiljs från serien: skriv --variant <ord>');
+  const entry = existsSync(registerPath(registry)) ? getEntry(registry, from.file) : undefined;
+  if (!entry) throw new TagningError(`${from.file} står inte i registret`);
+  if (entry.group !== 'clips') throw new TagningError(`${from.file} är inget klipp (gruppen ${String(entry.group)})`);
+  if (entry.status !== GOOD) throw new TagningError(`${from.file} är ${entry.status}: bara ett godkänt klipp ges som referens`);
+  return entry;
+}
+
+/**
+ * Prövar att klippet gör samma kort med samma cykel ur samma vy och samma REDO-ankare som tagningen, och att filen i
+ * registrets assets/ är den registret känner. Svaret har dockans film bakom klippet, ur paketet det gjordes i (räknat
+ * från projektmappen `root`), när den finns kvar.
+ */
+function sameCard(root: string, registry: string, entry: RegistryEntry, from: FromClip, spec: Spec & { cycle: string; action: Action }, view: SeatView, anchorFile: string): ClipSent {
+  const seen = entry.view as { kind?: unknown; seat?: unknown } | undefined;
+  const sameView = seen?.kind === view.kind && (view.kind !== 'plats' || seen?.seat === view.seat);
+  const action = (entry.action as Action | undefined) ?? 'deal';
+  if (entry.seat !== spec.seat || entry.index !== spec.index || action !== spec.action || entry.move !== spec.cycle || !sameView) {
+    throw new TagningError(`${entry.file} gör ${cardWords(entry.seat as Seat, Number(entry.index), action)} med ${String(entry.move)} ur ${JSON.stringify(entry.view)}: inte samma som tagningen (${cardWords(spec.seat, spec.index, spec.action)} med ${spec.cycle} ur ${spec.view})`);
+  }
+  const made = clipAnchorOf(entry as RoundEntry);
+  if (made !== anchorFile) throw new TagningError(`${entry.file} är gjort ur ${made ?? 'ett okänt ankare'}, inte ur vyns REDO-ankare ${anchorFile}: första och sista bilden passar inte klippet`);
+  const path = join(registry, 'assets', entry.file);
+  if (!existsSync(path)) throw new TagningError(`${entry.file} finns inte i assets/`);
+  const known = (entry.source as { sha256?: string } | undefined)?.sha256;
+  if (known && sha256Of(path) !== known) throw new TagningError(`${entry.file} i assets/ är inte filmen registret känner (sha256)`);
+  const pkg = (entry.source as { package?: unknown } | undefined)?.package;
+  const doll = typeof pkg === 'string' ? `${pkg}/referens.mp4` : null;
+  return { file: entry.file, path, status: entry.status, role: from.role, dollFilm: doll && existsSync(join(root, doll)) ? doll : null };
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
 // forbered
 
 export type Prepared = { id: string; dir: string; order: Record<string, unknown>; checks: Judged[] };
+/** Hur ett färdigt klipp skickas: som rörelsereferens (referenceVideos) eller som filmen som görs om (referenceVideo). */
+export const CLIP_ROLES = ['referenceVideos', 'referenceVideo'] as const;
+export type ClipRole = (typeof CLIP_ROLES)[number];
+/** Ett godkänt klipp ur registret som skickas i stället för dockans film, och hur. */
+export type FromClip = { file: string; role: ClipRole };
 export type PrepareOptions = {
   root?: string;
   out?: string;
   /** Tagningens nummer; annars nästa. */
   take?: number;
-  /** En referensfilm som redan finns (räknad från projektmappen), i stället för att scenen sparar en ny. */
+  /** Dockans film, när den redan finns (räknad från projektmappen), i stället för att scenen sparar en ny. */
   reference?: string;
-  /** En annan text än mallens: bara för en tagning som redan är beställd (pröva). */
+  /** En annan text än mallens, ur en fil (--text), eller för en tagning som redan är beställd (pröva). */
   text?: string;
+  /** En namngiven text ur content/tagning.json (prompt.named) i stället för mallens (--textnamn). */
+  textName?: string;
+  /** Ett godkänt klipp som skickas i stället för dockans film (--referensklipp, --roll). Kräver spec.variant. */
+  fromClip?: FromClip;
   /** Registret där ankarets post står (med dess öga); annars projektets, eller STUDIO_DATA. */
   registry?: string;
   say?: (text: string) => void;
@@ -388,10 +472,15 @@ async function prepare(spec: Spec, options: PrepareOptions, made: { dir?: string
   const out = options.out ?? join(root, PACKAGES);
   const say = options.say ?? ((text: string) => console.log(text));
   const content = readTagning(root);
-  const cycle = spec.cycle ?? 'cykel-nyp';
+  const registry = options.registry ?? (options.root ? root : studioRoot());
+  // Ett färdigt klipp som referens: det ska stå i registret, vara godkänt, och tagningen ska ha en egen variant.
+  const from = options.fromClip ? clipEntry(registry, options.fromClip, spec) : null;
+  const cycle = spec.cycle ?? (typeof from?.move === 'string' ? from.move : 'cykel-nyp');
   const action = spec.action ?? 'deal';
   if (!WORD.test(spec.dealer)) throw new TagningError(`Ogiltig dealer: ${spec.dealer}`);
   if (!ACTIONS.includes(action)) throw new TagningError(`Okänd handling: ${action}. Skriv ${ACTIONS.join(', ')}.`);
+  if (spec.variant !== undefined && (!WORD.test(spec.variant) || (ACTIONS as readonly string[]).includes(spec.variant))) throw new TagningError(`Ogiltig variant: ${spec.variant} (små bokstäver, siffror och bindestreck, och inte en handling)`);
+  if (options.text !== undefined && options.textName !== undefined) throw new TagningError('Skriv --text eller --textnamn, inte båda');
   if (action !== 'deal' && spec.seat !== 'D') throw new TagningError(action === 'wait' ? 'Väntan görs vid dealerns plats: skriv plats D och kort 0' : `${action} gäller dealerns hålkort: skriv plats D`);
   const view = viewOf(spec.view);
   const parts = readCycleParts(cycle, root);
@@ -411,7 +500,9 @@ async function prepare(spec: Spec, options: PrepareOptions, made: { dir?: string
   if (!existsSync(anchor)) throw new TagningError(`${anchorFile} finns inte i assets/`);
   // Ankarets öga: dockans film, kortets hörn och sista bilden görs genom det, så att ett ankare gäller också när
   // kortplanen ändras och närbilden räknas om. En äldre post utan eye: vyns närbild i dag, som förut.
-  const anchorEye = anchorEyeOf(options.registry ?? (options.root ? root : studioRoot()), anchorFile);
+  const anchorEye = anchorEyeOf(registry, anchorFile);
+  // Klippet ska göra samma kort med samma cykel ur samma vy och samma ankare: första och sista bilden är dess.
+  const clip = from ? sameCard(root, registry, from, options.fromClip!, { ...spec, cycle, action }, view, anchorFile) : null;
   const seen: CycleParts = anchorEye ? { ...parts, eye: anchorEye } : parts;
   const eye = cycleEye(seen, view);
   const margin = withinFrame(seen, card, eye);
@@ -435,14 +526,18 @@ async function prepare(spec: Spec, options: PrepareOptions, made: { dir?: string
   const painted = await paintedPicture(seen, anchor, card, 'last', at('sista.png'), { ...view, close: true });
   if (!painted) copyFileSync(anchor, at('sista.png'));
 
-  let source = options.reference;
+  // Dockans film: den som kom med, den bakom referensklippet (dess paket), eller en ny ur scenen.
+  let source = options.reference ?? clip?.dollFilm ?? undefined;
   if (!source) {
     say(`Dockans film för ${words} ur ${spec.view} sparas i ${content.reference.fps} rutor/s${anchorEye ? ' genom ankarets öga' : ''} …`);
     source = await shootReference(content, cycle, anchorEye ? { ...view, eye } : view, card, say);
   }
   copyFileSync(join(root, source), at('referens.mp4'));
   const reference = await probe(at('referens.mp4'));
-  const text = options.text ?? promptFor(content, action, wordsOf(dealer, mall));
+  if (clip) copyFileSync(clip.path, at('referensklipp.mp4'));
+  const sentClip = clip ? await probe(at('referensklipp.mp4')) : null;
+  const dealerWords = wordsOf(dealer, mall);
+  const text = options.text ?? (options.textName ? namedText(content, options.textName, action, dealerWords) : promptFor(content, action, dealerWords));
   writeFileSync(at('text.txt'), text);
 
   // Dockans film mätt som klippet sedan mäts, och sedd som ark.
@@ -458,8 +553,35 @@ async function prepare(spec: Spec, options: PrepareOptions, made: { dir?: string
   // tider för en giv, och ordningen mellan huvud och hand mäts bara när huvudet vrids (motion.orderTurn).
   for (const [key, value] of Object.entries(motion)) if (content.limits[key] && value !== null) checks.push(judgeOne(key, value, content.limits[key]!));
   const pkg = posix(relative(root, dir));
+  const kind = moveKind(spec, cycle);
+  const dollVideo = {
+    file: `${pkg}/referens.mp4`,
+    source: posix(source),
+    sha256: sha256Of(at('referens.mp4')),
+    durationSeconds: reference.seconds,
+    frames: reference.frames,
+    fps: reference.fps,
+    note: `dockan gör ${kind}, ${words}, ur ${viewTitle(view)}s närbild i grå ateljé (mätt med ffprobe)`,
+  };
+  // Det som skickas som film: dockans, eller det godkända klippet i dess ställe (som rörelsereferens eller som filmen som
+  // görs om). Dockans film står då kvar i paketet och mäts, men skickas inte.
+  const clipVideo = clip && sentClip
+    ? {
+        file: `${pkg}/referensklipp.mp4`,
+        asset: clip.file,
+        sha256: sha256Of(at('referensklipp.mp4')),
+        durationSeconds: sentClip.seconds,
+        frames: sentClip.frames,
+        fps: sentClip.fps,
+        status: clip.status,
+        note: `det godkända klippet ${clip.file} (${kind}, ${words}, ur ${anchorFile}) ${clip.role === 'referenceVideo' ? 'som filmen som görs om (referenceVideo, video till video)' : 'som rörelsereferens (referenceVideos)'}, i stället för dockans film (mätt med ffprobe)`,
+      }
+    : null;
+  const sent = clipVideo ? (clip!.role === 'referenceVideo' ? { referenceVideo: clipVideo } : { referenceVideos: [clipVideo] }) : { referenceVideos: [dollVideo] };
+  const sentRole: ClipRole = clip?.role ?? 'referenceVideos';
+  const sentFile = clipVideo ? 'referensklipp.mp4' : 'referens.mp4';
   const order = {
-    about: 'Beställningen av en tagning, gjord av src/pipeline/tagning.ts forbered. Allt Runways generate_video behöver: modell, upplösning, längd, text och vilka filer som är startFrame, endFrame och referenceVideos. Filerna ligger i paketet; source säger var de kommer ifrån.',
+    about: `Beställningen av en tagning, gjord av src/pipeline/tagning.ts forbered. Allt Runways generate_video behöver: modell, upplösning, längd, text och vilka filer som är startFrame, endFrame och ${sentRole} (inputs: det som skickas, och inget annat). Filerna ligger i paketet; source och asset säger var de kommer ifrån. doll är dockans film, som klippet mäts mot${clipVideo ? '; den skickas inte' : ''}.`,
     id,
     made: stamp(),
     dealer: spec.dealer,
@@ -470,8 +592,10 @@ async function prepare(spec: Spec, options: PrepareOptions, made: { dir?: string
     action,
     take,
     cycle,
+    ...(spec.variant ? { variant: spec.variant } : {}),
     clip: clipFile(spec, cycle, take),
     anchor: anchorFile,
+    ...(clip ? { motionFrom: { file: clip.file, role: clip.role, status: clip.status } } : {}),
     model: content.order.model,
     resolution: content.order.resolution,
     // Filmen är lika lång som cykeln (en väntan kan ha sin egen längd), i hela sekunder och minst order.least (Kling 4 tar
@@ -480,13 +604,14 @@ async function prepare(spec: Spec, options: PrepareOptions, made: { dir?: string
     ratio: content.order.ratio,
     tool: content.order.tool,
     promptFile: `${pkg}/text.txt`,
+    ...(options.textName ? { promptName: options.textName } : {}),
     prompt: text,
     inputs: {
       startFrame: firstPainted
         ? {
             file: `${pkg}/forsta.png`,
             sha256: sha256Of(at('forsta.png')),
-            madeWith: `paintedPicture i src/pipeline/cykel.ts: ${anchorFile} med märkkortet målat ${firstPainted.side === 'baksida' ? 'gult' : 'blått'} där kortet ligger när ${kindOf(spec, cycle)} börjar, ${words}`,
+            madeWith: `paintedPicture i src/pipeline/cykel.ts: ${anchorFile} med märkkortet målat ${firstPainted.side === 'baksida' ? 'gult' : 'blått'} där kortet ligger när ${kind} börjar, ${words}`,
             painted: firstPainted.painted,
             spared: firstPainted.spared,
             corners: firstPainted.corners,
@@ -496,25 +621,21 @@ async function prepare(spec: Spec, options: PrepareOptions, made: { dir?: string
         ? {
             file: `${pkg}/sista.png`,
             sha256: sha256Of(at('sista.png')),
-            madeWith: `paintedPicture i src/pipeline/cykel.ts: ${anchorFile} med märkkortet målat ${painted.side === 'baksida' ? 'gult' : 'blått'} där ${kindOf(spec, cycle)} lägger kortet, ${words}`,
+            madeWith: `paintedPicture i src/pipeline/cykel.ts: ${anchorFile} med märkkortet målat ${painted.side === 'baksida' ? 'gult' : 'blått'} där ${kind} lägger kortet, ${words}`,
             painted: painted.painted,
             spared: painted.spared,
             corners: painted.corners,
           }
         : { file: `${pkg}/sista.png`, asset: anchorFile, sha256: sha256Of(at('sista.png')), note: 'vyns REDO-ankare, oförändrat: en väntan slutar som den börjar' },
-      referenceVideos: [
-        {
-          file: `${pkg}/referens.mp4`,
-          source: posix(source),
-          sha256: sha256Of(at('referens.mp4')),
-          durationSeconds: reference.seconds,
-          frames: reference.frames,
-          fps: reference.fps,
-          note: `dockan gör ${kindOf(spec, cycle)}, ${words}, ur ${viewTitle(view)}s närbild i grå ateljé (mätt med ffprobe)`,
-        },
-      ],
+      ...sent,
     },
-    doll: { file: `${pkg}/docka.json`, seconds: doll.seconds, wristDeg: wrist, sheet: `${pkg}/ark-docka.jpg` },
+    doll: {
+      file: `${pkg}/docka.json`,
+      ...(clipVideo ? { film: dollVideo, sent: false, filmFrom: clip!.dollFilm ? `dockans film bakom ${clip!.file} (dess paket)` : options.reference ? 'filmen som kom med (reference)' : 'sparad ur scenen nu, eftersom klippets paket inte har sin' } : {}),
+      seconds: doll.seconds,
+      wristDeg: wrist,
+      sheet: `${pkg}/ark-docka.jpg`,
+    },
     scene: {
       shoe: shoeOf(scene.shoe),
       eye: eyeOf(anchorEye ?? viewEye(scene, { ...view, close: true })),
@@ -524,23 +645,24 @@ async function prepare(spec: Spec, options: PrepareOptions, made: { dir?: string
       source: 'content/scene.json när paketet gjordes: skon, som är inbakad i ankaret och klippet, ögat filmen görs genom (ankarets, eyeFrom), och kortplatsen kortet läggs på. frameMargin: hur nära rutans kant kortet och handen som lägger det kommer, i bp. Klippet mäts mot dem (partsOf), och posten bär dem (eye, shoe, place)',
     },
     checks,
-    uploads: `${pkg}/uppladdat.json: [{ "role": "startFrame" | "endFrame" | "referenceVideos", "url": "<adressen>", "assetId": "<id>", "at": "ÅÅÅÅ-MM-DD TT:MM" }]`,
+    uploads: `${pkg}/uppladdat.json: [{ "role": "startFrame" | "endFrame" | "${sentRole}", "url": "<adressen>", "assetId": "<id>", "at": "ÅÅÅÅ-MM-DD TT:MM" }]`,
   };
   write(at('bestallning.json'), order);
 
   say(`Paket: ${pkg}`);
   say(`  första bild   forsta.png   (${anchorFile}${firstPainted ? `, med hålkortet målat gult: ${firstPainted.painted} bp` : ''})`);
   say(painted ? `  sista bild    sista.png    (märkkortet ${painted.side === 'baksida' ? 'gult' : 'blått'}, ${words}: ${painted.painted} bp målade)` : `  sista bild    sista.png    (${anchorFile}, som första)`);
-  say(`  referens      referens.mp4 (${shown(reference.seconds)} s, ${reference.frames} rutor, ${shown(reference.fps)} rutor/s)`);
-  say(`  text          text.txt`);
+  say(`  ${clipVideo ? 'dockans film ' : 'referens     '} referens.mp4 (${shown(reference.seconds)} s, ${reference.frames} rutor, ${shown(reference.fps)} rutor/s)${clipVideo ? ', skickas inte' : ''}`);
+  if (clipVideo) say(`  ${sentRole.padEnd(13)} referensklipp.mp4 (${clip!.file}, ${clip!.status}: ${shown(clipVideo.durationSeconds)} s, ${clipVideo.frames} rutor)`);
+  say(`  text          text.txt${options.textName ? ` (content/tagning.json, prompt.named.${options.textName})` : ''}`);
   say(`  dockan        ark-docka.jpg; kortet ligger ${shown(doll.seconds.lands)} s, handen åter i skon ${shown(doll.seconds.home)} s`);
   for (const check of checks) say(`  ${check.verdict.toUpperCase().padEnd(9)} ${check.what}: ${shown(check.value)} ${check.unit} (${check.limit})`);
   say('Härnäst, för agenten:');
   say('  1. Se på ark-docka.jpg. Läs saldot (whoami eller show_plans_and_credits).');
-  say('  2. Ladda upp forsta.png, sista.png och referens.mp4 (init_upload, curl, complete_upload). Skriv adresserna i');
+  say(`  2. Ladda upp forsta.png, sista.png och ${sentFile} (init_upload, curl, complete_upload). Skriv adresserna i`);
   say(`     ${pkg}/uppladdat.json (formen står i bestallning.json, uploads).`);
   say(`  3. generate_video: ${content.order.model}, ${content.order.resolution}, ${order.duration} s, ${content.order.ratio}; startFrame forsta.png,`);
-  say('     endFrame sista.png, referenceVideos [referens.mp4], texten ur text.txt.');
+  say(`     endFrame sista.png, ${sentRole === 'referenceVideo' ? `referenceVideo ${sentFile}` : `referenceVideos [${sentFile}]`} med durationSeconds ur bestallning.json, texten ur text.txt.`);
   say('  4. Läs saldot igen och ladda ned filmen. Sedan:');
   say(`     node src/pipeline/tagning.ts ta-emot ${id} <film> --task <taskId> --krediter <n> --saldo-fore <n> --saldo-efter <n>`);
   return { id, dir, order, checks };
@@ -628,10 +750,14 @@ async function proofOf(root: string, dir: string, clip: string, asset: string, v
  */
 type Ordered = {
   id: string; dealer: string; view: SeatView; viewWord: string; seat: Seat; index: number; action?: Action; take: number; cycle: string; clip: string; anchor?: string;
-  model: string; resolution: string; duration: number; ratio: string; prompt: string;
-  inputs: { startFrame: { file: string; asset?: string }; endFrame: { file: string }; referenceVideos: { file: string; source: string }[] };
+  /** Varianten och klippet som skickades i stället för dockans film, när paketet gjordes med --referensklipp. */
+  variant?: string; motionFrom?: { file: string; role: ClipRole; status: string };
+  model: string; resolution: string; duration: number; ratio: string; prompt: string; promptName?: string;
+  /** Det som skickades: dockans film eller ett klipp (asset) som referenceVideos, eller ett klipp som referenceVideo. */
+  inputs: { startFrame: { file: string; asset?: string }; endFrame: { file: string }; referenceVideos?: SentVideo[]; referenceVideo?: SentVideo };
   scene?: { shoe: Shoe; eye?: FilmEye; place?: [number, number]; source: string };
 };
+type SentVideo = { file: string; source?: string; asset?: string; note?: string };
 const cardOf = (ordered: Ordered): CycleCard => ({ seat: ordered.seat, index: ordered.index, action: ordered.action ?? 'deal' });
 const anchorOf = (ordered: Ordered): string => ordered.anchor ?? ordered.inputs.startFrame.asset!;
 
@@ -773,6 +899,28 @@ const flag = (args: string[], name: string): string | undefined => {
   return at >= 0 ? args[at + 1] : undefined;
 };
 
+/** En film som skickades, i ord för registret: ett klipp med sin anmärkning ur paketet, dockans film med sin förlaga. */
+function sentWhat(sent: SentVideo, ordered: Ordered, action: Action, words: string): string {
+  if (sent.asset) return `${sent.file}: ${sent.note ?? sent.asset}`;
+  return `${sent.file} (förlagan ${sent.source}): dockan gör ${ordered.cycle} med ${action}, ${words}, ur ${viewTitle(ordered.view)}s närbild i grå ateljé`;
+}
+
+/** Var texten kom ifrån: mallen, en namngiven text (prompt.named) som den står i dag, eller paketets egen. */
+function promptNoteOf(content: TagningContent, ordered: Ordered, action: Action, words: Words, pkg: string): string {
+  if (ordered.promptName) {
+    let named: string | null = null;
+    try {
+      named = namedText(content, ordered.promptName, action, words);
+    } catch {
+      named = null;
+    }
+    return named === ordered.prompt ? `content/tagning.json, prompt.named.${ordered.promptName} (${pkg}/text.txt)` : `${pkg}/text.txt: prompt.named.${ordered.promptName} som den stod när paketet gjordes, inte som den står i dag`;
+  }
+  return ordered.prompt === promptFor(content, action, words)
+    ? `mallen i content/tagning.json, prompt${action === 'deal' ? '' : ` med prompt.actions.${action}`} (${pkg}/text.txt)`
+    : `${pkg}/text.txt, inte mallen i content/tagning.json`;
+}
+
 /** Tar emot en nedladdad film till ett paket. Se överst i filen. */
 export async function taEmot(id: string, download: string, receipt: Receipt, options: ReceiveOptions = {}): Promise<{ post: PostFile; judged: Judged[]; values: Values; registered: string[] }> {
   const root = options.root ?? ROOT;
@@ -812,9 +960,13 @@ export async function taEmot(id: string, download: string, receipt: Receipt, opt
   const anchor = anchorOf(ordered);
   const words = cardWords(ordered.seat, ordered.index, action);
   const startFile = ordered.inputs.startFrame.asset ?? ordered.inputs.startFrame.file;
+  // En film som skickades: ett registrerat klipp står med sitt namn i registret, dockans film med sin fil i paketet.
+  const video = ordered.inputs.referenceVideo ?? ordered.inputs.referenceVideos?.[0];
+  if (!video) throw new TagningError(`${id}: bestallning.json säger inte vilken film som skickades (inputs.referenceVideos eller referenceVideo)`);
+  const sentAs = (role: string): string => (role === 'startFrame' ? startFile : role === 'endFrame' ? ordered.inputs.endFrame.file : (video.asset ?? video.file));
   const uploads = existsSync(at('uppladdat.json'))
     ? (JSON.parse(readFileSync(at('uppladdat.json'), 'utf8')) as { role: string; url: string; assetId?: string; at?: string; file?: string }[]).map((entry) => ({
-        file: entry.file ?? (entry.role === 'startFrame' ? startFile : entry.role === 'endFrame' ? ordered.inputs.endFrame.file : ordered.inputs.referenceVideos[0]!.file),
+        file: entry.file ?? sentAs(entry.role),
         url: unsigned(entry.url),
         signed: entry.url,
         assetId: entry.assetId ?? null,
@@ -828,17 +980,22 @@ export async function taEmot(id: string, download: string, receipt: Receipt, opt
   const references = [
     { role: 'startFrame', what: ordered.inputs.startFrame.asset ?? `${ordered.inputs.startFrame.file}: ${anchor} med hålkortet målat gult där det ligger (src/pipeline/cykel.ts, paintedPicture)` },
     { role: 'endFrame', what: `${ordered.inputs.endFrame.file}: ${anchor} med märkkortet målat där kortet ligger, ${words} (src/pipeline/cykel.ts, paintedPicture)` },
-    { role: 'referenceVideos[0]', what: `${ordered.inputs.referenceVideos[0]!.file} (förlagan ${ordered.inputs.referenceVideos[0]!.source}): dockan gör ${ordered.cycle} med ${action}, ${words}, ur ${viewTitle(view)}s närbild i grå ateljé` },
+    ...(ordered.inputs.referenceVideos ?? []).map((sent, k) => ({ role: `referenceVideos[${k}]`, what: sentWhat(sent, ordered, action, words) })),
+    ...(ordered.inputs.referenceVideo ? [{ role: 'referenceVideo', what: sentWhat(ordered.inputs.referenceVideo, ordered, action, words) }] : []),
   ];
   const doing = action === 'wait' ? 'REDO → väntan med handen vid kortet i skon → REDO' : action === 'hole' ? 'REDO → hålkortet lagt med baksidan upp → REDO' : action === 'flip' ? 'REDO → hålkortet vänt där det ligger → REDO' : 'REDO → kortet lagt → REDO';
+  const motionFrom = ordered.motionFrom
+    ? `, med det godkända klippet ${ordered.motionFrom.file} ${ordered.motionFrom.role === 'referenceVideo' ? 'som filmen som görs om (referenceVideo)' : 'som rörelsereferens (referenceVideos)'} i stället för dockans film`
+    : '';
+  const variant = ordered.variant ? `, variant ${ordered.variant}` : '';
   const post: Post = {
     from: '',
     file: ordered.clip,
     group: 'clips',
     dealer: ordered.dealer,
-    title: `${action === 'deal' ? 'Cykel till ' : 'Cykel: '}${words} (nyp) ur ${viewTitle(view)}, tagning ${ordered.take}`,
+    title: `${action === 'deal' ? 'Cykel till ' : 'Cykel: '}${words} (nyp) ur ${viewTitle(view)}${variant}, tagning ${ordered.take}`,
     status: 'att granska',
-    note: `Tagen emot ${date} genom src/pipeline/tagning.ts (paketet ${pkg}). ${ordered.model}, ${doing}. Mätt: ${summary}. Inte dömd: döms av en oberoende granskare.`,
+    note: `Tagen emot ${date} genom src/pipeline/tagning.ts (paketet ${pkg}). ${ordered.model}, ${doing}${motionFrom}. Mätt: ${summary}. Inte dömd: döms av en oberoende granskare.`,
     pose: 'redo → redo',
     grip: 'nyp',
     seat: ordered.seat,
@@ -846,6 +1003,7 @@ export async function taEmot(id: string, download: string, receipt: Receipt, opt
     action,
     take: ordered.take,
     move: ordered.cycle,
+    ...(ordered.variant ? { variant: ordered.variant } : {}),
     use: 'dealerfilm',
     view,
     lands: { seat: ordered.seat, index: ordered.index, at: landsAt === null ? null : Number(landsAt.toFixed(2)) },
@@ -868,9 +1026,7 @@ export async function taEmot(id: string, download: string, receipt: Receipt, opt
       creditsBasis: basis === 'mätt' ? 'mätt: saldot direkt före och direkt efter' : `antaget: krediterna ${receipt.credits} är inte skillnaden mellan saldona ${receipt.before} och ${receipt.after}`,
       references,
       prompt: ordered.prompt,
-      promptNote: ordered.prompt === promptFor(content, action, wordsFor(root, ordered.dealer))
-        ? `mallen i content/tagning.json, prompt${action === 'deal' ? '' : ` med prompt.actions.${action}`} (${pkg}/text.txt)`
-        : `${pkg}/text.txt, inte mallen i content/tagning.json`,
+      promptNote: promptNoteOf(content, ordered, action, wordsFor(root, ordered.dealer), pkg),
       package: pkg,
     },
   };
@@ -878,7 +1034,7 @@ export async function taEmot(id: string, download: string, receipt: Receipt, opt
     at: receipt.at ?? date,
     model: ordered.model,
     kind: 'film',
-    purpose: `${action === 'deal' ? 'Cykel till ' : 'Cykel: '}${words} ur ${viewTitle(view)}, tagning ${ordered.take} (${id})`,
+    purpose: `${action === 'deal' ? 'Cykel till ' : 'Cykel: '}${words} ur ${viewTitle(view)}${variant}, tagning ${ordered.take} (${id})${motionFrom}`,
     inputs: JSON.stringify({ resolution: ordered.resolution, duration: ordered.duration, ratio: ordered.ratio, references }),
     prompt: ordered.prompt,
     taskId: receipt.taskId,
@@ -1060,7 +1216,8 @@ export async function prova(options: { root?: string; registry?: string; say?: (
 // Kommandoraden
 
 const USAGE = `Använd:
-  node src/pipeline/tagning.ts forbered <dealer> <vy> <plats> <kort> [deal|hole|flip] [--cykel <namn>] [--text <fil>]
+  node src/pipeline/tagning.ts forbered <dealer> <vy> <plats> <kort> [deal|hole|flip] [--cykel <namn>] [--text <fil> | --textnamn <namn>]
+      [--referensklipp <klipp i registret> [--roll referenceVideos|referenceVideo] --variant <ord>]
   node src/pipeline/tagning.ts ta-emot <id> <film> --task <taskId> --krediter <n> --saldo-fore <n> --saldo-efter <n> [--tid "ÅÅÅÅ-MM-DD TT:MM"]
   node src/pipeline/tagning.ts mät-om <id>
   node src/pipeline/tagning.ts pröva
@@ -1079,10 +1236,17 @@ if (import.meta.main) {
     const words = args.filter((arg, k) => !arg.startsWith('--') && !args[k - 1]?.startsWith('--'));
     if (word === 'forbered' && (words.length === 4 || words.length === 5)) {
       const [dealer, view, seat, index, action] = words;
-      // --cykel: en annan cykel i content/moves/ än cykel-nyp; --text: texten till filmmodellen ur en fil i stället för content/tagning.json.
+      // --cykel: en annan cykel i content/moves/ än cykel-nyp; --text: texten till filmmodellen ur en fil i stället för
+      // content/tagning.json, och --textnamn en namngiven text där; --referensklipp, --roll och --variant: se överst.
       const textFile = flag(args, '--text');
       const text = textFile ? readFileSync(join(ROOT, textFile), 'utf8').trim() : undefined;
-      await forbered({ dealer: dealer!, view: view!, seat: seatOf(seat!), index: Number(index), action: (action ?? 'deal') as Action, cycle: flag(args, '--cykel') }, { text });
+      const clip = flag(args, '--referensklipp');
+      const fromClip = clip ? { file: clip, role: (flag(args, '--roll') ?? 'referenceVideos') as ClipRole } : undefined;
+      if (!clip && flag(args, '--roll')) throw new TagningError('--roll gäller --referensklipp');
+      await forbered(
+        { dealer: dealer!, view: view!, seat: seatOf(seat!), index: Number(index), action: (action ?? 'deal') as Action, cycle: flag(args, '--cykel'), variant: flag(args, '--variant') },
+        { text, textName: flag(args, '--textnamn'), fromClip },
+      );
     } else if (word === 'ta-emot' && args.length >= 2) {
       const number = (name: string): number => {
         const value = flag(args, name);

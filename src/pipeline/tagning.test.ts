@@ -9,9 +9,9 @@ import { join, resolve } from 'node:path';
 import { after, before, test } from 'node:test';
 import sharp from 'sharp';
 import { probe } from './matning.ts';
-import { about, createRegister, getEntry, importAsset } from './registry.ts';
+import { about, createRegister, getEntry, importAsset, sha256Of } from './registry.ts';
 import { readDealer, readMall, wordsOf } from './dealer.ts';
-import { cardWords, clipFile, forbered, formatFor, matOm, nextTake, packageId, promptFor, readTagning, registrera, taEmot, type PostFile } from './tagning.ts';
+import { cardWords, clipFile, forbered, formatFor, matOm, namedText, nextTake, packageId, promptFor, readTagning, registrera, taEmot, type PostFile } from './tagning.ts';
 import { readScene } from '../scene/description.ts';
 import { cardPlace, type Seat } from '../scene/dollPose.ts';
 import { cardCorners, see, viewEye, type Eye } from '../scene/geometry.ts';
@@ -67,6 +67,24 @@ test('texten för hålkortet och vändningen är givens med bara de meningar byt
   assert.throws(() => promptFor(changed, 'hole'), /står inte precis en gång/);
 });
 
+test('de namngivna texterna: för ett färdigt klipp som referens, med det som måste hålla ordagrant ur givens text', () => {
+  const deal = promptFor(content, 'deal', words);
+  for (const name of ['klippref', 'redigering']) {
+    const text = namedText(content, name, 'deal', words);
+    assert.ok(!/[{}]/.test(text) && text.includes('with the same tattoos'), `${name}: dealerns ord ifyllda`);
+    assert.ok(!text.includes('mannequin in video 1') && text.includes('not like a mannequin') && text.includes('experienced blackjack dealer'), `${name}: en verklig dealers kropp, inte dockans`);
+    assert.ok(text.includes('Image 1 is the first frame of the clip and image 2 is the last frame.'), `${name}: första och sista bilden`);
+    for (const kept of ['solid yellow on one side and solid blue on the other', 'lies completely still exactly where she put it until the clip ends', 'Her hands stay small and slender, the same size as in the first frame, with the same tattoos.', 'The black card shoe does not move.', 'The background stays the same flat green everywhere: no table is visible, there are no shadows on the green, and nothing else appears. No sound.']) {
+      assert.ok(text.includes(kept) && deal.includes(kept), `${name}: "${kept}"`);
+    }
+  }
+  assert.ok(namedText(content, 'klippref', 'deal', words).includes('the same path, the same timing and the same place for the card as in video 1'));
+  assert.ok(namedText(content, 'redigering', 'deal', words).startsWith('Edit video 1'));
+  // En text gäller sin handling, och ett namn som inte finns sägs.
+  assert.throws(() => namedText(content, 'klippref', 'hole'), /skriven för deal/);
+  assert.throws(() => namedText(content, 'finns-inte'), /ingen text som heter finns-inte/);
+});
+
 test('gränserna: granskarens alla mått, med källa, och dockans film i filmmodellens takt', () => {
   for (const key of ['format', 'ljud', 'takt', 'kortdelar', 'gulForm', 'vandningTillbaka', 'halkortetBlatt', 'vandningenVidPlatsen', 'kortetsRorelse', 'kortetsOverlapp', 'kortetsMitt', 'kortetsYta', 'nastaKortSaknas', 'nastaKortFlyttar', 'handIRedo', 'handMotDockan', 'handBreddMotDockan', 'skarvRegion', 'skarvLjus', 'skarvHand', 'forstaRutan', 'sistaRutan', 'gront', 'skon', 'glipaRutor', 'glipaHojd', 'kortetLigger', 'handenISkon', 'bevisBlatt']) {
     const limit = content.limits[key];
@@ -96,6 +114,9 @@ test('paketets namn, klippets namn i registret och nästa tagning', () => {
   assert.equal(packageId({ ...spec, seat: 'D', index: 1, action: 'hole' }, 'cykel-nyp', 1), 'paulina_spelaren_cykel-nyp-hole_d-1_t1');
   assert.equal(packageId({ ...spec, seat: 'D', index: 1, action: 'deal' }, 'cykel-nyp', 1), 'paulina_spelaren_cykel-nyp_d-1_t1');
   assert.equal(clipFile({ ...spec, seat: 'D', index: 1, action: 'flip' }, 'cykel-nyp', 3), 'dealers/paulina/clips/cykel-nyp-flip-d-1_spelaren_t3.mp4');
+  // En variant står sist i slaget, efter handlingen, så att tagningen skiljs från seriens.
+  assert.equal(packageId({ ...spec, variant: 'prov' }, 'cykel-nyp', 1), 'paulina_spelaren_cykel-nyp-prov_4-0_t1');
+  assert.equal(clipFile({ ...spec, seat: 'D', index: 1, action: 'hole', variant: 'prov' }, 'cykel-nyp', 2), 'dealers/paulina/clips/cykel-nyp-hole-prov-d-1_spelaren_t2.mp4');
   assert.equal(cardWords('D', 1, 'flip'), 'vändningen av hålkortet (dealerns kort 1)');
   assert.equal(cardWords(3, 2), 'plats 3, kort 2');
   const dir = mkdtempSync(join(tmpdir(), 'tagning-namn-'));
@@ -127,11 +148,12 @@ before(async () => {
 });
 after(() => rmSync(project, { recursive: true, force: true }));
 
-const spec = { dealer: 'paulina', view: 'spelaren', seat: 4, index: 1 };
+// Varianten prov ger påhittade namn (cykel-nyp-prov-…): ett riktigt registernamn i ett test hindrar att klippet tas bort.
+const spec = { dealer: 'paulina', view: 'spelaren', seat: 4, index: 1, variant: 'prov' };
 
 test('forbered: paketet har bilderna, dockans film, texten och allt beställningen behöver', async () => {
   const made = await forbered(spec, { root: project, reference: 'docka.mp4', say: quiet });
-  assert.equal(made.id, 'paulina_spelaren_cykel-nyp_4-1_t1');
+  assert.equal(made.id, 'paulina_spelaren_cykel-nyp-prov_4-1_t1');
   const at = (file: string) => join(made.dir, file);
   for (const file of ['forsta.png', 'sista.png', 'referens.mp4', 'text.txt', 'docka.json', 'ark-docka.jpg', 'bestallning.json']) assert.ok(existsSync(at(file)), `${file} finns i paketet`);
   assert.equal(readFileSync(at('text.txt'), 'utf8'), promptFor(content, 'deal', words));
@@ -141,7 +163,7 @@ test('forbered: paketet har bilderna, dockans film, texten och allt beställning
   assert.equal(order.inputs.startFrame.asset, redoAnchor);
   assert.equal(order.inputs.referenceVideos[0].durationSeconds, 0.5);
   assert.equal(order.inputs.referenceVideos[0].fps, 24);
-  assert.equal(order.clip, 'dealers/paulina/clips/cykel-nyp-4-1_spelaren_t1.mp4');
+  assert.equal(order.clip, 'dealers/paulina/clips/cykel-nyp-prov-4-1_spelaren_t1.mp4');
   assert.equal(order.checks[0].key, 'dockansHandled');
   // Sista bilden är första bilden med märkkortet: bara kortets ruta skiljer, och där är det blått.
   const first = await sharp(at('forsta.png')).raw().toBuffer();
@@ -160,7 +182,7 @@ test('forbered: paketet har bilderna, dockans film, texten och allt beställning
   assert.equal(changed, order.inputs.endFrame.painted);
   // Nästa paket av samma kort är tagning 2.
   const again = await forbered(spec, { root: project, reference: 'docka.mp4', say: quiet });
-  assert.equal(again.id, 'paulina_spelaren_cykel-nyp_4-1_t2');
+  assert.equal(again.id, 'paulina_spelaren_cykel-nyp-prov_4-1_t2');
 });
 
 test('forbered säger vad som saknas: ankare för vyn, plats och kortplats', async () => {
@@ -231,15 +253,80 @@ test('forbered gör paketet genom ankarets eget öga: samma ankare ger samma pak
   );
 });
 
+// Ett påhittat, godkänt klipp till plats 4, kort 1, gjort ur ankaret, i ett eget register; dess paket har dockans film.
+const fromFile = 'dealers/paulina/clips/prova-klipp-4-1_spelaren_t1.mp4';
+
+test('forbered med ett godkänt klipp som referens: klippet skickas, dockans film bakom det mäts, och tagningen har sin variant', async () => {
+  const register = join(project, 'register-klipp');
+  createRegister(register, { about: 'prov', statuses: { 'att granska': 'inte dömd', godkänd: 'godkänd' }, asksWhy: [], groups: { clips: 'tagningar' }, sources: { runway: { what: 'Runway' } } });
+  mkdirSync(join(project, 'output', 'tagningar', 'prova-paket'), { recursive: true });
+  copyFileSync(join(project, 'docka.mp4'), join(project, 'output', 'tagningar', 'prova-paket', 'referens.mp4'));
+  film(join(project, 'klipp.mp4'), '0x02b631', 0.5, false);
+  const post = { file: fromFile, from: join(project, 'klipp.mp4'), title: 'prov', group: 'clips', dealer: 'paulina', status: 'godkänd', seat: 4, index: 1, action: 'deal', move: 'cykel-nyp', view: { kind: 'spelaren' }, source: { from: 'runway', package: 'output/tagningar/prova-paket', references: [{ role: 'startFrame', what: redoAnchor }] } };
+  await importAsset(register, post);
+  await importAsset(register, { ...post, file: 'dealers/paulina/clips/prova-klipp-4-1_spelaren_t2.mp4', status: 'att granska' });
+  await importAsset(register, { ...post, file: 'dealers/paulina/clips/prova-klipp-4-1_spelaren_t3.mp4', source: { ...post.source, references: [{ role: 'startFrame', what: 'dealers/paulina/anchors/prova-annat.png' }] } });
+  const options = { root: project, registry: register, say: quiet };
+
+  const made = await forbered({ ...spec, variant: 'klipp' }, { ...options, fromClip: { file: fromFile, role: 'referenceVideos' }, textName: 'klippref' });
+  assert.equal(made.id, 'paulina_spelaren_cykel-nyp-klipp_4-1_t1');
+  const order = JSON.parse(readFileSync(join(made.dir, 'bestallning.json'), 'utf8'));
+  assert.deepEqual(Object.keys(order.inputs), ['startFrame', 'endFrame', 'referenceVideos']);
+  assert.equal(order.inputs.referenceVideos.length, 1, 'bara klippet skickas');
+  assert.deepEqual([order.inputs.referenceVideos[0].file, order.inputs.referenceVideos[0].asset], [`output/tagningar/${made.id}/referensklipp.mp4`, fromFile]);
+  assert.equal(order.inputs.referenceVideos[0].sha256, sha256Of(join(project, 'klipp.mp4')));
+  // Dockans film bakom klippet står i paketet och mäts, men skickas inte.
+  assert.deepEqual([order.doll.sent, order.doll.film.source], [false, 'output/tagningar/prova-paket/referens.mp4']);
+  assert.equal(sha256Of(join(made.dir, 'referens.mp4')), sha256Of(join(project, 'docka.mp4')));
+  assert.deepEqual([order.variant, order.motionFrom, order.promptName], ['klipp', { file: fromFile, role: 'referenceVideos', status: 'godkänd' }, 'klippref']);
+  assert.equal(order.clip, 'dealers/paulina/clips/cykel-nyp-klipp-4-1_spelaren_t1.mp4');
+  assert.equal(readFileSync(join(made.dir, 'text.txt'), 'utf8'), namedText(content, 'klippref', 'deal', words));
+
+  // Som filmen som görs om: referenceVideo i stället för referenceVideos.
+  const edited = await forbered({ ...spec, variant: 'redigerad' }, { ...options, fromClip: { file: fromFile, role: 'referenceVideo' }, textName: 'redigering' });
+  const editOrder = JSON.parse(readFileSync(join(edited.dir, 'bestallning.json'), 'utf8'));
+  assert.deepEqual(Object.keys(editOrder.inputs), ['startFrame', 'endFrame', 'referenceVideo']);
+  assert.equal(editOrder.inputs.referenceVideo.asset, fromFile);
+
+  // Det som vägras: utan variant, ett klipp som inte är godkänt, ett annat kort, ett annat ankare, ett klipp som inte
+  // finns och en text som inte finns.
+  const { variant: _variant, ...plain } = spec;
+  await assert.rejects(forbered(plain, { ...options, fromClip: { file: fromFile, role: 'referenceVideos' } }), /egen variant/);
+  await assert.rejects(forbered({ ...spec, variant: 'klipp' }, { ...options, fromClip: { file: 'dealers/paulina/clips/prova-klipp-4-1_spelaren_t2.mp4', role: 'referenceVideos' } }), /att granska: bara ett godkänt klipp/);
+  await assert.rejects(forbered({ ...spec, index: 0, variant: 'klipp' }, { ...options, fromClip: { file: fromFile, role: 'referenceVideos' } }), /inte samma som tagningen/);
+  await assert.rejects(forbered({ ...spec, variant: 'klipp' }, { ...options, fromClip: { file: 'dealers/paulina/clips/prova-klipp-4-1_spelaren_t3.mp4', role: 'referenceVideos' } }), /gjort ur dealers\/paulina\/anchors\/prova-annat\.png/);
+  await assert.rejects(forbered({ ...spec, variant: 'klipp' }, { ...options, fromClip: { file: 'dealers/paulina/clips/prova-saknas.mp4', role: 'referenceVideos' } }), /står inte i registret/);
+  await assert.rejects(forbered({ ...spec, variant: 'klipp' }, { ...options, fromClip: { file: fromFile, role: 'referenceVideos' }, textName: 'finns-inte' }), /ingen text som heter/);
+  assert.equal(nextTake(join(project, 'output', 'tagningar'), { ...spec, variant: 'klipp' }, 'cykel-nyp'), 2, 'ett paket som vägrades tas bort');
+});
+
+test('ta-emot med ett klipp som referens: posten säger vilket klipp som skickades och hur, och bär varianten', async () => {
+  const id = 'paulina_spelaren_cykel-nyp-redigerad_4-1_t1';
+  const dir = join(project, 'output', 'tagningar', id);
+  writeFileSync(join(dir, 'uppladdat.json'), JSON.stringify([{ role: 'referenceVideo', url: 'https://d2jqrm6oza8nb6.cloudfront.net/datasets/klipp.mp4?_jwt=x.eyJleHAiOjE3OTUxMjEwNjJ9.y', assetId: 'v1', at: '2026-11-19 12:00' }]));
+  const result = await taEmot(id, join(project, 'nedladdad.mp4'), { taskId: 'task-2', credits: 64, before: 1000, after: 936 }, { root: project, proof: false, register: false, say: quiet });
+  const { post, order, uploads } = result.post;
+  assert.equal(post.file, 'dealers/paulina/clips/cykel-nyp-redigerad-4-1_spelaren_t1.mp4');
+  assert.deepEqual([post.variant, post.move, post.status], ['redigerad', 'cykel-nyp', 'att granska']);
+  assert.match(String(post.title), /variant redigerad, tagning 1$/);
+  assert.ok(String(post.note).includes(`${fromFile} som filmen som görs om (referenceVideo)`));
+  const references = (post.source as { references: { role: string; what: string }[] }).references;
+  assert.deepEqual(references.map((entry) => entry.role), ['startFrame', 'endFrame', 'referenceVideo']);
+  assert.ok(references[2]!.what.startsWith(`output/tagningar/${id}/referensklipp.mp4: det godkända klippet ${fromFile}`));
+  assert.match(String((post.source as { promptNote: string }).promptNote), /^content\/tagning\.json, prompt\.named\.redigering/);
+  assert.deepEqual(uploads, [{ file: fromFile, url: 'https://d2jqrm6oza8nb6.cloudfront.net/datasets/klipp.mp4', assetId: 'v1', at: '2026-11-19 12:00' }]);
+  assert.ok(order.inputs!.includes('"role":"referenceVideo"'));
+});
+
 let received: PostFile | null = null;
 let clip = '';
 
 test('ta-emot: ljudet tas bort, måtten prövas, och posten bär allt registret ska ha, utan signerade adresser', async () => {
-  const id = 'paulina_spelaren_cykel-nyp_4-1_t1';
+  const id = 'paulina_spelaren_cykel-nyp-prov_4-1_t1';
   const dir = join(project, 'output', 'tagningar', id);
   writeFileSync(join(dir, 'uppladdat.json'), JSON.stringify([{ role: 'endFrame', url: 'https://d2jqrm6oza8nb6.cloudfront.net/datasets/abc.png?_jwt=eyJhbGciOiJIUzI1NiJ9.eyJleHAiOjE3OTUxMjEwNjJ9.x', assetId: 'a1', at: '2026-11-18 12:00' }]));
   const result = await taEmot(id, join(project, 'nedladdad.mp4'), { taskId: 'task-1', credits: 85, before: 1000, after: 915 }, { root: project, proof: false, register: false, say: quiet });
-  clip = join(dir, 'cykel-nyp-4-1_spelaren_t1.mp4');
+  clip = join(dir, 'cykel-nyp-prov-4-1_spelaren_t1.mp4');
   assert.equal((await probe(clip)).audio, false, 'klippet har inget ljud');
   assert.ok(existsSync(join(dir, 'med-ljud.mp4')), 'den nedladdade filmen med ljud står kvar i paketet');
   assert.equal(result.values.ljud, false);
@@ -251,8 +338,8 @@ test('ta-emot: ljudet tas bort, måtten prövas, och posten bär allt registret 
   assert.ok(!written.includes('_jwt'), 'post.json bär ingen signerad adress');
   const posted = JSON.parse(written) as PostFile;
   const { post, order, measurements, uploads } = posted;
-  assert.equal(post.file, 'dealers/paulina/clips/cykel-nyp-4-1_spelaren_t1.mp4');
-  assert.equal(post.from, 'output/tagningar/paulina_spelaren_cykel-nyp_4-1_t1/cykel-nyp-4-1_spelaren_t1.mp4');
+  assert.equal(post.file, 'dealers/paulina/clips/cykel-nyp-prov-4-1_spelaren_t1.mp4');
+  assert.equal(post.from, 'output/tagningar/paulina_spelaren_cykel-nyp-prov_4-1_t1/cykel-nyp-prov-4-1_spelaren_t1.mp4');
   assert.deepEqual([post.group, post.status, post.use, post.seat, post.index, post.take], ['clips', 'att granska', 'dealerfilm', 4, 1, 1]);
   assert.deepEqual(post.view, { kind: 'spelaren' });
   assert.deepEqual(post.lands, { seat: 4, index: 1, at: null });
@@ -268,7 +355,7 @@ test('ta-emot: ljudet tas bort, måtten prövas, och posten bär allt registret 
   assert.deepEqual(post.shoe, { at: scene.shoe.at, yawDeg: scene.shoe.yawDeg, length: scene.shoe.length });
   assert.deepEqual(post.place, scene.places.seats.find((entry) => entry.seat === 4)!.cards[1]);
   assert.equal(post.action, 'deal');
-  assert.deepEqual(uploads, [{ file: 'output/tagningar/paulina_spelaren_cykel-nyp_4-1_t1/sista.png', url: 'https://d2jqrm6oza8nb6.cloudfront.net/datasets/abc.png', assetId: 'a1', at: '2026-11-18 12:00' }]);
+  assert.deepEqual(uploads, [{ file: 'output/tagningar/paulina_spelaren_cykel-nyp-prov_4-1_t1/sista.png', url: 'https://d2jqrm6oza8nb6.cloudfront.net/datasets/abc.png', assetId: 'a1', at: '2026-11-18 12:00' }]);
   received = posted;
   // Krediter som inte är skillnaden mellan saldona är antagna.
   const guessed = await taEmot(id, join(project, 'nedladdad.mp4'), { taskId: 'task-1', credits: 85, before: 1000, after: 900 }, { root: project, proof: false, register: false, say: quiet });
@@ -303,7 +390,7 @@ test('registreringen: klippet som post att granska, beställningen och måtten, 
 });
 
 test('mät-om: måtten tas om och ersätter de förra i post.json och registret; klippet, posten och omdömet rörs inte', async () => {
-  const id = 'paulina_spelaren_cykel-nyp_4-1_t1';
+  const id = 'paulina_spelaren_cykel-nyp-prov_4-1_t1';
   const dir = join(project, 'output', 'tagningar', id);
   const register = join(project, 'register');
   const before = JSON.parse(readFileSync(join(dir, 'post.json'), 'utf8')) as PostFile;
