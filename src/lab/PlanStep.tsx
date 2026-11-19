@@ -14,7 +14,6 @@ import { backgroundOf, planPlace, readRound, spotPlace } from '../scene/round.ts
 import { roundChoices } from './backdrops.ts';
 import { fetchAll, fetchContent, savePlan, type Content } from './content.ts';
 import { fetchRegistry, mediaUrl, type Registry } from './registry.ts';
-import './scene.css';
 import './plan.css';
 
 // Första dealern, som i steget Scen.
@@ -125,16 +124,22 @@ function Workbench({ registry, scene, doll, round, dealt, start, problem, onProb
           <h2>Rakt uppifrån</h2>
           <PlanView scene={planned} doll={doll} filmed={filmed} />
           <p className="planlegend">
-            <span className="swatch plan" /> kortplanen, i kortens storlek på bordet ({comma(draft.scale, 2)} ×)
-            <span className="swatch dealer" /> dealerns kort
-            <span className="swatch filmed" /> där handen lägger kortet i filmerna, i filmens storlek; linjen är vägen kortet glider
+            <span className="legendpart">
+              <span className="swatch plan" /> kortplanen, i kortens storlek på bordet ({comma(draft.scale, 2)} ×)
+            </span>
+            <span className="legendpart">
+              <span className="swatch dealer" /> dealerns kort
+            </span>
+            <span className="legendpart">
+              <span className="swatch filmed" /> där handen lägger kortet i filmerna; linjen är vägen kortet glider
+            </span>
           </p>
         </section>
         <section className="planpane" aria-label="Hela given ur Spelaren">
           <h2>
             Ur Spelaren, hela given{' '}
-            <button type="button" className="reset" disabled={!handle?.clip} onClick={again}>
-              Börja om
+            <button type="button" className="btn small" disabled={!handle?.clip} onClick={again}>
+              ⟲ Börja om
             </button>
             <label className="check">
               <input type="checkbox" checked={showPlaces} onChange={(event) => setShowPlaces(event.currentTarget.checked)} />
@@ -152,7 +157,7 @@ function Workbench({ registry, scene, doll, round, dealt, start, problem, onProb
       </div>
 
       <section className="plancontrols" aria-label="Reglage" inert={busy}>
-        {problem && <p className="warning">{problem}</p>}
+        {problem && <p className="problem">{problem}</p>}
         <div className="plangroups">
           <fieldset>
             <legend>Spelarnas kort (bågen)</legend>
@@ -184,23 +189,25 @@ function Workbench({ registry, scene, doll, round, dealt, start, problem, onProb
               onChange={(speed) => set((plan) => ({ ...plan, speed }))}
             />
             {span(1) && (
-              <p className="controlhint">
+              <p className="hint">
                 Ett kort med klipp tar {span(draft.speed)} (filmat {span(1)}).
               </p>
             )}
             <div className="planbuttons">
-              <button type="button" className="go" disabled={!changed || busy} title="Kortplanen i content/scene.json och farten i content/runda.json" onClick={save}>
+              <button type="button" className="btn primary" disabled={!changed || busy} title="Kortplanen i content/scene.json och farten i content/runda.json" onClick={save}>
                 Spara
               </button>
-              <button type="button" className="reset" disabled={busy} onClick={reset}>
+              <button type="button" className="btn" disabled={busy} onClick={reset}>
                 Återställ till det sparade
               </button>
             </div>
-            <p className="controlhint" role="status">
+            <p className="hint" role="status">
               {busy ? 'Arbetar …' : (said ?? (changed ? 'Ändrat men inte sparat: det syns här, men inte i steget Scen, Casinot eller runda.ts förrän det är sparat.' : 'Som det står i content/scene.json och content/runda.json.'))}
             </p>
           </fieldset>
         </div>
+        <details className="more">
+          <summary>Vad som gäller direkt, och vad som kräver nya filmer</summary>
         <div className="plannotes">
           <p>
             <strong>Gäller direkt, också för filmerna som redan finns:</strong> var korten ligger på bordet och hur stora de är. Kortet
@@ -219,6 +226,7 @@ function Workbench({ registry, scene, doll, round, dealt, start, problem, onProb
             glider sedan därifrån. Ju längre bort planen ligger, desto längre glider kortet.
           </p>
         </div>
+        </details>
       </section>
     </div>
   );
@@ -237,10 +245,11 @@ type SliderProps = {
 /** Ett reglage inom talets gränser (plan.ts), med värdet i ord bredvid. Talet avrundas till 0,1 mm, som i filen. */
 function Slider({ label, range, step = 0.0005, value, show, hint, onChange }: SliderProps) {
   return (
-    <label className="planslider" title={hint}>
+    <label className="slider">
       <span>{label}</span>
       <input type="range" min={range[0]} max={range[1]} step={step} value={value} onChange={(event) => onChange(round4(Number(event.currentTarget.value)))} />
       <output>{show(value)}</output>
+      {hint && <small className="what">{hint}</small>}
     </label>
   );
 }
@@ -288,10 +297,10 @@ function PlanView({ scene, doll, filmed }: PlanViewProps) {
         skon
       </text>
       {/* Där handen lägger korten i filmerna, och vägen därifrån till planen. */}
-      {filmed.map(({ card: spot, place }) => {
+      {filmed.map(({ card: spot, place }, order) => {
         const target = planPlace(scene, spot);
         return (
-          <g key={`${spot.seat}/${spot.index}`}>
+          <g key={`${spot.seat}/${spot.index}/${order}`}>
             <rect className="planfilmed" {...card(place, 1)} rx={3.5} />
             {target && Math.hypot(target[0] - place[0], target[1] - place[1]) > 0.001 && (
               <line className="planglide" x1={place[0] * MM} y1={place[1] * MM} x2={target[0] * MM} y2={target[1] * MM} />

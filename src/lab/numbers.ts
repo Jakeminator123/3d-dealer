@@ -5,7 +5,8 @@
 import type { SceneDescription, Vec3 } from '../scene/description.ts';
 import { closeEye, floorY, playerEye, sceneEye, seatEye, tablePosition, type Eye } from '../scene/geometry.ts';
 import type { Asset } from './registry.ts';
-import { anchorLabel, cardName, viewLabel, viewWord, type Take } from './takes.ts';
+import { anchorName, cardCode, cardName, framesOf, viewLabel, viewWord } from './names.ts';
+import { sentWords, type Take } from './takes.ts';
 
 export type Row = { label: string; value: string; basis?: string };
 export type Table = { caption?: string; head: string[]; rows: string[][]; /** Långa texter i cellerna: raderna bryts i stället för att tabellen rullar. */ wrap?: boolean };
@@ -96,7 +97,7 @@ export function sceneGroups(input: SceneInput): Group[] {
 
   const anchorEntries = assets.filter((entry) => entry.group === 'anchors' && String(entry.pose ?? '').toLowerCase() === 'redo');
   const eyeName = (eye: Eye): string => {
-    const names = anchorEntries.filter((entry) => sameEye(entry.eye, eye)).map((entry) => `ankaret ${anchorLabel(entry.file)}${viewWord(entry.view) === 'spelaren' ? '' : ` (${viewLabel(viewWord(entry.view))})`}`);
+    const names = anchorEntries.filter((entry) => sameEye(entry.eye, eye)).map((entry) => `ankaret ${anchorName(entry.file)}${viewWord(entry.view) === 'spelaren' ? '' : ` (${viewLabel(viewWord(entry.view))})`}`);
     for (const view of ['spelaren', ...seats.map((seat) => `plats-${seat}`)]) {
       const near = todayClose(scene, view);
       if (near && sameEye(eye, near) && !(view !== 'spelaren' && Number(view.split('-')[1]) === scene.camera.seat)) names.push(`${viewLabel(view)}s närbild i dag`);
@@ -222,7 +223,7 @@ export function sceneGroups(input: SceneInput): Group[] {
       tables: [
         {
           caption: 'Kortplatserna i dag, x; z i meter',
-          head: ['Plats', ...Array.from({ length: cards }, (_, k) => `C${k}`)],
+          head: ['Plats', ...Array.from({ length: cards }, (_, k) => cardCode(k))],
           rows: [...scene.places.seats.map((one) => [`P${one.seat}`, ...one.cards.map((card) => point(card, ''))]), ['D', ...scene.places.dealer.map((card) => point(card, ''))]],
         },
       ],
@@ -264,7 +265,7 @@ export function sceneGroups(input: SceneInput): Group[] {
         { label: 'VILA: handleden från kroppens mitt i sidled', value: withUnit(dollJson.rest?.wristFromCentre, 'm', 4), basis: basisOf(dollJson.rest) },
         { label: 'VILA: fingertopparna framför bordskanten', value: withUnit(dollJson.rest?.fingertipsBeforeEdge, 'm'), basis: basisOf(dollJson.rest) },
         { label: 'VILA: handen vriden inåt', value: withUnit(dollJson.rest?.toeInDeg, '°'), basis: basisOf(dollJson.rest) },
-        { label: 'Blicken i REDO mot', value: dollJson.gaze?.ready ? `plats ${dollJson.gaze.ready.seat}, kort ${dollJson.gaze.ready.index}` : 'saknas', basis: basisOf(dollJson.gaze) },
+        { label: 'Blicken i REDO mot', value: dollJson.gaze?.ready ? `plats ${dollJson.gaze.ready.seat}, ${cardCode(dollJson.gaze.ready.index)}` : 'saknas', basis: basisOf(dollJson.gaze) },
       ],
       sources: [...sourceOf('body', dollJson.body), ...sourceOf('sitting', dollJson.sitting), ...sourceOf('arm', dollJson.arm), ...sourceOf('rest', dollJson.rest), ...sourceOf('gaze', dollJson.gaze)],
     },
@@ -280,7 +281,7 @@ export function sceneGroups(input: SceneInput): Group[] {
     const source = (entry?.source ?? {}) as Json;
     groups.push({
       id: `ankare-${view}`,
-      title: `Ankaret ${anchorLabel(file)} ur ${viewLabel(view)}`,
+      title: `Ankaret ${anchorName(file)} ur ${viewLabel(view)}`,
       rows: [
         { label: 'Registernamnet', value: file },
         { label: 'Status', value: entry ? (entry.status === 'utgår' ? 'underkänd' : entry.status) : 'ingen post i registret' },
@@ -350,13 +351,20 @@ export function jobGroups(tagningJson: Json, takes: Take[], sample: Take | null,
           wrap: true,
           head: ['Underlag', 'Vad', 'Format'],
           rows: [
-            ['Första bild (startFrame)', `vyns REDO-ankare${sample?.anchor ? `, ${anchorLabel(sample.anchor)} (${sample.anchor})` : ''}, oförändrat`, 'en stillbild i filmens ruta'],
-            ['Sista bild (endFrame)', 'samma ankare med märkkortet målat blått där kortet ska ligga', 'en stillbild i filmens ruta'],
-            [
-              'Dockans film (referenceVideos)',
-              `dockan gör cykeln ur vyns närbild i grå ateljé (skärmen ${point(reference.studio?.screen, '', 0)}, bordet ${point(reference.studio?.table, '', 0)}, 0–255)`,
-              sample?.reference ? `${withUnit(sample.reference.fps ?? reference.fps, 'rutor/s')}, ${num(sample.reference.frames)} rutor, ${withUnit(sample.reference.seconds, 's')}` : withUnit(reference.fps, 'rutor/s'),
-            ],
+            ['Första bild (startFrame)', `vyns REDO-ankare${sample?.anchor ? `, ${framesOf(sample.anchor, sample.seat, sample.index, sample.action).first} (${sample.anchor})` : ''}`, 'en stillbild i filmens ruta'],
+            ['Sista bild (endFrame)', `samma ankare med märkkortet målat där kortet ska ligga${sample ? `, ${framesOf(sample.anchor, sample.seat, sample.index, sample.action).last}` : ''}`, 'en stillbild i filmens ruta'],
+            // Filmen som skickades med bilderna står i beställningen: dockans film, ett klipp i dess ställe, eller ingen.
+            sample && sample.sent.kind !== 'docka'
+              ? [
+                  sample.sent.role ? `Referensen (${sample.sent.role})` : 'Referensen',
+                  sentWords(sample.sent),
+                  sample.sent.kind === 'ingen' ? 'ingen film' : `${withUnit(sample.sent.fps, 'rutor/s')}, ${num(sample.sent.frames)} rutor, ${withUnit(sample.sent.seconds, 's')}`,
+                ]
+              : [
+                  'Dockans film (referenceVideos)',
+                  `dockan gör cykeln ur vyns närbild i grå ateljé (skärmen ${point(reference.studio?.screen, '', 0)}, bordet ${point(reference.studio?.table, '', 0)}, 0–255)`,
+                  sample?.reference ? `${withUnit(sample.reference.fps ?? reference.fps, 'rutor/s')}, ${num(sample.reference.frames)} rutor, ${withUnit(sample.reference.seconds, 's')}` : withUnit(reference.fps, 'rutor/s'),
+                ],
           ],
         },
       ],

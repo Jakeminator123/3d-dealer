@@ -1,5 +1,6 @@
 // Serverns egna vägar: registret, filerna i assets/ och deras förhandsbilder, förlagorna som scenen sparar, kortplanen
-// och klippens fart som Labbet ställer (kortplan.ts), och spelsessionen (src/game/game.ts): Casinots runda mot spelkärnan, och rundan som Labbet
+// och klippens fart som Labbet ställer (kortplan.ts), dockans rörelser och tagningen som förbereds ur steget Dockan
+// (rorelser.ts, forbered.ts), och spelsessionen (src/game/game.ts): Casinots runda mot spelkärnan, och rundan som Labbet
 // och runda.ts visar.
 // Allt annat lämnas vidare (till Vite, som sköter sidorna).
 
@@ -14,6 +15,8 @@ import { assetsDir, RegistryError, setStatus, setWords, stamp, viewRegistry } fr
 import { readRound, RoundError } from '../pipeline/runda.ts';
 import { pathInside, sendFile, sendJson, sendText } from './files.ts';
 import { createGame, dealRound, type GameOptions } from '../game/game.ts';
+import { createPreparing, type Preparer } from './forbered.ts';
+import { listMoves, measureMove, MoveError, saveMove } from './rorelser.ts';
 import { listTakes, takeFile } from './tagningar.ts';
 import { canThumbnail, thumbnail } from './thumbs.ts';
 
@@ -84,7 +87,7 @@ function decodeName(part: string): string {
 
 /** Ett fel i en ändring som den som frågade kan rätta. Andra fel är serverns egna. */
 const askersFault = (error: unknown): error is Error =>
-  error instanceof RegistryError || error instanceof ForlagaError || error instanceof RequestError || error instanceof RoundError || error instanceof PlanError;
+  error instanceof RegistryError || error instanceof ForlagaError || error instanceof RequestError || error instanceof RoundError || error instanceof PlanError || error instanceof MoveError;
 
 /** Ett fröord i en adress eller ett kommando: 1–200 tecken, eller inget. */
 function seedOf(value: unknown): string | undefined {
@@ -105,13 +108,16 @@ export type Api = (request: IncomingMessage, response: ServerResponse) => Promis
 
 /**
  * Svarar på serverns vägar för projektmappen `root`. Ger false när vägen inte är serverns.
- * `now` ger tiden som den skrivs i registret, "ÅÅÅÅ-MM-DD TT:MM".
+ * `now` ger tiden som den skrivs i registret, "ÅÅÅÅ-MM-DD TT:MM". `prepare` är vägen som gör en tagnings paket
+ * (tagning.ts forbered om inget annat sägs; ett prov ger en egen).
  * Varje fel svaras med sitt skäl: 400 när en ändring är fel ställd, annars 500 (JSON under /api/, text annars).
  */
-export function createApi(root: string, now: () => string = stamp, gameOptions: GameOptions = {}): Api {
+export function createApi(root: string, now: () => string = stamp, gameOptions: GameOptions = {}, tools: { prepare?: Preparer } = {}): Api {
   const assets = assetsDir(root);
   // Casinots spelsession: en för hela servern, så länge den kör.
   const game = createGame(gameOptions);
+  // Tagningen som förbereds ur steget Dockan: en i taget, så länge servern kör.
+  const preparing = createPreparing(root, now, tools.prepare);
   const round = () => readRound(JSON.parse(readFileSync(join(root, 'content', 'runda.json'), 'utf8')));
 
   return async (request, response) => {
@@ -169,6 +175,25 @@ export function createApi(root: string, now: () => string = stamp, gameOptions: 
       if (typeof body?.file !== 'string' || typeof body?.comment !== 'string') throw new RequestError('Förfrågan ska bära file och comment');
       setWords(root, body.file, 'comment', body.comment, now());
       sendJson(response, 200, viewRegistry(root));
+    } else if (path === '/api/rorelser' && reading) {
+      // Dockans rörelser i content/moves/, med vad som är gjort med dem och vilka som inte får skrivas över (rorelser.ts).
+      sendJson(response, 200, { moves: listMoves(root) });
+    } else if (path === '/api/rorelser' && request.method === 'POST') {
+      // En ändrad cykel ur steget Dockan, sparad som en ny rörelse i content/moves/ (rorelser.ts, saveMove).
+      if (!sentByOwnPage(request)) return sendText(response, 403, 'Rörelser tas bara emot från Labbets egen sida');
+      const saved = await saveMove(root, await readJson(request), now());
+      sendJson(response, 200, { saved, moves: listMoves(root) });
+    } else if (path === '/api/rorelser/matt' && request.method === 'POST') {
+      // Dockans mått för värden som inte är sparade, prövade mot gränserna som när ett paket görs. Ingenting sparas.
+      if (!sentByOwnPage(request)) return sendText(response, 403, 'Rörelser tas bara emot från Labbets egen sida');
+      sendJson(response, 200, await measureMove(root, await readJson(request)));
+    } else if (path === '/api/forbered' && reading) {
+      // Tagningen som förbereds eller förbereddes senast ur steget Dockan (forbered.ts).
+      sendJson(response, 200, { job: preparing.current() });
+    } else if (path === '/api/forbered' && request.method === 'POST') {
+      // Förbereder en tagning som tagning.ts forbered gör det. Ingenting beställs: det gör agenten.
+      if (!sentByOwnPage(request)) return sendText(response, 403, 'Tagningar förbereds bara från Labbets egen sida');
+      sendJson(response, 200, { job: preparing.start(await readJson(request)) });
     } else if (path === '/api/kortplan' && request.method === 'POST') {
       // Kortplanen som Labbet ställer (steget Kortplan): bara bågens, radens och kortens storleks tal, sparade i
       // content/scene.json, och klippens fart, sparad i content/runda.json, var och en inom sina gränser (plan.ts).

@@ -13,6 +13,7 @@ import { backdropItems, backdropKind, dealerChoices, PLAIN, roundChoices, sameLo
 import { fetchAll, type Content } from './content.ts';
 import { saveForlaga, type Saved } from './forlaga.ts';
 import { fetchRegistry, mediaUrl, saveComment, saveStatus, thumbUrl, type Asset, type Item, type Registry } from './registry.ts';
+import { anchorName as coded, shownText } from './names.ts';
 import { routeTo } from './route.ts';
 import { Verdict, type Judge } from './Verdict.tsx';
 import { Words, type Say } from './Words.tsx';
@@ -182,18 +183,21 @@ function Workbench({ registry, scene, doll, round, dealt, route, problem, onProb
           {chosen ? (
             <>
               <div className="scenetitle">
-                <span className="scenenumber">{chosen.number}</span>
-                <h1>{chosen.asset.title}</h1>
-                {chosen.asset.note && <p className="scenenote">{chosen.asset.note}</p>}
+                <span className="label">
+                  Bakgrund {chosen.number} av {items.length}
+                </span>
+                <h2>{chosen.asset.title}</h2>
+                {chosen.asset.note && <p className="hint">{chosen.asset.note}</p>}
               </div>
               {/* Omdömet och Jakobs egna ord om bakgrunden, intill scenen han ser den i. Rutan är bakgrundens egen: den byts med bakgrunden. */}
               <div className="scenejudge">
+                <span className="label">Ditt omdöme om bakgrunden</span>
                 <Verdict registry={registry} asset={chosen.asset} onJudge={onJudge} />
                 <Words key={chosen.asset.file} registry={registry} asset={chosen.asset} onSay={onSay} always />
               </div>
             </>
           ) : (
-            <h1>Registret har inga bakgrunder</h1>
+            <h2>Registret har inga bakgrunder</h2>
           )}
         </header>
 
@@ -214,13 +218,13 @@ function Workbench({ registry, scene, doll, round, dealt, route, problem, onProb
 
         {/* Medan en förlaga sparas står reglagen stilla: varje ruta ska ritas ur samma scen. */}
         <section className="scenecontrols" aria-label="Reglage" inert={saving !== null}>
-          {problem && <p className="warning">{problem}</p>}
+          {problem && <p className="problem">{problem}</p>}
           {chosen && !chosen.asset.present && <p className="warning">Bakgrundens fil saknas i assets/.</p>}
 
-          <div className="control">
-            <span className="controlname">Dealer</span>
+          <div className="row">
+            <span className="rowname">Dealer</span>
             <select
-              className="pick"
+              className="select"
               aria-label="Dealer"
               value={roundChoice?.key ?? choice?.dealer.file ?? ''}
               onChange={(event) => {
@@ -248,27 +252,16 @@ function Workbench({ registry, scene, doll, round, dealt, route, problem, onProb
             </select>
             {playing && (
               <>
-                <button type="button" className="reset" aria-pressed={paused} onClick={() => setPaused(!paused)}>
-                  {paused ? 'Spela' : 'Pausa'}
+                <button type="button" className="btn" aria-pressed={paused} onClick={() => setPaused(!paused)}>
+                  {paused ? '▶ Spela' : '❚❚ Pausa'}
                 </button>
-                <button type="button" className="reset" disabled={!handle?.clip} title="Dealerns film från början" onClick={again}>
-                  Börja om
+                <button type="button" className="btn" disabled={!handle?.clip} title="Dealerns film från början" onClick={again}>
+                  ⟲ Börja om
                 </button>
               </>
             )}
-            <button type="button" className="reset" disabled={!handle} title={`Scenen ur ${viewName} som en bild, ${frameText(scene)}`} onClick={() => save(true)}>
-              Spara bild
-            </button>
-            <button
-              type="button"
-              className="reset"
-              disabled={!handle || !playing}
-              title={`Hela dealerns film ur ${viewName}, ruta för ruta, ${frameText(scene)}`}
-              onClick={() => save(false)}
-            >
-              Spara klipp
-            </button>
-            <span className="controlhint" role="status">
+            <span className="spacer" />
+            <span className="hint" role="status">
               {saving
                 ? saving.of > 0
                   ? `Sparar ruta ${saving.done} av ${saving.of} …`
@@ -277,11 +270,23 @@ function Workbench({ registry, scene, doll, round, dealt, route, problem, onProb
                   ? `Sparad: ${saved.file}${saved.seconds > 0 ? ` (${saved.frames} rutor, ${comma(saved.seconds)} s)` : ''}`
                   : `Förlagan sparas ur ${viewName}${moved ? ', inte ur den fria vyn' : ''}.`}
             </span>
+            <button type="button" className="btn" disabled={!handle} title={`Scenen ur ${viewName} som en bild, ${frameText(scene)}`} onClick={() => save(true)}>
+              Spara bild
+            </button>
+            <button
+              type="button"
+              className="btn"
+              disabled={!handle || !playing}
+              title={`Hela dealerns film ur ${viewName}, ruta för ruta, ${frameText(scene)}`}
+              onClick={() => save(false)}
+            >
+              Spara klipp
+            </button>
           </div>
 
-          <div className="control">
-            <span className="controlname">Vy</span>
-            <div className="filters" role="group" aria-label="Vy">
+          <div className="row">
+            <span className="rowname">Vy</span>
+            <div className="seg" role="group" aria-label="Vy">
               <button
                 type="button"
                 aria-pressed={!moved && view.kind === 'spelaren'}
@@ -306,8 +311,8 @@ function Workbench({ registry, scene, doll, round, dealt, route, problem, onProb
               </button>
             </div>
             {moved && (
-              <button type="button" className="reset" onClick={() => choose({ ...view })}>
-                Tillbaka till {viewName}
+              <button type="button" className="btn quiet" onClick={() => choose({ ...view })}>
+                ↩ Tillbaka till {viewName}
               </button>
             )}
             <label className="check" title="Samma öga, inzoomat på dealern: rutan dealerns filmer görs i">
@@ -321,36 +326,40 @@ function Workbench({ registry, scene, doll, round, dealt, route, problem, onProb
               />
               Närbild
             </label>
-            <span className="controlhint">Dra i scenen för att vrida, hjulet zoomar, högerknappen flyttar.</span>
             <label className="check">
               <input type="checkbox" checked={shoeHidden} onChange={(event) => setShoeHidden(event.currentTarget.checked)} />
               Dölj skon
             </label>
+            <span className="hint">Dra i scenen för att vrida, hjulet zoomar, högerknappen flyttar.</span>
           </div>
 
           {look && start && (
-            <div className="control">
-              <span className="controlname">Bakgrund</span>
-              <Slider label="Vrid" unit="°" min={-180} max={180} step={1} value={look.turn} onChange={(turn) => change({ turn })} />
-              {sphere && (
-                <>
-                  <Slider label="Höjd" unit=" m" min={0.5} max={4} step={0.05} value={look.height} onChange={(height) => change({ height })} />
-                  <Slider label="Radie" unit=" m" min={3} max={40} step={0.5} value={look.radius} onChange={(radius) => change({ radius })} />
-                </>
-              )}
-              <Slider label="Lyft" unit="°" min={0} max={45} step={1} value={look.lift} onChange={(lift) => change({ lift })} />
-              <Slider label="Oskärpa" min={0} max={30} step={0.5} value={look.blur} onChange={(blur) => change({ blur })} />
-              <Slider label="Ljusstyrka" min={0.05} max={2} step={0.01} value={look.exposure} onChange={(exposure) => change({ exposure })} />
+            <div className="row">
+              <span className="rowname">Bakgrund</span>
+              <div className="slidergrid">
+                <Slider label="Vrid" unit="°" min={-180} max={180} step={1} value={look.turn} onChange={(turn) => change({ turn })} />
+                {sphere && (
+                  <>
+                    <Slider label="Höjd" unit=" m" min={0.5} max={4} step={0.05} value={look.height} onChange={(height) => change({ height })} />
+                    <Slider label="Radie" unit=" m" min={3} max={40} step={0.5} value={look.radius} onChange={(radius) => change({ radius })} />
+                  </>
+                )}
+                <Slider label="Lyft" unit="°" min={0} max={45} step={1} value={look.lift} onChange={(lift) => change({ lift })} />
+                <Slider label="Oskärpa" min={0} max={30} step={0.5} value={look.blur} onChange={(blur) => change({ blur })} />
+                <Slider label="Ljusstyrka" min={0.05} max={2} step={0.01} value={look.exposure} onChange={(exposure) => change({ exposure })} />
+              </div>
               <label className="check">
                 <input type="checkbox" checked={look.mirror} onChange={(event) => change({ mirror: event.currentTarget.checked })} />
                 Spegelvänd
               </label>
-              <button type="button" className="reset" disabled={sameLook(look, start)} onClick={() => change(start)}>
+              <button type="button" className="btn quiet" disabled={sameLook(look, start)} onClick={() => change(start)}>
                 Återställ
               </button>
             </div>
           )}
 
+          <details className="more">
+            <summary>Vad du ser, och vad som sparas</summary>
           <ul className="scenenotes">
             <li>
               Reglagen sparas inte än. De startar på bakgrundens värden ur gamla projektet, när posten har sådana, och rummets höjd,
@@ -366,7 +375,7 @@ function Workbench({ registry, scene, doll, round, dealt, route, problem, onProb
             </li>
             <li>
               {roundChoice
-                ? `Hela given: en runda som spelkärnan har delat (frö ${dealt.seed}, plats ${dealt.bets.map((bet) => bet.seat).join(', ')}, Hit under ${dealt.hitBelow}; content/runda.json), ${roundChoice.plan.dealt.length} kort i spelkärnans ordning med dess valörer. Varje kort spelas med dealerns godkända cykelklipp ur registret, gjort i närbilden av ${madeIn}, eller, när klippet saknas, går kortet självt medan dealern står i REDO; samma val och samma uppspelning som node src/pipeline/runda.ts och Casinot. Hålkortet ligger med baksidan upp tills det vänds. Klippen spelas efter varandra utan glapp, i ${comma(round.speed.clips)} gångers fart (content/runda.json, ställs i steget Kortplan), och varje kort ligger kvar på bordet från att det har landat; när handen har släppt det och lyft går det till sin plats i kortplanen och sin storlek på bordet (steget Kortplan). ${wait ? `Efter sista kortet väntar dealern: vänta-klippet (${wait.split('/').at(-1)}) spelas ett varv eller fler, så många som täcker ${comma(round.film.hold)} s, och given börjar om där ett varv slutar, i REDO.` : `Efter sista kortet står sista rutan kvar ${comma(round.film.hold)} s, och sedan börjar given om (givens ankare har inget vänta-klipp).`} Börja om tar den från början. Bilden läggs tillbaka genom ${madeIn}s öga: sedd ur den vyn, eller dess närbild, är den bilden som den är; ur andra vyer är kroppen platt. Alla klipp i given är gjorda ur samma REDO-ankare, det med flest godkända klipp för rundan: ${anchorName(roundChoice.plan.anchor)}${roundChoice.plan.anchors.length > 1 ? ` (inte valda: ${roundChoice.plan.anchors.slice(1).map((one) => `${anchorName(one.anchor)}, ${one.clips} klipp`).join('; ')})` : ''}.${roundChoice.plan.missing.length > 0 ? ` Saknar klipp: ${roundChoice.plan.missing.map(dealName).join('; ')}.` : ''}`
+                ? `Hela given: en runda som spelkärnan har delat (frö ${dealt.seed}, plats ${dealt.bets.map((bet) => bet.seat).join(', ')}, Hit under ${dealt.hitBelow}; content/runda.json), ${roundChoice.plan.dealt.length} kort i spelkärnans ordning med dess valörer. Varje kort spelas med dealerns godkända cykelklipp ur registret, gjort i närbilden av ${madeIn}, eller, när klippet saknas, går kortet självt medan dealern står i REDO; samma val och samma uppspelning som node src/pipeline/runda.ts och Casinot. Hålkortet ligger med baksidan upp tills det vänds. Klippen spelas efter varandra utan glapp, i ${comma(round.speed.clips)} gångers fart (content/runda.json, ställs i steget Kortplan), och varje kort ligger kvar på bordet från att det har landat; när handen har släppt det och lyft går det till sin plats i kortplanen och sin storlek på bordet (steget Kortplan). ${wait ? `Efter sista kortet väntar dealern: vänta-klippet (${wait.split('/').at(-1)}) spelas ett varv eller fler, så många som täcker ${comma(round.film.hold)} s, och given börjar om där ett varv slutar, i REDO.` : `Efter sista kortet står sista rutan kvar ${comma(round.film.hold)} s, och sedan börjar given om (givens ankare har inget vänta-klipp).`} Börja om tar den från början. Bilden läggs tillbaka genom ${madeIn}s öga: sedd ur den vyn, eller dess närbild, är den bilden som den är; ur andra vyer är kroppen platt. Alla klipp i given är gjorda ur samma REDO-ankare, det med flest godkända klipp för rundan: ${coded(roundChoice.plan.anchor)} (${anchorName(roundChoice.plan.anchor)})${roundChoice.plan.anchors.length > 1 ? ` (inte valda: ${roundChoice.plan.anchors.slice(1).map((one) => `${coded(one.anchor)} (${anchorName(one.anchor)}), ${one.clips} klipp`).join('; ')})` : ''}.${roundChoice.plan.missing.length > 0 ? ` Saknar klipp: ${roundChoice.plan.missing.map((deal) => shownText(dealName(deal))).join('; ')}.` : ''}`
                 : !choice
                   ? 'Ingen dealer visas: registret har ingen dealerfilm för dealern.'
                   : `Dealern är en dealerfilm: ”${choice.label}”, en ${choice.film ? 'film' : 'stillbild'} av dealern på grön skärm, gjord i närbilden av ${madeIn}: samma öga som vyn, inzoomat på dealern. Bilden läggs tillbaka genom det ögat och viks vid bordskanten, så att kroppen står upprätt och händerna ligger på filten. Sedd ur den vyn är den bilden som den är; ur andra vyer är kroppen platt.${choice.lands ? ` När klippet har lagt sitt märkkort (${comma(choice.lands.at)} s in) tas det blå bort och scenens kort ligger där handen lade det, och går sedan till kortplatsen för plats ${choice.lands.seat} i kortplanen; valören är en stå-in.` : ''}`}{' '}
@@ -385,12 +394,13 @@ function Workbench({ registry, scene, doll, round, dealt, route, problem, onProb
               sidan syns att den hänger utanför bordskanten.
             </li>
           </ul>
+          </details>
         </section>
       </main>
 
       <aside className="backdrops" aria-label="Bakgrunder" inert={saving !== null}>
-        <h2>
-          Bakgrunder <span>{items.length}</span>
+        <h2 className="label">
+          Bakgrunderna <span>{items.length}, välj en för att se den i scenen</span>
         </h2>
         {items.map((item) => (
           <BackdropCard key={item.asset.file} item={item} registry={registry} current={item === chosen} onJudge={onJudge} />

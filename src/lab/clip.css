@@ -1,5 +1,6 @@
 /* Steget Klipp: tagningarna i en lista till vänster på en bred skärm, filmen och dockan bredvid varandra, och under
-   dem det som står om tagningen. På en smal skärm en spalt: väljaren överst, filmerna över varandra. */
+   dem det som står om tagningen. På en smal skärm en spalt: väljaren överst, filmerna över varandra. Knappar, flikar,
+   listor och mått är Labbets gemensamma (lab.css). */
 
 .clipstep {
   display: grid;
@@ -10,10 +11,9 @@
 .takelist h3 {
   margin: 14px 10px 4px;
   font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: var(--dim);
+  color: var(--faint);
 }
 
 .takelist section:first-child h3 {
@@ -21,63 +21,27 @@
 }
 
 .takelist .section {
-  align-items: center;
   padding: 5px 10px;
 }
 
 .clipstep .tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  margin-bottom: 12px;
-}
-
-.clipstep .tabs a {
-  display: inline-flex;
-  align-items: center;
-  min-height: 40px;
-  padding: 0 12px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  color: var(--dim);
-}
-
-.clipstep .tabs a[aria-current='page'] {
-  background: var(--raised);
-  color: var(--text);
-  box-shadow: inset 0 -2px 0 var(--accent);
+  margin-bottom: 14px;
 }
 
 .clipstep .picker {
   display: flex;
-  align-items: stretch;
+  align-items: center;
   gap: 8px;
   margin-bottom: 12px;
 }
 
-.clipstep .picker .nav {
-  display: inline-grid;
-  place-items: center;
-  min-width: 44px;
-  min-height: 44px;
-  font-size: 18px;
-}
-
-.clipstep .picker select {
+.clipstep .picker .select {
   flex: 1;
   min-width: 0;
   max-width: 520px;
-  min-height: 44px;
-  padding: 0 8px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: var(--panel);
-  color: var(--text);
-  font: inherit;
 }
 
 .clipstep .count {
-  align-self: center;
   color: var(--dim);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -86,7 +50,7 @@
 .compare .pair {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
+  gap: 12px;
 }
 
 .compare figure {
@@ -114,8 +78,8 @@
   place-items: center;
   aspect-ratio: 16 / 9;
   border: 1px solid var(--line);
-  border-radius: 6px;
-  background: #0a0b0d;
+  border-radius: var(--radius);
+  background: var(--sunk);
   overflow: hidden;
 }
 
@@ -125,62 +89,12 @@
   object-fit: contain;
 }
 
-.compare .switch {
-  display: inline-flex;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  overflow: hidden;
-}
-
-.compare .switch button {
-  min-height: 32px;
-  padding: 0 10px;
-  border: 0;
-  background: transparent;
-  color: var(--dim);
-}
-
-.compare .switch button[aria-pressed='true'] {
-  background: #343842;
-  color: var(--text);
-}
-
 .compare .controls {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   margin: 10px 0 4px;
-}
-
-.compare .controls button {
-  min-height: 44px;
-  min-width: 44px;
-  padding: 0 14px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: var(--panel);
-}
-
-.compare .controls button:hover {
-  background: var(--raised);
-}
-
-.compare .controls button.primary {
-  border-color: var(--accent);
-  background: var(--accent);
-  color: #0a1630;
-  font-weight: 600;
-}
-
-.compare .controls button[aria-pressed='true'] {
-  background: #343842;
-  border-color: var(--accent);
-}
-
-.compare .controls button:disabled {
-  opacity: 0.4;
-  cursor: default;
 }
 
 .compare .controls .frame {
@@ -200,13 +114,8 @@
   margin: 0 0 8px;
 }
 
-.clipstep .dim {
-  color: var(--dim);
-}
-
 .facts .link {
   margin-left: 8px;
-  color: var(--accent);
   white-space: nowrap;
 }
 
@@ -222,43 +131,8 @@
 }
 
 .facts .more {
-  min-height: 40px;
   margin-bottom: 8px;
-  padding: 0 12px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: transparent;
   color: var(--accent);
-}
-
-.measures {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin: 0 0 8px;
-  padding: 0;
-  list-style: none;
-}
-
-.measures li {
-  display: flex;
-  flex-direction: column;
-  padding: 6px 0;
-  border-bottom: 1px solid var(--line);
-}
-
-.measures b {
-  font-weight: 500;
-}
-
-.measures small {
-  color: var(--dim);
-}
-
-.measures em {
-  font-style: normal;
-  font-weight: 600;
-  color: var(--no);
 }
 
 .facts .format {
@@ -281,7 +155,7 @@
 .numbergroup summary {
   display: flex;
   align-items: center;
-  min-height: 44px;
+  min-height: 40px;
   color: var(--accent);
   cursor: pointer;
 }
@@ -313,7 +187,6 @@
 .numbergroup h3 {
   margin: 0 0 6px;
   font-size: 14px;
-  font-weight: 600;
 }
 
 .numbergroup p {
@@ -426,4 +299,23 @@
     min-width: 0;
     width: 45%;
   }
+}
+
+.clipjudge {
+  display: grid;
+  gap: 6px;
+  max-width: 560px;
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--panel);
+}
+
+.clipjudge .seg {
+  justify-self: start;
+}
+
+.clipjudge .words {
+  margin: 0;
 }

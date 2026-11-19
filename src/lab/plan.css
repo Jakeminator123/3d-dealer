@@ -1,4 +1,5 @@
-/* Steget Kortplan. Färgerna är Labbets egna, ur lab.css; reglagen och knapparna som i steget Scen (scene.css). */
+/* Steget Kortplan: planen rakt uppifrån och given ur Spelaren bredvid varandra, reglagen under. Knappar och reglage är
+   Labbets gemensamma (lab.css). */
 
 .planstep {
   display: grid;
@@ -9,8 +10,8 @@
 .planviews {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 12px;
-  padding: 10px 16px;
+  gap: 16px;
+  padding: 12px 20px;
   min-height: 0;
 }
 
@@ -36,27 +37,32 @@
   font-size: 12px;
 }
 
+.legendpart {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: 12px;
+}
+
 .swatch {
   display: inline-block;
   width: 12px;
   height: 16px;
-  margin-left: 8px;
   border-radius: 2px;
 }
 
 .swatch.plan {
-  margin-left: 0;
-  background: rgba(122, 162, 247, 0.55);
+  background: rgb(134 168 245 / 0.55);
   border: 1px solid #9dbaf9;
 }
 
 .swatch.dealer {
-  background: rgba(224, 176, 92, 0.55);
+  background: rgb(227 179 95 / 0.55);
   border: 1px solid #f0c77a;
 }
 
 .swatch.filmed {
-  border: 1.5px dashed #e06c6c;
+  border: 1.5px dashed var(--no);
 }
 
 .planpane h2 {
@@ -65,10 +71,8 @@
   gap: 12px;
   margin: 0;
   font-size: 14px;
-  font-weight: 600;
 }
 
-.planpane h2 .reset,
 .planpane h2 .check {
   font-size: 13px;
   font-weight: 400;
@@ -79,8 +83,8 @@
 .planview {
   width: 100%;
   height: 100%;
-  border-radius: 8px;
-  background: #0a0b0d;
+  border-radius: var(--radius);
+  background: var(--sunk);
 }
 
 .planfelt {
@@ -90,7 +94,7 @@
 }
 
 .planedge {
-  stroke: #9a9ea8;
+  stroke: var(--dim);
   stroke-width: 2.5;
   stroke-dasharray: 14 10;
 }
@@ -113,26 +117,26 @@
 }
 
 .plancard {
-  fill: rgba(122, 162, 247, 0.55);
+  fill: rgb(134 168 245 / 0.55);
   stroke: #9dbaf9;
   stroke-width: 2;
 }
 
 .plandealer {
-  fill: rgba(224, 176, 92, 0.55);
+  fill: rgb(227 179 95 / 0.55);
   stroke: #f0c77a;
   stroke-width: 2;
 }
 
 .planfilmed {
   fill: none;
-  stroke: #e06c6c;
+  stroke: var(--no);
   stroke-width: 2.5;
   stroke-dasharray: 8 6;
 }
 
 .planglide {
-  stroke: #e06c6c;
+  stroke: var(--no);
   stroke-width: 2;
   stroke-dasharray: 4 5;
 }
@@ -144,9 +148,9 @@
   display: grid;
   place-items: center;
   min-height: 0;
-  border-radius: 8px;
+  border-radius: var(--radius);
   overflow: hidden;
-  background: #0a0b0d;
+  background: var(--sunk);
 }
 
 .planstage {
@@ -166,8 +170,8 @@
 
 .plancontrols {
   display: grid;
-  gap: 10px;
-  padding: 10px 16px 12px;
+  gap: 8px;
+  padding: 10px 20px 10px;
   border-top: 1px solid var(--line);
   background: var(--panel);
 }
@@ -176,7 +180,7 @@
   opacity: 0.6;
 }
 
-.plancontrols .warning {
+.plancontrols .problem {
   margin: 0;
 }
 
@@ -189,34 +193,28 @@
 .plangroups fieldset {
   display: grid;
   align-content: start;
-  gap: 4px;
+  gap: 2px;
   margin: 0;
   padding: 6px 12px 10px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius);
 }
 
 .plangroups legend {
   padding: 0 4px;
   color: var(--dim);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
 }
 
-.planslider {
-  display: grid;
-  grid-template-columns: 160px minmax(0, 1fr) 72px;
-  align-items: center;
-  gap: 8px;
+.plangroups .slider {
+  grid-template-columns: minmax(110px, 150px) minmax(60px, 1fr) 64px;
 }
 
-.planslider input {
-  width: 100%;
-  accent-color: var(--accent);
-}
-
-.planslider output {
-  color: var(--dim);
-  font-variant-numeric: tabular-nums;
-  text-align: right;
+.plangroups .slider .what {
+  margin: -4px 0 2px;
 }
 
 .planbuttons {
@@ -226,27 +224,13 @@
   margin-top: 8px;
 }
 
-.planbuttons .go {
-  padding: 5px 12px;
-  border: 1px solid var(--accent);
-  border-radius: 6px;
-  background: rgba(122, 162, 247, 0.18);
-}
-
-.planbuttons .go:disabled {
-  border-color: var(--line);
-  background: transparent;
-  color: #5d616b;
-  cursor: default;
-}
-
-.plancontrols .controlhint {
+.plancontrols .hint {
   margin: 4px 0 0;
 }
 
 .plannotes {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
   color: var(--dim);
   font-size: 12px;

@@ -1,6 +1,7 @@
 // En fil i full storlek, med allt registret vet om den bredvid.
 
 import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react';
+import { shownText } from './names.ts';
 import { formatBytes, mediaUrl, type Asset, type Item, type Registry, type Section } from './registry.ts';
 import { Verdict, type Judge } from './Verdict.tsx';
 import { Words, type Say } from './Words.tsx';
@@ -36,7 +37,7 @@ export function Detail({ item, section, registry, close, previous, next, onJudge
   }, [close, previous, next]);
 
   return (
-    <div className="detail" role="dialog" aria-modal="true" aria-label={asset.title}>
+    <div className="detail" role="dialog" aria-modal="true" aria-label={shownText(asset.title)}>
       <header className="detailbar">
         <span className="where">
           {section.label} {item.number} av {section.items.length}
@@ -49,7 +50,7 @@ export function Detail({ item, section, registry, close, previous, next, onJudge
         <Step href={next} title="Nästa (högerpil)">
           Nästa →
         </Step>
-        <a className="nav" href={close} title="Stäng (Esc)">
+        <a className="btn" href={close} title="Stäng (Esc)">
           Stäng
         </a>
       </header>
@@ -75,11 +76,11 @@ export function Detail({ item, section, registry, close, previous, next, onJudge
 
 function Step({ href, title, children }: { href?: string; title: string; children: ReactNode }) {
   return href ? (
-    <a className="nav" href={href} title={title}>
+    <a className="btn" href={href} title={title}>
       {children}
     </a>
   ) : (
-    <span className="nav off">{children}</span>
+    <span className="btn off">{children}</span>
   );
 }
 
@@ -103,7 +104,7 @@ function ImageStage({ asset }: { asset: Asset }) {
 
   return (
     <div ref={stage} className={zoom ? 'stage full' : 'stage fit'}>
-      <img src={mediaUrl(asset.file)} alt={asset.title} draggable={false} onClick={toggle} />
+      <img src={mediaUrl(asset.file)} alt={shownText(asset.title)} draggable={false} onClick={toggle} />
     </div>
   );
 }
@@ -151,19 +152,19 @@ function FilmStage({ asset }: { asset: Asset }) {
         onSeeked={(event) => setFrame(frameAt(event.currentTarget.currentTime))}
       />
       <div className="filmbar">
-        <button type="button" onClick={() => step(-1)}>
+        <button type="button" className="btn" onClick={() => step(-1)}>
           ← Ruta
         </button>
         <span className="frame">
           Ruta {frame + 1}
           {frames > 0 && ` av ${frames}`}
         </span>
-        <button type="button" onClick={() => step(1)}>
+        <button type="button" className="btn" onClick={() => step(1)}>
           Ruta →
         </button>
         <span className="spacer" />
         {RATES.map((value) => (
-          <button key={value} type="button" aria-pressed={rate === value} onClick={() => speed(value)}>
+          <button key={value} type="button" className="btn small" aria-pressed={rate === value} onClick={() => speed(value)}>
             {String(value).replace('.', ',')}×
           </button>
         ))}
@@ -213,7 +214,7 @@ function Info({ asset, registry, onJudge, onSay }: InfoProps) {
 
   return (
     <aside className="info">
-      <h2>{asset.title}</h2>
+      <h2>{shownText(asset.title)}</h2>
       <Verdict registry={registry} asset={asset} onJudge={onJudge} />
       <p className="meaning">
         {registry.statuses[asset.status] ?? asset.status}

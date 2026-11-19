@@ -12,7 +12,7 @@ import { after, before, test } from 'node:test';
 import { addEntry, addOrder, archive, createRegister, setStatus } from '../pipeline/registry.ts';
 import { createApi } from './api.ts';
 import { handler } from './main.ts';
-import type { Takes } from './tagningar.ts';
+import { sentOf, type Takes } from './tagningar.ts';
 
 let root: string;
 let server: Server;
@@ -165,4 +165,13 @@ test('annat än paketets visade filer, och sökvägar utanför paketen, nekas', 
   }
   // Ett ../ som står öppet i vägen städas bort av adressen innan servern ser den: den når aldrig tagningarnas väg.
   assert.equal(await raw('/tagning/../../hemlig.txt'), 418);
+});
+
+test('filmen som skickades läses ur beställningen: dockans film, ett klipp i dess ställe, eller ingen', () => {
+  const doll = { file: 'output/tagningar/p/referens.mp4', frames: 72, fps: 24, durationSeconds: 3 };
+  const clip = { file: 'output/tagningar/p/referensklipp.mp4', asset: KEPT, frames: 73, fps: 24, durationSeconds: 3.04 };
+  assert.deepEqual(sentOf({ inputs: { referenceVideos: [doll] } }), { kind: 'docka', role: 'referenceVideos', asset: null, frames: 72, fps: 24, seconds: 3 });
+  assert.deepEqual(sentOf({ inputs: { referenceVideos: [clip] }, motionFrom: { file: KEPT, role: 'referenceVideos' } }), { kind: 'klipp', role: 'referenceVideos', asset: KEPT, frames: 73, fps: 24, seconds: 3.04 });
+  assert.deepEqual(sentOf({ inputs: { referenceVideo: clip } }).role, 'referenceVideo', 'video till video');
+  assert.deepEqual(sentOf({ inputs: { startFrame: {}, endFrame: {} } }), { kind: 'ingen', role: null, asset: null, frames: null, fps: null, seconds: null });
 });

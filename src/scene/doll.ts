@@ -25,6 +25,11 @@ export type Doll = {
   clip: Clip;
   /** Visar rörelsen där den står (`giv`), eller ställer dockan i VILA utan kort (`vila`) och pausar. */
   show(pose: 'giv' | 'vila'): void;
+  /**
+   * Byter rörelsen dockan gör, utan att något byggs om: tiden står kvar, inom den nya rörelsens längd, och ställningen
+   * ritas om. Så ändras en rörelse i Labbet medan man ser på.
+   */
+  setMove(move: DollMove): void;
   dispose(): void;
 };
 
@@ -48,7 +53,9 @@ const v3 = (point: Vec3): THREE.Vector3 => new THREE.Vector3(point[0], point[1],
  * Dockan för scenen, med rörelsen `move`. `changed` anropas varje gång dockan har fått en ny ställning och ska ritas.
  * Från början står hon i rörelsens första ställning (REDO).
  */
-export function createDoll(scene: SceneDescription, doll: DollDescription, move: DollMove, changed: () => void): Doll {
+export function createDoll(scene: SceneDescription, doll: DollDescription, first: DollMove, changed: () => void): Doll {
+  // Rörelsen dockan gör just nu; setMove byter den.
+  let move = first;
   const group = new THREE.Group();
   const { shape } = doll;
   const skeleton = handSkeleton(doll);
@@ -284,6 +291,12 @@ export function createDoll(scene: SceneDescription, doll: DollDescription, move:
       if (closed) return;
       if (pose === 'vila') pause();
       shown = pose;
+      draw();
+    },
+    setMove(next) {
+      if (closed) return;
+      move = next;
+      time = Math.min(time, move.seconds);
       draw();
     },
     dispose() {

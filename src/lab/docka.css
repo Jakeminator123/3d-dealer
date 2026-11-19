@@ -1,0 +1,526 @@
+/* Steget Dockan: valen överst, dockan i scenen, uppspelningen och kameran under, och panelen med värden, mått och
+   tagning till höger. Knappar, reglage och listor är Labbets gemensamma (lab.css). */
+
+.dollstep {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 410px;
+  min-height: 0;
+}
+
+.dollmain {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* Valen: rörelse, plats, kort och handling */
+
+.dollpick {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px 18px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.pickfield {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.pickfield .select {
+  max-width: 340px;
+}
+
+/* Dockan i scenen */
+
+.dollview {
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--sunk);
+}
+
+.dollstage {
+  position: absolute;
+  inset: 0;
+  cursor: grab;
+}
+
+.dollstage:active {
+  cursor: grabbing;
+}
+
+.dollstage canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: block;
+}
+
+.dolltag {
+  position: absolute;
+  top: 10px;
+  left: 12px;
+  display: grid;
+  gap: 1px;
+  padding: 6px 10px;
+  border-radius: var(--radius);
+  background: rgb(0 0 0 / 0.55);
+  pointer-events: none;
+}
+
+.dolltag b {
+  font-size: 13px;
+}
+
+.dolltag span {
+  font-size: 11px;
+  color: var(--dim);
+}
+
+.dollbusy {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  padding: 4px 10px;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  background: rgb(11 22 49 / 0.8);
+  color: var(--accent);
+  font-size: 12px;
+}
+
+.dollproblem {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  left: 12px;
+  margin: 0;
+}
+
+.dollview > .notice {
+  display: grid;
+  place-items: center;
+  height: 100%;
+}
+
+/* Uppspelningen: tiden med rörelsens tidpunkter utmärkta */
+
+.transport {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px 6px;
+  border-top: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.timeline {
+  position: relative;
+  flex: 1;
+  min-width: 180px;
+  padding-bottom: 16px;
+}
+
+.timeline input {
+  display: block;
+  width: 100%;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.marks span {
+  position: absolute;
+  top: 20px;
+  transform: translateX(-50%);
+  font-size: 10px;
+  line-height: 1;
+  color: var(--faint);
+  white-space: nowrap;
+}
+
+.marks span::before {
+  content: '';
+  position: absolute;
+  top: -7px;
+  left: 50%;
+  width: 1px;
+  height: 5px;
+  background: var(--line-strong);
+}
+
+.clock {
+  display: grid;
+  min-width: 92px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  line-height: 1.2;
+}
+
+.clock small {
+  color: var(--faint);
+  font-size: 11px;
+}
+
+.dollcamera {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 6px 16px 10px;
+  background: var(--panel);
+}
+
+.dollcamera .rowname {
+  width: auto;
+}
+
+/* Panelen */
+
+.dollside {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 0;
+  border-left: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.dollside .tabs {
+  padding: 0 12px;
+}
+
+.tally {
+  display: inline-grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.dollpanel {
+  overflow: hidden auto;
+  padding: 14px 16px 48px;
+}
+
+.movehead code {
+  overflow-wrap: anywhere;
+}
+
+.movehead {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.movehead h2 {
+  font-size: 16px;
+}
+
+.movehead .hint .badge {
+  margin-right: 4px;
+}
+
+.valuesbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-size: 13px;
+  color: var(--dim);
+}
+
+.valuesbar b {
+  color: var(--text);
+}
+
+.valuegroup {
+  border-top: 1px solid var(--line);
+  padding: 6px 0 8px;
+}
+
+.valuegroup > summary {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0 2px;
+  padding: 4px 0;
+  cursor: pointer;
+  list-style: none;
+}
+
+.valuegroup > summary::-webkit-details-marker {
+  display: none;
+}
+
+.valuegroup > summary::before {
+  content: '▸';
+  grid-row: 1;
+  margin-right: 6px;
+  color: var(--faint);
+}
+
+.valuegroup[open] > summary::before {
+  content: '▾';
+}
+
+.valuegroup > summary b {
+  grid-row: 1;
+  font-size: 14px;
+}
+
+.valuegroup > summary small {
+  grid-column: 1 / -1;
+  padding-left: 16px;
+  font-size: 12px;
+  color: var(--faint);
+}
+
+/* Ett reglage: namnet och värdet på en rad, reglaget i hela bredden under, och vad det gör sist. */
+.control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto 26px;
+  align-items: center;
+  gap: 0 8px;
+  padding: 6px 0 6px 16px;
+}
+
+.control .name {
+  font-size: 13px;
+}
+
+.control input[type='range'] {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  width: 100%;
+  margin: 2px 0 0;
+  accent-color: var(--accent);
+}
+
+.control output {
+  font-size: 12px;
+  color: var(--dim);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.control .seg {
+  grid-column: 1 / 3;
+  grid-row: 2;
+  justify-self: start;
+  margin-top: 4px;
+}
+
+.control .reset {
+  min-width: 26px;
+  padding: 0;
+}
+
+.control .what {
+  grid-column: 1 / -1;
+  font-size: 12px;
+  color: var(--faint);
+}
+
+.control .what em {
+  font-style: normal;
+  color: var(--accent);
+}
+
+.control.changed .name,
+.control.changed output {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.savebox,
+.preparefields {
+  display: grid;
+  gap: 8px;
+}
+
+.savebox {
+  margin-top: 16px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--ground);
+}
+
+.savebox .btn.primary {
+  justify-self: start;
+}
+
+.savefield {
+  display: grid;
+  gap: 4px;
+}
+
+.savefield > span {
+  font-size: 12px;
+  color: var(--dim);
+}
+
+.measurepanel,
+.preparepanel {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
+
+.measurepanel > .btn,
+.preparepanel > .btn {
+  justify-self: start;
+}
+
+.preparepanel > p,
+.measurepanel > p {
+  margin: 0;
+}
+
+.preparepanel h3 {
+  margin-top: 12px;
+}
+
+.job {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+}
+
+.job header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.job header small {
+  color: var(--faint);
+}
+
+.job p {
+  margin: 0;
+}
+
+.frames {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.frames figure {
+  margin: 0;
+}
+
+.frames img,
+.frames video {
+  display: block;
+  width: 100%;
+  border-radius: 6px;
+  background: var(--sunk);
+}
+
+.frames figcaption {
+  font-size: 11px;
+  color: var(--faint);
+}
+
+.log {
+  max-height: 240px;
+  margin: 0;
+  padding: 8px 10px;
+  overflow: auto;
+  border-radius: 6px;
+  background: var(--sunk);
+  color: var(--dim);
+  font-size: 11px;
+  white-space: pre-wrap;
+}
+
+.prompt {
+  font-size: 12px;
+  color: var(--dim);
+}
+
+.waitlist {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.waitlist li {
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--ground);
+}
+
+.waitlist small {
+  color: var(--faint);
+}
+
+@media (max-width: 1280px) {
+  .dollstep {
+    grid-template-columns: minmax(0, 1fr) 360px;
+  }
+}
+
+.valuegroup > summary .tally {
+  justify-self: start;
+}
+
+/* En fast rad längst ner i panelen när värden är ändrade men inte sparade. */
+.savebar {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 12px -16px 0;
+  padding: 10px 16px;
+  border-top: 1px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, var(--panel));
+  font-size: 13px;
+}
+
+.measures .mark {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  margin-right: 4px;
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.measures .mark.ok {
+  background: color-mix(in srgb, var(--yes) 25%, transparent);
+  color: var(--yes);
+}
+
+.measures .mark.see {
+  background: color-mix(in srgb, var(--warn) 25%, transparent);
+  color: var(--warn);
+}
+
+.measures .mark.off {
+  background: color-mix(in srgb, var(--no) 25%, transparent);
+  color: var(--no);
+}

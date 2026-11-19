@@ -3,8 +3,9 @@
 //   GET /api/tagningar           takes: varje klipp i registret som har ett paket i output/tagningar/, och de arkiverade
 //                                underkända som har kvar sitt paket, med paketets mått och beställningen. waiting:
 //                                paketen som väntar på att beställas (bestallning.json utan post.json).
-//   GET /tagning/<paket>/<fil>   referens.mp4 (dockans förlaga), ark.jpg och bevis.mp4 ur paketet, och klippet.mp4: ett
-//                                arkiverat klipp ur output/work/arkiv/. Ett klipp i assets/ hämtas genom /media/.
+//   GET /tagning/<paket>/<fil>   referens.mp4 (dockans förlaga), ark.jpg, bevis.mp4, forsta.png, sista.png och
+//                                ark-docka.jpg ur paketet, och klippet.mp4: ett arkiverat klipp ur output/work/arkiv/.
+//                                Ett klipp i assets/ hämtas genom /media/.
 //
 // Paketen görs av src/pipeline/tagning.ts (forbered och ta-emot); här läses bara bestallning.json och matning.json.
 
@@ -14,8 +15,12 @@ import { clipAnchor } from '../pipeline/dealer.ts';
 import { ARCHIVE, query, viewRegistry, type RegistryEntry } from '../pipeline/registry.ts';
 import { pathInside } from './files.ts';
 
-/** Paketets filer som steget visar. Inga andra lämnas ut. */
-export const TAKE_FILES = ['referens.mp4', 'ark.jpg', 'bevis.mp4', 'klippet.mp4'] as const;
+/**
+ * Paketets filer som Labbet visar: stegen Klipp och Dockan. Inga andra lämnas ut. forsta.png och sista.png är bilderna
+ * filmen börjar och slutar på, ark-docka.jpg dockans film som rutor, och referensklipp.mp4 det godkända klippet som
+ * skickades i stället för dockans film (tagning.ts forbered --referensklipp).
+ */
+export const TAKE_FILES = ['referens.mp4', 'ark.jpg', 'bevis.mp4', 'klippet.mp4', 'forsta.png', 'sista.png', 'ark-docka.jpg', 'referensklipp.mp4'] as const;
 export type TakeFile = (typeof TAKE_FILES)[number];
 
 /** De mått ur matning.json som steget alltid visar; de andra visas när de ligger utanför sin gräns. */
@@ -40,6 +45,8 @@ export type Take = {
   action: string;
   take: number | null;
   move: string | null;
+  /** Ordet som skiljer en tagning som görs på ett annat sätt än serien (tagning.ts forbered --variant), eller null. */
+  variant: string | null;
   /** REDO-ankaret klippet är gjort ur (dealer.ts, clipAnchor). */
   anchor: string | null;
   status: string;
@@ -59,8 +66,10 @@ export type Take = {
   /** Tiderna i klippet och i dockans film, i sekunder (matning.json, seconds och doll). */
   times: { clip: Record<string, number | null>; doll: Record<string, number | null> } | null;
   judged: { inside: number; total: number; shown: Judged[] } | null;
-  /** Dockans film som den skickades (bestallning.json, inputs.referenceVideos). */
+  /** Dockans film i paketet (referens.mp4), skickad eller inte: bestallning.json, doll.film, annars inputs.referenceVideos. */
   reference: { frames: number | null; fps: number | null; seconds: number | null } | null;
+  /** Det som skickades till filmmodellen som film (sentOf). */
+  sent: Sent;
   /** Det paketet beställde: modell, upplösning, längd och bildformat. */
   request: { model: string | null; resolution: string | null; duration: number | null; ratio: string | null; made: string | null };
   /** Beställningen i registret (orders), med längden ur dess indata. */
@@ -71,7 +80,15 @@ export type Take = {
   lands: unknown;
 };
 
-export type Waiting = { id: string; dealer: string | null; view: string | null; seat: Seat | null; index: number | null; action: string; take: number | null; move: string | null; anchor: string | null; clip: string | null; made: string | null };
+/**
+ * Filmen som skickas med första och sista bilden (bestallning.json, inputs, så som src/pipeline/tagning.ts forbered
+ * skriver det): dockans film (`docka`, inputs.referenceVideos), ett godkänt klipp i dess ställe (`klipp`, som
+ * rörelsereferens i referenceVideos eller som filmen som görs om i referenceVideo, med klippets registernamn), eller
+ * ingen film (`ingen`).
+ */
+export type Sent = { kind: 'docka' | 'klipp' | 'ingen'; role: 'referenceVideos' | 'referenceVideo' | null; asset: string | null; frames: number | null; fps: number | null; seconds: number | null };
+
+export type Waiting = { id: string; dealer: string | null; view: string | null; seat: Seat | null; index: number | null; action: string; take: number | null; move: string | null; anchor: string | null; clip: string | null; made: string | null; sent: Sent['kind'] };
 export type Takes = { takes: Take[]; waiting: Waiting[] };
 
 const readJson = (path: string): any => JSON.parse(readFileSync(path, 'utf8'));
@@ -105,6 +122,23 @@ function archivedPath(root: string, place: unknown): string | null {
   return path && existsSync(path) ? path : null;
 }
 
+/** Det paketet skickar som film (Sent): ur inputs, och klippets namn ur filen eller motionFrom. */
+export function sentOf(order: any): Sent {
+  const inputs = order?.inputs ?? {};
+  const one = inputs.referenceVideo ?? (Array.isArray(inputs.referenceVideos) ? inputs.referenceVideos[0] : undefined);
+  if (!one) return { kind: 'ingen', role: null, asset: null, frames: null, fps: null, seconds: null };
+  const role = inputs.referenceVideo ? 'referenceVideo' : 'referenceVideos';
+  const asset = text(one.asset) ?? text(order?.motionFrom?.file);
+  const clip = asset !== null || String(one.file ?? '').endsWith('/referensklipp.mp4');
+  return { kind: clip ? 'klipp' : 'docka', role, asset, frames: count(one.frames), fps: count(one.fps), seconds: count(one.durationSeconds) };
+}
+
+/** Dockans film i paketet: den som står i doll.film när ett klipp skickades i dess ställe, annars den som skickades. */
+function dollFilmOf(order: any): Take['reference'] {
+  const film = order?.doll?.film ?? (sentOf(order).kind === 'docka' ? order?.inputs?.referenceVideos?.[0] : undefined);
+  return film ? { frames: count(film.frames), fps: count(film.fps), seconds: count(film.durationSeconds) } : null;
+}
+
 const durationOf = (inputs: unknown): number | null => {
   try {
     return count(JSON.parse(String(inputs ?? '{}')).duration);
@@ -124,7 +158,6 @@ function takeOf(root: string, pkg: Package, entry: RegistryEntry & { present?: b
   const judged: any[] = Array.isArray(matning?.judged) ? matning.judged : [];
   const lands = (entry.lands ?? {}) as { seat?: unknown; index?: unknown };
   const files = TAKE_FILES.filter((name) => (name === 'klippet.mp4' ? archived !== null && archivedPath(root, archived.place) !== null : existsSync(join(pkg.dir, name))));
-  const reference = pkg.order.inputs?.referenceVideos?.[0];
   return {
     id: pkg.id,
     file: entry.file,
@@ -136,6 +169,7 @@ function takeOf(root: string, pkg: Package, entry: RegistryEntry & { present?: b
     action: String(entry.action ?? pkg.order.action ?? 'deal'),
     take: count(entry.take ?? pkg.order.take),
     move: text(entry.move) ?? text(pkg.order.cycle),
+    variant: text(pkg.order.variant),
     anchor: clipAnchor(entry) ?? text(pkg.order.anchor),
     status: archived ? String(verdict?.status ?? entry.status) : entry.status,
     statusBy: archived ? (text(verdict?.who) ?? text(entry.statusBy)) : text(entry.statusBy),
@@ -158,7 +192,8 @@ function takeOf(root: string, pkg: Package, entry: RegistryEntry & { present?: b
             .map((one) => ({ key: String(one.key), what: String(one.what ?? one.key), value: one.value ?? null, unit: String(one.unit ?? ''), limit: String(one.limit ?? ''), verdict: String(one.verdict ?? '') })),
         }
       : null,
-    reference: reference ? { frames: count(reference.frames), fps: count(reference.fps), seconds: count(reference.durationSeconds) } : null,
+    reference: dollFilmOf(pkg.order),
+    sent: sentOf(pkg.order),
     request: { model: text(pkg.order.model), resolution: text(pkg.order.resolution), duration: count(pkg.order.duration), ratio: text(pkg.order.ratio), made: text(pkg.order.made) },
     order: order
       ? { at: text(order.at), model: String(order.model), credits: count(order.credits), basis: String(order.basis ?? ''), seconds: durationOf(order.inputs), received: String(order.note ?? '').includes('togs emot') }
@@ -214,6 +249,7 @@ export function listTakes(root: string): Takes {
       anchor: text(pkg.order.anchor),
       clip: text(pkg.order.clip),
       made: text(pkg.order.made),
+      sent: sentOf(pkg.order).kind,
     }));
   return { takes, waiting };
 }

@@ -31,7 +31,7 @@ server ───> engine, pipeline
 | --- | --- | --- |
 | `src/engine` | Regler, sko, slump, pengar, signaler | Känner inte till bild, film eller scen |
 | `src/scene` | Ritar scenen och spelar upp klipp och signaler | Avgör inga kort eller utfall |
-| `src/lab` | Stegen Scen, Dealer, Klipp, Granska, Spela | Har ingen egen scen eller uppspelning |
+| `src/lab` | Labbet: översikten och stegen Scen, Kortplan, Dealer, Dockan, Klipp och Granska, i den ordning en dealer går dem (`src/lab/steps.ts`); Spela är Casinot | Har ingen egen scen eller uppspelning |
 | `src/casino` | En riktig runda från vald plats | Har ingen egen scen eller uppspelning |
 | `src/pipeline` | Förlaga, beställning, och registret (`registry.ts`, den enda vägen till `content/register.db`) | Spelar inte, avgör inget i spelet |
 | `src/server` | Registret, filerna och förlagorna över HTTP; senare spelsessionen | Har ingen logik som hör till kärnan |
@@ -70,6 +70,7 @@ Att byta kamera ändrar aldrig kortets plats, rörelsen som spelas eller utfalle
 | Scen | Bord, sko, kortplatser och kameror i meter. En beskrivning. |
 | Identitet | De godkända bilderna som bär en dealers likhet: ansikte, kläder, händer. Spelas aldrig. Ersätter keystone. |
 | Ankare | En gjord stillbild som klipp börjar och slutar på, aldrig en ruta ur en film. Tre slag: VILA (båda händerna på filten), REDO (handen på kortet i skon) och LAGT n (handen vid plats n med kortet just lagt; n är 1–7 eller D för dealern). VILA och REDO hette A1 och A2 i gamla projektet. Ett ankare är gjort för en vy: dealern på grön skärm i vyns närbild, i dockans ställning. |
+| Koder | Labbets korta namn bredvid orden (`src/lab/names.ts`): A1 är VILA, A2.n REDO (n är REDO-ställningen, och var och en har sin serie; i dag finns en, A2.1, och en ny version av samma bild är fortfarande A2.1), A3P1–A3P7 och A3D REDO med kortet lagt på plats 1–7 eller hos dealern, det en tagning slutar på. Korten på en plats heter C1, C2, C3 i Labbet och kort 0, 1, 2 i data. Filer, poster och fält behåller sina namn. |
 | Klipp | En film som gör en sak med ett kort. Produktionen gör cykler. Nyp eller släp är en egenskap hos klippet. Ett klipp finns i en tagning per vy. |
 | Cykel | REDO → kortet läggs på platsens kortplats (kort 0 eller 1) → REDO. Börjar och slutar i samma ställning, så cykler kan följa på varandra i vilken ordning som helst. Takten står i `content/moves/cykel-nyp.json`. |
 | Följd | Klipp som spelas efter varandra på dealerytan, med scenens kort kvar på bordet. Ett ensamt klipp är en följd med ett klipp. Den enda uppspelningen (`src/scene/reel.ts`). |

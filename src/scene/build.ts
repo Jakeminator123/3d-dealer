@@ -124,6 +124,11 @@ export type SceneHandle = {
    * 1. Så ställs farten i Labbet medan given spelar. Utan dealerfilm gör den ingenting.
    */
   setSpeed(speed: number): void;
+  /**
+   * Byter rörelsen dockan gör (doll.ts, setMove) utan att scenen byggs om: bord, sko, vy och tid står kvar. Så ändras
+   * en rörelse i Labbets steg Dockan medan man ser på. Utan docka gör den ingenting.
+   */
+  setDollMove(move: DollMove): void;
   /** Ytans storlek på sidan. Hela vyns ruta visas alltid, inpassad på höjden eller bredden. */
   resize(width: number, height: number): void;
   /** Ritar en ruta nu. Annars ritas scenen bara när något har ändrats. */
@@ -602,6 +607,9 @@ export function buildScene(host: HTMLElement, scene: SceneDescription, options: 
     },
     setSpeed(speed) {
       film?.setSpeed(speed);
+    },
+    setDollMove(move) {
+      doll?.setMove(move);
     },
     resize(width, height) {
       if (!(width > 0 && height > 0)) return;

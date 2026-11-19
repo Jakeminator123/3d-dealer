@@ -1,16 +1,20 @@
 // Steget Klipp: varje tagning bredvid dockans förlaga den gjordes efter, startade och stoppade tillsammans och i samma
-// takt, med omdömet, det mätta och beställningen. Fliken Underlaget visar scenens tal och vad ett videojobb är.
+// takt, med omdömet (som Jakob kan sätta här, med sina ord om vad som inte är naturligt), det mätta och beställningen.
+// Fliken Underlaget visar scenens tal och vad ett videojobb är.
 // Tagningarna och paketens filer kommer från servern (/api/tagningar och /tagning/, src/server/tagningar.ts). Steget
-// visar bara; omdömen sätts i Granska.
+// skriver bara omdömet och orden, genom servern som Granska.
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { readScene, type SceneDescription } from '../scene/description.ts';
 import { fetchContent } from './content.ts';
 import { NumberGroup } from './NumberGroup.tsx';
 import { axesText, jobGroups, judgedValue, megabytes, num, point, sceneGroups, withUnit } from './numbers.ts';
-import { fetchRegistry, sectionsOf, type Registry } from './registry.ts';
+import { fetchRegistry, saveComment, saveStatus, sectionsOf, type Registry } from './registry.ts';
+import { Verdict, type Judge } from './Verdict.tsx';
+import { Words, type Say } from './Words.tsx';
 import { routeTo } from './route.ts';
-import { anchorLabel, cardName, cardWords, clipUrl, cycleLabel, fetchTakes, groupTakes, takeUrl, viewLabel, viewWord, type Take, type TakeGroup, type Takes } from './takes.ts';
+import { anchorName, cardKey, cardName, cardWords, cycleLabel, framesOf, viewLabel, viewWord } from './names.ts';
+import { clipUrl, fetchTakes, groupTakes, sentWords, takeUrl, type Take, type TakeGroup, type Takes } from './takes.ts';
 import './clip.css';
 
 const STEP = 'klipp';
@@ -62,6 +66,15 @@ export default function ClipStep({ route }: { route: string[] }) {
   useEffect(() => {
     load().then(setData, (error: Error) => setProblem(error.message));
   }, []);
+  // Ett omdöme eller Jakobs ord sparas genom servern, och sedan läses tagningarna om, så att läget syns överallt i steget.
+  const keep = useCallback((saving: Promise<Registry>) => {
+    saving.then(
+      () => load().then(setData, (error: Error) => setProblem(error.message)),
+      (error: Error) => setProblem(error.message),
+    );
+  }, []);
+  const judge = useCallback<Judge>((file, status) => keep(saveStatus(file, status)), [keep]);
+  const say = useCallback<Say>((file, comment) => keep(saveComment(file, comment)), [keep]);
 
   const groups = useMemo(() => (data ? groupTakes(data.takes.takes, data.current) : []), [data]);
   const ordered = useMemo(() => groups.flatMap((group) => group.takes), [groups]);
@@ -72,7 +85,15 @@ export default function ClipStep({ route }: { route: string[] }) {
   }, [data]);
 
   if (!data) return <main className="notice">{problem ?? 'Läser tagningarna …'}</main>;
-  if (ordered.length === 0) return <main className="main clipstep"><p className="empty">Inga tagningar med paket än. En tagning börjar med <code>node src/pipeline/tagning.ts forbered</code>.</p></main>;
+  if (ordered.length === 0)
+    return (
+      <main className="main clipstep">
+        <div className="emptystate">
+          <b>Inga tagningar med paket än</b>
+          En tagning förbereds i steget Dockan, eller med <code>node src/pipeline/tagning.ts forbered</code>, och beställs av agenten.
+        </div>
+      </main>
+    );
 
   const numbers = route[0] === TAL;
   const wanted = numbers ? route[1] : route[0];
@@ -81,25 +102,25 @@ export default function ClipStep({ route }: { route: string[] }) {
   const previous = ordered[(at - 1 + ordered.length) % ordered.length]!;
   const next = ordered[(at + 1) % ordered.length]!;
   const cycle = (move: string | null) => cycleLabel(move, move ? data.abouts[move] : undefined);
-  const groupName = (group: TakeGroup) => `${viewLabel(group.view)} · ${anchorLabel(group.anchor)} · ${cycle(group.move)}${group.current ? '' : ' (äldre ankare)'}`;
+  const groupName = (group: TakeGroup) => `${viewLabel(group.view)} · ${anchorName(group.anchor)} · ${cycle(group.move)}${group.current ? '' : ' (äldre ankare)'}`;
   const to = (id: string) => routeTo(STEP, ...(numbers ? [TAL] : []), id);
   const picker = (
     <div className="picker">
-      <a className="nav" href={to(previous.id)} aria-label="Föregående tagning">
+      <a className="btn icon" href={to(previous.id)} aria-label="Föregående tagning">
         ‹
       </a>
-      <select aria-label="Välj tagning" value={take.id} onChange={(event) => void (window.location.hash = to(event.currentTarget.value))}>
+      <select className="select" aria-label="Välj tagning" value={take.id} onChange={(event) => void (window.location.hash = to(event.currentTarget.value))}>
         {groups.map((group) => (
           <optgroup key={group.key} label={groupName(group)}>
             {group.takes.map((one) => (
               <option key={one.id} value={one.id}>
-                {`${cardName(one.seat, one.index, one.action)} t${one.take ?? '?'} · ${statusWord(one.status)}${one.archived ? ', arkiverad' : ''}`}
+                {`${cardName(one.seat, one.index, one.action)} t${one.take ?? '?'}${one.variant ? ` ${one.variant}` : ''} · ${statusWord(one.status)}${one.archived ? ', arkiverad' : ''}`}
               </option>
             ))}
           </optgroup>
         ))}
       </select>
-      <a className="nav" href={to(next.id)} aria-label="Nästa tagning">
+      <a className="btn icon" href={to(next.id)} aria-label="Nästa tagning">
         ›
       </a>
       <span className="count">
@@ -116,7 +137,7 @@ export default function ClipStep({ route }: { route: string[] }) {
             <h3>{groupName(group)}</h3>
             {group.takes.map((one) => (
               <a key={one.id} className="section" href={to(one.id)} aria-current={one.id === take.id ? 'page' : undefined}>
-                {cardName(one.seat, one.index, one.action)} t{one.take ?? '?'}
+                {cardName(one.seat, one.index, one.action)} t{one.take ?? '?'}{one.variant ? ` ${one.variant}` : ''}
                 <span className={`badge ${statusClass(one.status)}`}>{statusWord(one.status)}</span>
               </a>
             ))}
@@ -138,7 +159,8 @@ export default function ClipStep({ route }: { route: string[] }) {
         ) : (
           <>
             <Compare key={take.id} take={take} rate={rate} setRate={setRate} />
-            <Facts take={take} cycle={cycle} review={review.get(take.file)} />
+            {problem && <p className="problem">{problem}</p>}
+            <Facts take={take} cycle={cycle} review={review.get(take.file)} registry={data.registry} onJudge={judge} onSay={say} />
           </>
         )}
       </main>
@@ -159,7 +181,18 @@ function Compare({ take, rate, setRate }: { take: Take; rate: number; setRate: (
   const fps = take.film?.fps ?? 24;
   const frames = take.film?.frames ?? null;
   const film = top === 'bevis' && take.files.includes('bevis.mp4') ? takeUrl(take.id, 'bevis.mp4') : clipUrl(take);
-  const doll = take.files.includes('referens.mp4') ? takeUrl(take.id, 'referens.mp4') : null;
+  // Till höger dockans film, som klippet mäts mot, eller det klipp som skickades som referens i dess ställe.
+  const [right, setRight] = useState<'docka' | 'klipp'>('docka');
+  const sentClip = take.sent.kind === 'klipp' && take.files.includes('referensklipp.mp4');
+  const doll = right === 'klipp' && sentClip ? takeUrl(take.id, 'referensklipp.mp4') : take.files.includes('referens.mp4') ? takeUrl(take.id, 'referens.mp4') : null;
+  const rightWords =
+    right === 'klipp' && sentClip
+      ? 'Referensklippet, som skickades i stället för dockans film'
+      : take.sent.kind === 'docka'
+        ? 'Dockans film, som skickades som rörelsereferens'
+        : take.sent.kind === 'klipp'
+          ? 'Dockans film: skickades inte, ett klipp var referens'
+          : 'Dockans film: skickades inte, ingen film var referens';
 
   const frameOf = (t: number): number => {
     const k = Math.floor(t * fps + 0.001);
@@ -246,7 +279,7 @@ function Compare({ take, rate, setRate }: { take: Take; rate: number; setRate: (
           <figcaption>
             <span>{top === 'bevis' ? 'Beviset: klippet lagt i scenen' : 'Filmen'}</span>
             {take.files.includes('bevis.mp4') && (
-              <span className="switch" role="group" aria-label="Överst">
+              <span className="seg small" role="group" aria-label="Överst">
                 <button type="button" aria-pressed={top === 'film'} onClick={() => setTop('film')}>
                   Filmen
                 </button>
@@ -266,23 +299,34 @@ function Compare({ take, rate, setRate }: { take: Take; rate: number; setRate: (
         </figure>
         <figure>
           <figcaption>
-            <span>Dockans förlaga</span>
-            <span className="dim">{take.reference?.frames ? `${take.reference.frames} rutor` : ''}</span>
+            <span>{rightWords}</span>
+            {sentClip ? (
+              <span className="seg small" role="group" aria-label="Till höger">
+                <button type="button" aria-pressed={right === 'docka'} onClick={() => setRight('docka')}>
+                  Dockan
+                </button>
+                <button type="button" aria-pressed={right === 'klipp'} onClick={() => setRight('klipp')}>
+                  Referensklippet
+                </button>
+              </span>
+            ) : (
+              <span className="dim">{take.reference?.frames ? `${take.reference.frames} rutor` : ''}</span>
+            )}
           </figcaption>
-          <div className="screen">{doll ? <video ref={b} src={`${doll}#t=0.001`} muted playsInline preload="auto" disablePictureInPicture onLoadedMetadata={(event) => void (event.currentTarget.playbackRate = rate)} /> : <span className="placeholder">Paketet har ingen förlaga</span>}</div>
+          <div className="screen">{doll ? <video key={doll} ref={b} src={`${doll}#t=0.001`} muted playsInline preload="auto" disablePictureInPicture onLoadedMetadata={(event) => void (event.currentTarget.playbackRate = rate)} /> : <span className="placeholder">Paketet har ingen film av dockan</span>}</div>
         </figure>
       </div>
       <div className="controls">
-        <button type="button" className="primary" onClick={() => (playing ? stop() : start())} disabled={!film}>
+        <button type="button" className="btn primary" onClick={() => (playing ? stop() : start())} disabled={!film}>
           {playing ? 'Stoppa' : 'Spela båda'}
         </button>
-        <button type="button" aria-pressed={rate !== 1} onClick={() => setRate(rate === 1 ? 0.5 : 1)}>
+        <button type="button" className="btn" aria-pressed={rate !== 1} onClick={() => setRate(rate === 1 ? 0.5 : 1)}>
           Halv fart
         </button>
-        <button type="button" onClick={() => step(-1)} aria-label="En ruta bakåt" disabled={!film}>
+        <button type="button" className="btn" onClick={() => step(-1)} aria-label="En ruta bakåt" disabled={!film}>
           ‹ Ruta
         </button>
-        <button type="button" onClick={() => step(1)} aria-label="En ruta framåt" disabled={!film}>
+        <button type="button" className="btn" onClick={() => step(1)} aria-label="En ruta framåt" disabled={!film}>
           Ruta ›
         </button>
         <span className="frame" ref={pos} aria-live="polite" />
@@ -294,7 +338,9 @@ function Compare({ take, rate, setRate }: { take: Take; rate: number; setRate: (
 // ---------------------------------------------------------------------------------------------------------------------
 // Det som står om tagningen
 
-function Facts({ take, cycle, review }: { take: Take; cycle: (move: string | null) => string; review?: string }) {
+function Facts({ take, cycle, review, registry, onJudge, onSay }: { take: Take; cycle: (move: string | null) => string; review?: string; registry: Registry; onJudge: Judge; onSay: Say }) {
+  // Tagningens post i registret, när klippet står där: då går omdömet att sätta här.
+  const asset = take.present ? registry.assets.find((entry) => entry.file === take.file) : undefined;
   const [whole, setWhole] = useState(false);
   const why = take.statusBy ?? '';
   const long = why.length > 320;
@@ -328,17 +374,25 @@ function Facts({ take, cycle, review }: { take: Take; cycle: (move: string | nul
   return (
     <section className="facts">
       <div className="bar">
-        <h1>
-          {cardName(take.seat, take.index, take.action)} t{take.take ?? '?'}
-        </h1>
+        <h2>
+          {cardName(take.seat, take.index, take.action)} t{take.take ?? '?'}{take.variant ? ` · variant ${take.variant}` : ''}
+        </h2>
         <span className={`badge ${statusClass(take.status)}`}>{statusWord(take.status)}</span>
       </div>
       <p className="dim">
-        {cardWords(take.seat, take.index, take.action)}; cykel {cycle(take.move)}, ur {viewLabel(view)}, ankaret {anchorLabel(take.anchor)}
+        {cardWords(take.seat, take.index, take.action)}; cykel {cycle(take.move)}, ur {viewLabel(view)}, ankaret {anchorName(take.anchor)}
         {take.anchor ? ` (${take.anchor.split('/').at(-1)})` : ''}.
       </p>
+      <p className="frameline">
+        Börjar på <b>{framesOf(take.anchor, take.seat, take.index, take.action).first}</b> och slutar på <b>{framesOf(take.anchor, take.seat, take.index, take.action).last}</b>. Referensen: {sentWords(take.sent)}.
+      </p>
       <p>
-        <code>{take.file}</code> {review && take.present ? <a className="link" href={review}>Öppna i Granska</a> : null}
+        <code>{take.file}</code> {review && take.present ? <a className="link" href={review}>Öppna i Granska</a> : null}{' '}
+        {take.move && (
+          <a className="link" href={routeTo('docka', 'varden', take.move, cardKey(take.seat, take.index, take.action))}>
+            Se rörelsen i Dockan
+          </a>
+        )}
       </p>
       {take.archived && (
         <p className="warning">
@@ -347,12 +401,19 @@ function Facts({ take, cycle, review }: { take: Take; cycle: (move: string | nul
       )}
 
       <h2>Omdömet</h2>
+      {asset && (
+        <div className="clipjudge">
+          <span className="label">Ditt omdöme, och vad som inte är naturligt</span>
+          <Verdict registry={registry} asset={asset} onJudge={onJudge} />
+          <Words key={asset.file} registry={registry} asset={asset} onSay={onSay} always />
+        </div>
+      )}
       <p>
         <span className={`badge ${statusClass(take.status)}`}>{statusWord(take.status)}</span> {take.statusAt ? `satt ${take.statusAt}` : 'inget datum'}
       </p>
       <p className={long && !whole ? 'why clamp' : 'why'}>{why ? `Dömd av: ${why}` : 'Inget omdöme med motivering än.'}</p>
       {long && (
-        <button type="button" className="more" onClick={() => setWhole(!whole)}>
+        <button type="button" className="btn quiet small more" onClick={() => setWhole(!whole)}>
           {whole ? 'Visa mindre' : 'Visa hela motiveringen'}
         </button>
       )}
@@ -401,8 +462,16 @@ function Facts({ take, cycle, review }: { take: Take; cycle: (move: string | nul
       <dl className="format">
         <dt>Filmen</dt>
         <dd>{film ? `${film.width ?? '?'} × ${film.height ?? '?'} bp, ${withUnit(film.fps, 'rutor/s')}, ${num(film.frames)} rutor, ${withUnit(film.seconds, 's')}, ${film.codec ?? '?'}, ${film.audio ? 'med ljud' : 'utan ljud'}, ${megabytes(take.bytes)}` : 'inte mätt'}</dd>
+        <dt>Referensen</dt>
+        <dd>
+          {sentWords(take.sent)}
+          {take.sent.kind === 'klipp' ? `${take.sent.role ? ` (${take.sent.role})` : ''}: ${withUnit(take.sent.fps, 'rutor/s')}, ${num(take.sent.frames)} rutor, ${withUnit(take.sent.seconds, 's')}` : ''}
+        </dd>
         <dt>Dockans film</dt>
-        <dd>{take.reference ? `${withUnit(take.reference.fps, 'rutor/s')}, ${num(take.reference.frames)} rutor, ${withUnit(take.reference.seconds, 's')}` : 'saknas i beställningen'}</dd>
+        <dd>
+          {take.reference ? `${withUnit(take.reference.fps, 'rutor/s')}, ${num(take.reference.frames)} rutor, ${withUnit(take.reference.seconds, 's')}` : 'saknas i beställningen'}
+          {take.sent.kind !== 'docka' && take.reference ? '; skickades inte, men klippet mäts mot den' : ''}
+        </dd>
         <dt>Kortplatsen</dt>
         <dd>{point(take.place)} (x; z på filten)</dd>
         <dt>Paketet</dt>

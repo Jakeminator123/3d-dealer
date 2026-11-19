@@ -14,6 +14,7 @@ import {
   type Registry,
 } from './registry.ts';
 import { routeTo } from './route.ts';
+import { shownText } from './names.ts';
 import { capitalize, Verdict, type Judge } from './Verdict.tsx';
 import { Words, type Say } from './Words.tsx';
 
@@ -24,6 +25,11 @@ export function Review({ route }: { route: string[] }) {
   const [registry, setRegistry] = useState<Registry | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [only, setOnly] = useState<string | null>(null);
+  // Adressen granska/<vy>/status/<status> visar bara filerna med det omdömet: dit leder översikten.
+  const asked = route[1] === 'status' ? (route[2] ?? null) : null;
+  useEffect(() => {
+    if (asked !== null) setOnly(asked);
+  }, [asked]);
 
   useEffect(() => {
     fetchRegistry().then(setRegistry, (error: Error) => setProblem(error.message));
@@ -67,6 +73,7 @@ export function Review({ route }: { route: string[] }) {
   return (
     <div className="review">
       <aside className="side">
+        <h2 className="label">Registrets avdelningar</h2>
         <nav aria-label="Avdelningar">
           <a className="section" href={routeTo(STEP, ALL)} aria-current={view === ALL ? 'page' : undefined}>
             Alla <span>{sections.flatMap((section) => section.items).filter(passes).length}</span>
@@ -89,8 +96,8 @@ export function Review({ route }: { route: string[] }) {
 
       <main className="main">
         <div className="bar">
-          <h1>{view === ALL ? 'Alla filer' : (shown[0]?.label ?? 'Okänd avdelning')}</h1>
-          <div className="filters" role="group" aria-label="Visa">
+          <h2>{view === ALL ? 'Alla filer' : (shown[0]?.label ?? 'Okänd avdelning')}</h2>
+          <div className="seg" role="group" aria-label="Visa">
             <button type="button" aria-pressed={only === null} onClick={() => setOnly(null)}>
               Alla <b>{items.length}</b>
             </button>
@@ -173,13 +180,13 @@ function Card({ item, registry, href, onJudge, onSay }: CardProps) {
 
   return (
     <article className="card" data-status={asset.status}>
-      <a className="thumb" href={href} aria-label={`Öppna ${asset.title}`}>
+      <a className="thumb" href={href} aria-label={`Öppna ${shownText(asset.title)}`}>
         <Thumb item={item} />
         <span className="number">{item.number}</span>
         {kind !== 'bild' && <span className="kind">{kind === 'film' ? 'Film' : '3D-modell'}</span>}
       </a>
       <div className="caption">
-        <div className="title">{asset.title}</div>
+        <div className="title">{shownText(asset.title)}</div>
         <div className="file">
           {asset.file.slice(asset.file.lastIndexOf('/') + 1)} · {facts.join(' · ')}
         </div>

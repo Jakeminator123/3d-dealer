@@ -7,28 +7,16 @@
 import { useEffect, useMemo, useState } from 'react';
 import { readScene, type SceneDescription } from '../scene/description.ts';
 import { fetchContent } from './content.ts';
+import { fetchDealers, type DealerCard as Card, type DealerState as State, type DealerView as View, type Shown } from './dealers.ts';
+import { anchorName, cardCode, cardName, shownText, viewLabel } from './names.ts';
 import { fetchRegistry, sectionsOf, thumbUrl, type Registry } from './registry.ts';
 import { routeTo } from './route.ts';
-import { anchorLabel, dealerOrder, fetchTakes, NODE_STATES, nodeOf, type MapNode, type NodeState, type SeriesCard, type Takes } from './takes.ts';
+import { dealerOrder, fetchTakes, NODE_STATES, nodeOf, type MapNode, type NodeState, type Takes, type Waiting } from './takes.ts';
 import './dealer.css';
 
-// Läget som servern ger det (DealerState i src/pipeline/dealer.ts; Labbet läser inte pipeline, så formen står här).
-type Shown = { file: string; status: string; present: boolean; title: string };
-type Card = SeriesCard & { key: string; clip: (Shown & { take: number | null; move: string | null }) | null };
-type View = { view: string; anchor: Shown | null; candidates: Shown[]; cards: Card[]; elsewhere: { anchor: string; clips: number }[]; playable: boolean };
-type State = {
-  id: string;
-  name: string;
-  file: string;
-  identity: { role: string; what: string; need: boolean; image: (Shown & { note?: string }) | null }[];
-  views: View[];
-  packages: { kind: string; id: string; waiting: boolean }[];
-  next: { what: string; commands: string[] }[];
-  problems: string[];
-};
-
 const STEP = 'dealer';
-const viewName = (view: string): string => (view === 'spelaren' ? 'Spelaren' : `Plats ${view.split('-')[1]}`);
+/** Ett paket som väntar, med kortets namn och cykeln: "P4 C1 t2 (cykel-tva-hander)". */
+const packageName = (one: Waiting): string => `${cardName(one.seat, one.index, one.action)} t${one.take ?? '?'} (${one.move ?? 'okänd cykel'})`;
 const statusClass = (status: string | undefined): string => (status === 'godkänd' ? 'yes' : status === 'utgår' || status === 'saknas' ? 'no' : status ? 'wait' : 'none');
 const NODE_CLASS: Record<NodeState, string> = { godkänd: 'st-ok', 'att granska': 'st-rev', underkänd: 'st-fail', 'paket väntar': 'st-pkg', saknas: 'st-none' };
 const NODE_BADGE: Record<NodeState, string> = { godkänd: 'yes', 'att granska': 'wait', underkänd: 'no', 'paket väntar': 'pkg', saknas: 'none' };
@@ -49,13 +37,7 @@ export default function DealerStep({ route }: { route: string[] }) {
   const [problem, setProblem] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch('/api/dealers', { cache: 'no-store' })
-      .then(async (response) => {
-        const body = (await response.json()) as State[] | { error?: string };
-        if (!response.ok || !Array.isArray(body)) throw new Error((body as { error?: string }).error ?? `Dealerna gick inte att läsa (${response.status})`);
-        setDealers(body);
-      })
-      .catch((error: Error) => setProblem(error.message));
+    fetchDealers().then(setDealers, (error: Error) => setProblem(error.message));
     fetchRegistry().then(setRegistry, () => {});
     fetchTakes().then(setTakes, (error: Error) => setProblem(error.message));
     fetchContent('scene.json', 'Scenens beskrivning', readScene).then(setScene, () => {});
@@ -72,9 +54,11 @@ export default function DealerStep({ route }: { route: string[] }) {
   if (dealers.length === 0) {
     return (
       <main className="main dealer">
-        <h1>Ingen dealer än</h1>
-        <p className="empty">En dealer börjar med en bild av personen:</p>
-        <pre className="command">node src/pipeline/identitet.ts ny &lt;id&gt; "&lt;Namn&gt;" &lt;bild&gt;</pre>
+        <div className="emptystate">
+          <b>Ingen dealer än</b>
+          En dealer börjar med en bild av personen:
+          <pre className="command">node src/pipeline/identitet.ts ny &lt;id&gt; "&lt;Namn&gt;" &lt;bild&gt;</pre>
+        </div>
       </main>
     );
   }
@@ -90,7 +74,7 @@ export default function DealerStep({ route }: { route: string[] }) {
   return (
     <main className="main dealer">
       {dealers.length > 1 && (
-        <nav className="chooser" aria-label="Dealers">
+        <nav className="tabs chooser" aria-label="Dealers">
           {dealers.map((one) => (
             <a key={one.id} href={routeTo(STEP, one.id)} aria-current={one.id === state.id ? 'page' : undefined}>
               {one.name}
@@ -99,11 +83,11 @@ export default function DealerStep({ route }: { route: string[] }) {
         </nav>
       )}
       <div className="bar">
-        <h1>
+        <h2 className="dealername">
           {state.name} <code>{state.file}</code>
-        </h1>
+        </h2>
         <span className={state.views.some((view) => view.playable) ? 'badge yes' : 'badge wait'}>
-          {state.views.some((view) => view.playable) ? `spelbar ur ${state.views.filter((view) => view.playable).map((view) => viewName(view.view)).join(', ')}` : 'inte spelbar än'}
+          {state.views.some((view) => view.playable) ? `spelbar ur ${state.views.filter((view) => view.playable).map((view) => viewLabel(view.view)).join(', ')}` : 'inte spelbar än'}
         </span>
       </div>
       {state.problems.map((text) => (
@@ -112,26 +96,33 @@ export default function DealerStep({ route }: { route: string[] }) {
         </p>
       ))}
 
-      <h2>Nästa steg</h2>
+      <h2>
+        Nästa steg <span>kommandona körs i terminalen, beställningar av agenten</span>
+      </h2>
       {state.next.length === 0 ? (
         <p className="empty">Inget att göra här.</p>
       ) : (
-        <ol className="next">
+        <ol className="next panel">
           {state.next.map((step) => (
             <li key={step.what}>
-              <p>{step.what}</p>
-              {step.commands.map((command) => (
-                <pre key={command} className="command">
-                  {command}
-                </pre>
-              ))}
+              <p>{shownText(step.what)}</p>
+              {step.commands.length > 0 && (
+                <details className="more">
+                  <summary>{step.commands.length === 1 ? 'Kommandot' : `${step.commands.length} kommandon`}, för agenten i terminalen</summary>
+                  {step.commands.map((command) => (
+                    <pre key={command} className="command">
+                      {command}
+                    </pre>
+                  ))}
+                </details>
+              )}
             </li>
           ))}
         </ol>
       )}
       {waiting.length > 0 && (
         <p className="empty">
-          Paket som väntar på beställning: {waiting.map((one) => `${one.id} (${one.kind})`).join(', ')}
+          Förberedda tagningar som väntar på att agenten beställer dem: {(ownTakes?.waiting ?? []).map(packageName).join(', ') || waiting.length}.
         </p>
       )}
 
@@ -141,10 +132,13 @@ export default function DealerStep({ route }: { route: string[] }) {
       <p className="empty">
         En kedja per vy: godkända identitetsbilder, ett godkänt REDO-ankare för vyn, och ett godkänt klipp för varje kort i serien (content/dealer.json, series). Ett tryck på ett kort med klipp öppnar det i steget Klipp, bredvid dockan.
       </p>
-      <p className="empty names">
-        Namnen: P är platsen och C kortet räknat från 0, så P4 C0 är plats 4, första kortet. D är dealern: D C0 hennes öppna kort, D hålkort det andra kortet med baksidan upp, D vändning när det vänds, D C2 och D C3 hennes extrakort. Väntan spelas medan spelet väntar; t är tagningen. A2 är REDO-ankaret och siffran efter punkten dess version
-        {spelaren?.anchor ? `: ${anchorLabel(spelaren.anchor.file)} är ${spelaren.anchor.file}` : ''}.
-      </p>
+      <details className="more">
+        <summary>Hur namnen läses: P4 C1, D hålkort, A2.1 · REDO</summary>
+        <p className="empty names">
+          P är platsen och C kortet på platsen, räknat från 1: P4 C1 är plats 4, första kortet. D är dealern: D C1 hennes öppna kort, D hålkort det andra kortet med baksidan upp, D vändning när det vänds, D C3 och D C4 hennes extrakort. Väntan spelas medan spelet väntar; t är tagningen. Ankarna: A1 · VILA (båda händerna på filten), A2.n · REDO (handen vid kortet i skon; n är REDO-ställningens version, med sin serie)
+          {spelaren?.anchor ? `, här ${anchorName(spelaren.anchor.file)} (${spelaren.anchor.file.split('/').at(-1)})` : ''}, och A3P1–A3P7 och A3D · C1 (REDO med kortet lagt på platsen: det en tagning slutar på).
+        </p>
+      </details>
       <div className="legend" aria-label="Lägena">
         {NODE_STATES.map((one) => (
           <span key={one} className="legendrow">
@@ -172,18 +166,18 @@ export default function DealerStep({ route }: { route: string[] }) {
             ↓
           </div>
           <h2>
-            Vy {viewName(view.view)} <span>{summary(view, ownTakes)}</span>
+            Vy {viewLabel(view.view)} <span>{summary(view, ownTakes)}</span>
           </h2>
           <div className="mapstage">
             <h3>
-              REDO-ankaret {view.anchor ? anchorLabel(view.anchor.file) : ''} <span className="empty">vyns, i dealerns fil</span>
+              REDO-ankaret {view.anchor ? anchorName(view.anchor.file) : ''} <span className="empty">vyns, i dealerns fil</span>
             </h3>
             <div className="tiles">
-              <Tile label={view.anchor ? anchorLabel(view.anchor.file) : 'REDO-ankaret'} sub={view.anchor ? view.anchor.title : 'inget i dealerns fil'} shown={view.anchor} href={view.anchor ? linkTo(view.anchor.file) : undefined} wide />
+              <Tile label={view.anchor ? anchorName(view.anchor.file) : 'REDO-ankaret'} sub={view.anchor ? shownText(view.anchor.title) : 'inget i dealerns fil'} shown={view.anchor} href={view.anchor ? linkTo(view.anchor.file) : undefined} wide />
             </div>
             {view.candidates.length > 0 && (
               <p className="empty">
-                Andra REDO-ankare för vyn: {view.candidates.map((one) => `${anchorLabel(one.file)} (${one.status})`).join(', ')}. Klipp ur dem kedjas inte med vyns ankare.
+                Andra REDO-ankare för vyn: {view.candidates.map((one) => `${anchorName(one.file)} (${one.status})`).join(', ')}. Klipp ur dem kedjas inte med vyns ankare.
               </p>
             )}
           </div>
@@ -192,12 +186,12 @@ export default function DealerStep({ route }: { route: string[] }) {
           </div>
           <div className="mapstage">
             <h3>
-              Serien ur {view.anchor ? anchorLabel(view.anchor.file) : 'vyn'} <span className="empty">tonade kolumner och kort hör till serien sedan</span>
+              Serien ur {view.anchor ? anchorName(view.anchor.file) : 'vyn'} <span className="empty">tonade kolumner och kort hör till serien sedan</span>
             </h3>
             {ownTakes ? <SeriesMap view={view} takes={ownTakes} /> : <p className="empty">{problem ?? 'Läser tagningarna …'}</p>}
             {view.elsewhere.map((one) => (
               <p key={one.anchor} className="empty">
-                Ur {anchorLabel(one.anchor)} ({one.anchor.split('/').at(-1)}): {one.clips} godkända klipp, som inte kedjas med vyns ankare.
+                Ur {anchorName(one.anchor)} ({one.anchor.split('/').at(-1)}): {one.clips} godkända klipp, som inte kedjas med vyns ankare.
               </p>
             ))}
             {ownTakes && <OtherPackages view={view} takes={ownTakes} />}
@@ -241,11 +235,11 @@ function SeriesMap({ view, takes }: { view: View; takes: Takes }) {
   const dealer = nodes.filter((one) => one.card.seat === 'D').sort((a, b) => dealerOrder(a.card.index, a.card.action) - dealerOrder(b.card.index, b.card.action));
   return (
     <div className="seriesmap">
-      <div className="nodegrid" style={{ gridTemplateColumns: `2.4rem repeat(${columns.length}, minmax(84px, 1fr))` }} role="group" aria-label={`Spelarnas kort ur ${viewName(view.view)}`}>
+      <div className="nodegrid" style={{ gridTemplateColumns: `2.4rem repeat(${columns.length}, minmax(84px, 1fr))` }} role="group" aria-label={`Spelarnas kort ur ${viewLabel(view.view)}`}>
         <span />
         {columns.map((index) => (
           <span key={index} className={later(index) ? 'colhead later' : 'colhead'}>
-            C{index}
+            {cardCode(index)}
             {later(index) ? ' (sedan)' : ''}
           </span>
         ))}
@@ -254,7 +248,7 @@ function SeriesMap({ view, takes }: { view: View; takes: Takes }) {
         ))}
       </div>
       <h4>Dealern</h4>
-      <div className="dealergrid" role="group" aria-label={`Dealerns kort ur ${viewName(view.view)}`}>
+      <div className="dealergrid" role="group" aria-label={`Dealerns kort ur ${viewLabel(view.view)}`}>
         {dealer.map(({ card, node }) => (
           <Node key={card.key} node={node} first={card.first} />
         ))}
@@ -304,7 +298,7 @@ function OtherPackages({ view, takes }: { view: View; takes: Takes }) {
   const shown = new Set(view.cards.flatMap((card) => (card.clip ? [] : takes.waiting.filter((one) => (one.view ?? 'spelaren') === view.view && one.seat === card.seat && one.index === card.index && one.action === card.action && (anchor === null || one.anchor === anchor)).map((one) => one.id))));
   const rest = takes.waiting.filter((one) => (one.view ?? 'spelaren') === view.view && !shown.has(one.id));
   if (rest.length === 0) return null;
-  return <p className="empty">Andra paket ur vyn som väntar på beställning: {rest.map((one) => `${one.id}`).join(', ')}.</p>;
+  return <p className="empty">Andra förberedda tagningar ur vyn som väntar på beställning: {rest.map(packageName).join(', ')}.</p>;
 }
 
 function Tile({ label, sub, shown, href, note, wide }: { label: string; sub: string; shown: Shown | null; href?: string; note?: string; wide?: boolean }) {

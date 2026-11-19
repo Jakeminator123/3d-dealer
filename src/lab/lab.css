@@ -1,14 +1,26 @@
+/* Labbets gemensamma utseende: färger, text, ramen med menyn, knappar, reglage, märken, tomma lägen och fel. Stegens
+   egna filer (scene.css, plan.css, dealer.css, clip.css, docka.css) har bara det som är stegets eget. */
+
 :root {
-  --ground: #0f1013;
-  --panel: #17191d;
-  --raised: #1f2227;
-  --line: #2a2d34;
-  --text: #e6e7ea;
-  --dim: #9a9ea8;
-  --accent: #7aa2f7;
-  --yes: #4fb477;
-  --no: #e06c6c;
-  --warn: #e0b05c;
+  --ground: #0e0f12;
+  --panel: #15171b;
+  --raised: #1c1f24;
+  --sunk: #0a0b0d;
+  --line: #262a31;
+  --line-strong: #353a44;
+  --text: #e9eaed;
+  --dim: #a1a6af;
+  --faint: #6d737d;
+  --accent: #86a8f5;
+  --accent-ink: #0b1631;
+  --accent-soft: rgb(134 168 245 / 0.14);
+  --yes: #56b87e;
+  --warn: #e3b35f;
+  --no: #e2706f;
+  --radius: 8px;
+  --radius-lg: 12px;
+  --font: 'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --mono: ui-monospace, 'Cascadia Mono', Consolas, monospace;
   color-scheme: dark;
 }
 
@@ -26,7 +38,8 @@ body,
 body {
   background: var(--ground);
   color: var(--text);
-  font: 14px/1.45 system-ui, 'Segoe UI', sans-serif;
+  font: 14px/1.5 var(--font);
+  -webkit-font-smoothing: antialiased;
 }
 
 a {
@@ -34,14 +47,36 @@ a {
   text-decoration: none;
 }
 
-button {
+a.link,
+p a,
+.info dd a {
+  color: var(--accent);
+}
+
+a.link:hover,
+p a:hover,
+.info dd a:hover {
+  text-decoration: underline;
+}
+
+button,
+input,
+select,
+textarea {
   font: inherit;
   color: inherit;
+}
+
+button {
   cursor: pointer;
 }
 
+code,
+pre {
+  font: 12px/1.45 var(--mono);
+}
+
 code {
-  font: 12px/1.4 ui-monospace, Consolas, monospace;
   color: var(--dim);
   overflow-wrap: anywhere;
 }
@@ -51,58 +86,265 @@ code {
   outline-offset: 2px;
 }
 
-/* Ramen */
+h1,
+h2,
+h3,
+h4 {
+  margin: 0;
+  font-weight: 600;
+  letter-spacing: 0.005em;
+}
+
+h1 {
+  font-size: 20px;
+}
+
+/* Ramen: menyn överst, stegets rad under den, och steget i resten */
 
 .lab {
   display: grid;
-  grid-template-rows: 52px minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr);
   height: 100%;
 }
 
-.top {
+.topbar {
   display: flex;
-  align-items: center;
-  gap: 32px;
-  padding: 0 20px;
+  align-items: stretch;
+  gap: 18px;
+  height: 56px;
+  padding: 0 16px;
   border-bottom: 1px solid var(--line);
   background: var(--panel);
 }
 
 .brand {
-  font-weight: 600;
-  letter-spacing: 0.01em;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  flex: none;
+  line-height: 1.15;
+}
+
+.brand b {
+  font-weight: 650;
 }
 
 .brand span {
+  font-size: 11px;
+  color: var(--faint);
+}
+
+.menu {
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+}
+
+.menupart {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  padding: 0 6px;
+}
+
+.menupart + .menupart {
+  border-left: 1px solid var(--line);
+}
+
+.menuitem {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  flex: none;
+  padding: 0 11px;
+  border-bottom: 2px solid transparent;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.menuitem b {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.menuitem small {
+  font-size: 11px;
+  color: var(--faint);
+}
+
+.menuitem:hover {
+  background: var(--raised);
+}
+
+.menuitem[aria-current='page'] {
+  border-bottom-color: var(--accent);
+  background: linear-gradient(to top, var(--accent-soft), transparent 80%);
+}
+
+.menuitem[aria-current='page'] small {
+  color: var(--dim);
+}
+
+.menuitem.away b::after {
+  content: ' ↗';
+  color: var(--faint);
+  font-weight: 400;
+}
+
+.topright {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  flex: none;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 12px;
+  color: var(--dim);
+  white-space: nowrap;
+}
+
+a.pill:hover {
+  background: var(--raised);
+  color: var(--text);
+}
+
+.pill b {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.pill .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--faint);
+}
+
+.pill.attention {
+  border-color: color-mix(in srgb, var(--warn) 55%, transparent);
+}
+
+.pill.attention .dot {
+  background: var(--warn);
+}
+
+.pill.ok .dot {
+  background: var(--yes);
+}
+
+.stephead {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 46px;
+  padding: 6px 20px;
+  border-bottom: 1px solid var(--line);
+}
+
+.stephead h1 {
+  flex: none;
+  font-size: 16px;
+}
+
+.stephead p {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  color: var(--dim);
+  font-size: 13px;
+}
+
+/* Produktionens väg, med stegets delar av den framhävda */
+
+.path {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 3px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 11px;
+  color: var(--faint);
+}
+
+.path .pathname {
+  margin-right: 2px;
+  color: var(--faint);
+}
+
+.path li + li:not(:nth-child(2))::before {
+  content: '›';
+  margin-right: 3px;
+  color: var(--line-strong);
+}
+
+.path span {
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.path .on {
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+/* Ett steg som rullar, med luft */
+
+.main {
+  overflow: auto;
+  padding: 20px 24px 64px;
+}
+
+.main h2 {
+  margin: 28px 0 12px;
+  font-size: 15px;
+}
+
+.main h2 span,
+.label span {
+  margin-left: 6px;
   color: var(--dim);
   font-weight: 400;
-  margin-left: 6px;
 }
 
-.steps {
+.label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+.bar {
   display: flex;
-  gap: 4px;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
 }
 
-.step {
-  padding: 6px 12px;
-  border-radius: 6px;
+.dim {
+  color: var(--dim);
 }
 
-.step.on {
-  background: var(--raised);
-  box-shadow: inset 0 -2px 0 var(--accent);
+.hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--dim);
 }
 
-.step.off {
-  color: #5d616b;
-  cursor: default;
-}
-
-.step.elsewhere {
-  margin-left: auto;
-  border: 1px solid var(--line);
-}
+/* Lägen: läser, tomt, varning, fel */
 
 .notice {
   margin: 0;
@@ -110,7 +352,361 @@ code {
   color: var(--dim);
 }
 
-/* Ett omdöme eller läge som ett märke, och lägenas färger i kartan och i steget Klipp: godkänd, att granska,
+.empty {
+  color: var(--dim);
+}
+
+.emptystate {
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+  max-width: 640px;
+  margin: 24px 0;
+  padding: 20px 22px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-lg);
+  color: var(--dim);
+}
+
+.emptystate b {
+  color: var(--text);
+  font-size: 15px;
+}
+
+.warning,
+.problem {
+  margin: 0 0 12px;
+  padding: 9px 12px;
+  border: 1px solid;
+  border-left-width: 3px;
+  border-radius: var(--radius);
+  overflow-wrap: anywhere;
+}
+
+.warning {
+  border-color: color-mix(in srgb, var(--warn) 60%, transparent);
+  background: color-mix(in srgb, var(--warn) 8%, transparent);
+  color: var(--warn);
+}
+
+.problem {
+  border-color: color-mix(in srgb, var(--no) 60%, transparent);
+  background: color-mix(in srgb, var(--no) 9%, transparent);
+  color: #f0a3a2;
+}
+
+.done {
+  margin: 0 0 12px;
+  padding: 9px 12px;
+  border: 1px solid color-mix(in srgb, var(--yes) 55%, transparent);
+  border-left-width: 3px;
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--yes) 8%, transparent);
+  color: #9fd8b5;
+}
+
+/* Knappar */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--panel);
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.btn:hover:enabled,
+a.btn:hover {
+  background: var(--raised);
+  border-color: #474d59;
+}
+
+.btn[aria-pressed='true'] {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.btn.primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+
+.btn.primary:hover:enabled,
+a.btn.primary:hover {
+  background: #9db9f7;
+  border-color: #9db9f7;
+}
+
+.btn.quiet {
+  border-color: transparent;
+  background: transparent;
+  color: var(--dim);
+}
+
+.btn.quiet:hover:enabled {
+  background: var(--raised);
+  color: var(--text);
+}
+
+.btn.small {
+  min-height: 26px;
+  padding: 0 8px;
+  font-size: 12px;
+}
+
+.btn.icon {
+  min-width: 32px;
+  padding: 0 8px;
+}
+
+.btn:disabled,
+.btn.off {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* Knappar i grupp, ett val bland flera: vyerna, filtren, omdömet */
+
+.seg {
+  display: inline-flex;
+  flex-wrap: wrap;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--panel);
+}
+
+.seg button {
+  min-height: 30px;
+  padding: 0 11px;
+  border: 0;
+  border-right: 1px solid var(--line);
+  background: transparent;
+  color: var(--dim);
+  white-space: nowrap;
+}
+
+.seg button:last-child {
+  border-right: 0;
+}
+
+.seg button:hover:enabled {
+  background: var(--raised);
+  color: var(--text);
+}
+
+.seg button[aria-pressed='true'] {
+  background: var(--accent-soft);
+  color: var(--text);
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+.seg button:disabled {
+  color: #4f545d;
+  cursor: default;
+}
+
+.seg button b {
+  margin-left: 4px;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.7;
+}
+
+.seg.small button {
+  min-height: 26px;
+  padding: 0 8px;
+  font-size: 12px;
+}
+
+.verdict button[aria-pressed='true'][data-status='godkänd'] {
+  background: var(--yes);
+  color: #06200f;
+  box-shadow: none;
+}
+
+.verdict button[aria-pressed='true'][data-status='utgår'] {
+  background: var(--no);
+  color: #2a0606;
+  box-shadow: none;
+}
+
+.verdict button[aria-pressed='true'][data-status='granska igen'] {
+  background: var(--warn);
+  color: #2a1c02;
+  box-shadow: none;
+}
+
+.verdict button[aria-pressed='true'][data-status='att granska'] {
+  background: #3a3f4a;
+  box-shadow: none;
+}
+
+/* Flikar */
+
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  border-bottom: 1px solid var(--line);
+}
+
+.tabs a,
+.tabs button {
+  display: inline-flex;
+  align-items: center;
+  min-height: 38px;
+  padding: 0 12px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--dim);
+  white-space: nowrap;
+}
+
+.tabs a:hover,
+.tabs button:hover {
+  color: var(--text);
+}
+
+.tabs [aria-current='page'],
+.tabs [aria-selected='true'] {
+  border-bottom-color: var(--accent);
+  color: var(--text);
+}
+
+/* Fält: lista, text, reglage, kryssruta */
+
+.select,
+.field {
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--panel);
+  color: var(--text);
+}
+
+.select {
+  max-width: 100%;
+  padding-right: 6px;
+}
+
+.field:focus,
+.select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+textarea.field {
+  display: block;
+  width: 100%;
+  padding: 7px 10px;
+  resize: vertical;
+}
+
+.slider {
+  display: grid;
+  grid-template-columns: minmax(110px, 160px) minmax(80px, 1fr) 76px;
+  align-items: center;
+  gap: 4px 10px;
+}
+
+.slider > span {
+  color: var(--text);
+}
+
+.slider input {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.slider output {
+  color: var(--dim);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.slider .what {
+  grid-column: 1 / -1;
+  margin: -2px 0 4px;
+  font-size: 12px;
+  color: var(--faint);
+}
+
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  white-space: nowrap;
+}
+
+.check input {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--accent);
+}
+
+/* En rad med reglage: namnet till vänster och valen efter det */
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.rowname {
+  width: 76px;
+  flex: none;
+  font-size: 12px;
+  color: var(--faint);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* En yta med innehåll */
+
+.panel {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--panel);
+}
+
+.command {
+  margin: 0 0 4px;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--sunk);
+  color: var(--text);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
+details.more > summary {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  color: var(--accent);
+  cursor: pointer;
+}
+
+details.more[open] > summary {
+  margin-bottom: 6px;
+}
+
+/* Ett omdöme eller läge som ett märke, och lägenas färger i kartan och i stegen Klipp och Dockan: godkänd, att granska,
    underkänd, paket väntar, saknas. */
 
 .badge {
@@ -118,6 +714,7 @@ code {
   padding: 1px 8px;
   border-radius: 10px;
   font-size: 12px;
+  line-height: 1.5;
   background: #343842;
   color: var(--dim);
   white-space: nowrap;
@@ -140,12 +737,12 @@ code {
 
 .badge.pkg {
   background: var(--accent);
-  color: #0a1630;
+  color: var(--accent-ink);
 }
 
 .badge.none {
   background: transparent;
-  border: 1px dashed var(--line);
+  border: 1px dashed var(--line-strong);
 }
 
 .st-ok {
@@ -165,35 +762,277 @@ code {
 }
 
 .st-none {
-  --c: #5d616b;
+  --c: var(--faint);
 }
 
-/* En smal skärm: stegen rullar i sidled, och sidorna får mindre luft. */
+/* Mått med sina gränser: i stegen Klipp och Dockan */
 
-@media (max-width: 720px) {
-  .top {
-    gap: 12px;
-    padding: 0 10px;
-    overflow-x: auto;
-    scrollbar-width: none;
-  }
+.measures {
+  display: flex;
+  flex-direction: column;
+  margin: 0 0 8px;
+  padding: 0;
+  list-style: none;
+}
 
-  .brand span {
-    display: none;
-  }
+.measures li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0 12px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--line);
+}
 
-  .brand,
-  .step {
-    flex: none;
-  }
+.measures b {
+  font-weight: 500;
+}
 
-  .step {
-    padding: 12px 10px;
-  }
+.measures span {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
 
-  .main {
-    padding: 12px 12px 48px;
-  }
+.measures small {
+  grid-column: 1 / -1;
+  color: var(--faint);
+}
+
+.measures em {
+  font-style: normal;
+  font-weight: 600;
+  color: var(--no);
+}
+
+.measures em.see {
+  color: var(--warn);
+}
+
+/* Översikten */
+
+.main.overview > * {
+  max-width: 1180px;
+  margin-inline: auto;
+}
+
+.main.overview > h2:first-child {
+  margin-top: 0;
+}
+
+.needs {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 12px;
+}
+
+.need {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: auto 1fr auto;
+  gap: 2px 14px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--warn);
+  border-radius: var(--radius-lg);
+  background: var(--panel);
+}
+
+.need.agent {
+  border-left-color: var(--accent);
+}
+
+.need .count {
+  grid-row: 1 / 3;
+  font-size: 28px;
+  font-weight: 650;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.need b {
+  font-weight: 600;
+}
+
+.need p {
+  margin: 0;
+  font-size: 12px;
+  color: var(--dim);
+}
+
+.need .btn {
+  grid-column: 2;
+  justify-self: start;
+  margin-top: 8px;
+}
+
+.dealercard {
+  padding: 16px 18px;
+}
+
+.dealercard + .dealercard {
+  margin-top: 12px;
+}
+
+.dealercard header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-bottom: 14px;
+}
+
+.dealercard header h3 {
+  font-size: 17px;
+}
+
+.dealercard header .btn {
+  margin-left: auto;
+}
+
+.journey {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.journey li {
+  position: relative;
+}
+
+.journey a,
+.journey div {
+  display: grid;
+  gap: 2px;
+  height: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-top: 3px solid var(--c, var(--line));
+  border-radius: var(--radius);
+  background: var(--ground);
+}
+
+.journey a:hover {
+  background: var(--raised);
+}
+
+.journey .jstage {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+.journey b {
+  font-weight: 600;
+}
+
+.journey small {
+  font-size: 12px;
+  color: var(--dim);
+}
+
+.nextstep {
+  margin: 14px 0 0;
+  font-size: 13px;
+}
+
+.nextstep .command {
+  margin-top: 6px;
+}
+
+.holdings {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px;
+}
+
+.holding {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--panel);
+}
+
+a.holding:hover {
+  background: var(--raised);
+}
+
+.holding .count {
+  font-size: 22px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+.holding small {
+  font-size: 12px;
+  color: var(--dim);
+}
+
+.steplist {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 10px;
+}
+
+.stepcard {
+  display: grid;
+  gap: 4px;
+  align-content: start;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--panel);
+}
+
+.stepcard:hover {
+  background: var(--raised);
+  border-color: var(--line-strong);
+}
+
+.stepcard b {
+  font-size: 15px;
+}
+
+.stepcard small {
+  color: var(--faint);
+}
+
+.stepcard p {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--dim);
+}
+
+.stepcard .path {
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.replies {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.replies li {
+  padding: 10px 12px;
+  border-left: 2px solid var(--accent);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  background: var(--panel);
+  font-size: 13px;
+}
+
+.replies li small {
+  display: block;
+  color: var(--faint);
 }
 
 /* Granska */
@@ -206,140 +1045,42 @@ code {
 
 .side {
   overflow: auto;
-  padding: 16px 12px;
+  padding: 16px 10px;
   border-right: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.side .label {
+  margin: 0 10px 8px;
 }
 
 .section {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   gap: 8px;
-  padding: 7px 10px;
+  padding: 6px 10px;
   border-radius: 6px;
   color: var(--dim);
 }
 
 .section:hover {
-  background: var(--panel);
+  background: var(--raised);
   color: var(--text);
 }
 
 .section[aria-current='page'] {
-  background: var(--raised);
+  background: var(--accent-soft);
   color: var(--text);
 }
 
-.section span {
+.section > span {
   font-variant-numeric: tabular-nums;
-  color: var(--dim);
+  color: var(--faint);
 }
 
-.hint {
+.side .hint {
   margin: 20px 10px 0;
-  font-size: 12px;
-  color: var(--dim);
-}
-
-.main {
-  overflow: auto;
-  padding: 16px 24px 64px;
-}
-
-.bar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 16px;
-}
-
-h1 {
-  margin: 0;
-  font-size: 20px;
-  font-weight: 600;
-}
-
-.main h2 {
-  margin: 28px 0 12px;
-  font-size: 15px;
-  font-weight: 600;
-}
-
-.main h2 span {
-  color: var(--dim);
-  font-weight: 400;
-  margin-left: 6px;
-}
-
-.filters,
-.verdict {
-  display: inline-flex;
-  border: 1px solid var(--line);
-  border-radius: 7px;
-  overflow: hidden;
-}
-
-.filters button,
-.verdict button {
-  padding: 5px 11px;
-  border: 0;
-  border-right: 1px solid var(--line);
-  background: transparent;
-  color: var(--dim);
-  white-space: nowrap;
-}
-
-.filters button:last-child,
-.verdict button:last-child {
-  border-right: 0;
-}
-
-.filters button:hover,
-.verdict button:hover {
-  color: var(--text);
-  background: var(--raised);
-}
-
-.filters button b {
-  font-weight: 400;
-  font-variant-numeric: tabular-nums;
-  opacity: 0.7;
-  margin-left: 4px;
-}
-
-.filters button[aria-pressed='true'],
-.verdict button[aria-pressed='true'] {
-  background: #343842;
-  color: var(--text);
-}
-
-.verdict button[aria-pressed='true'][data-status='godkänd'] {
-  background: var(--yes);
-  color: #06200f;
-}
-
-.verdict button[aria-pressed='true'][data-status='utgår'] {
-  background: var(--no);
-  color: #2a0606;
-}
-
-.verdict button[aria-pressed='true'][data-status='granska igen'] {
-  background: var(--warn);
-  color: #2a1c02;
-}
-
-.warning {
-  margin: 0 0 12px;
-  padding: 10px 12px;
-  border: 1px solid var(--warn);
-  border-radius: 8px;
-  color: var(--warn);
-  overflow-wrap: anywhere;
-}
-
-.empty {
-  color: var(--dim);
 }
 
 .grid {
@@ -352,21 +1093,21 @@ h1 {
   display: flex;
   flex-direction: column;
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: var(--panel);
   overflow: hidden;
 }
 
 .card[data-status='godkänd'] {
-  border-color: var(--yes);
+  border-color: color-mix(in srgb, var(--yes) 70%, transparent);
 }
 
 .card[data-status='utgår'] {
-  border-color: var(--no);
+  border-color: color-mix(in srgb, var(--no) 70%, transparent);
 }
 
 .card[data-status='granska igen'] {
-  border-color: var(--warn);
+  border-color: color-mix(in srgb, var(--warn) 70%, transparent);
 }
 
 .card[data-status='utgår'] .thumb > :first-child {
@@ -378,7 +1119,7 @@ h1 {
   display: grid;
   place-items: center;
   aspect-ratio: 3 / 2;
-  background: #0a0b0d;
+  background: var(--sunk);
 }
 
 .thumb img,
@@ -418,7 +1159,6 @@ h1 {
 }
 
 .caption {
-  flex: 1;
   padding: 10px 12px 8px;
 }
 
@@ -433,10 +1173,26 @@ h1 {
   overflow-wrap: anywhere;
 }
 
+/* Omdömet på ett kort: fyra val i två rader, lika breda. */
 .card .verdict {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   margin: 0 12px 12px;
-  align-self: flex-start;
   font-size: 12px;
+}
+
+.card .verdict button {
+  min-height: 28px;
+  padding: 0 6px;
+  border-bottom: 1px solid var(--line);
+}
+
+.card .verdict button:nth-child(2n) {
+  border-right: 0;
+}
+
+.card .verdict button:nth-last-child(-n + 2) {
+  border-bottom: 0;
 }
 
 /* Jakobs ord om en fil, och agentens svar */
@@ -453,11 +1209,10 @@ h1 {
   display: block;
   width: 100%;
   padding: 7px 9px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--line-strong);
   border-radius: 6px;
   background: var(--ground);
   color: var(--text);
-  font: inherit;
   font-size: 13px;
   resize: vertical;
 }
@@ -471,7 +1226,7 @@ h1 {
   min-height: 16px;
   margin-top: 3px;
   font-size: 11px;
-  color: var(--dim);
+  color: var(--faint);
 }
 
 .reply {
@@ -487,6 +1242,14 @@ h1 {
   color: var(--dim);
 }
 
+/* Agentens svar på ett kort i Granska: fem rader; hela svaret står när filen öppnas. */
+.card .reply {
+  display: -webkit-box;
+  -webkit-line-clamp: 5;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
 /* En fil i full storlek */
 
 .detail {
@@ -495,7 +1258,7 @@ h1 {
   z-index: 10;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 380px;
-  grid-template-rows: 48px minmax(0, 1fr);
+  grid-template-rows: 52px minmax(0, 1fr);
   background: var(--ground);
 }
 
@@ -503,7 +1266,7 @@ h1 {
   grid-column: 1 / -1;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   padding: 0 16px;
   border-bottom: 1px solid var(--line);
   background: var(--panel);
@@ -521,25 +1284,11 @@ h1 {
   flex: 1;
 }
 
-.nav {
-  padding: 5px 11px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-}
-
-a.nav:hover {
-  background: var(--raised);
-}
-
-.nav.off {
-  color: #5d616b;
-}
-
 .stagewrap {
   position: relative;
   min-width: 0;
   min-height: 0;
-  background: #0a0b0d;
+  background: var(--sunk);
 }
 
 .stage {
@@ -584,26 +1333,12 @@ a.nav:hover {
 
 .filmbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   padding: 10px 16px;
   border-top: 1px solid var(--line);
   background: var(--panel);
-}
-
-.filmbar button {
-  padding: 5px 11px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: transparent;
-}
-
-.filmbar button:hover {
-  background: var(--raised);
-}
-
-.filmbar button[aria-pressed='true'] {
-  background: #343842;
 }
 
 .frame {
@@ -651,16 +1386,14 @@ a.nav:hover {
 .info h2 {
   margin: 0 0 14px;
   font-size: 17px;
-  font-weight: 600;
 }
 
 .info h3 {
   margin: 24px 0 10px;
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 11px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--dim);
+  color: var(--faint);
 }
 
 .meaning {
@@ -699,11 +1432,61 @@ a.nav:hover {
   overflow-wrap: anywhere;
 }
 
-.info dd a {
-  color: var(--accent);
-}
-
 .info dd ul {
   margin: 0;
   padding-left: 16px;
+}
+
+/* En bärbar skärm: stegets rad tappar vägen, menyn tappar sina små rader och märkena krymper. */
+
+@media (max-width: 1400px) {
+  .stephead .path {
+    display: none;
+  }
+}
+
+@media (max-width: 1280px) {
+  .menuitem small,
+  .brand span,
+  .pill .long {
+    display: none;
+  }
+
+  .menuitem {
+    padding: 0 9px;
+  }
+}
+
+@media (max-width: 900px) {
+  .topbar {
+    gap: 10px;
+    padding: 0 8px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .stephead p {
+    display: none;
+  }
+
+  .journey {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .main {
+    padding: 12px 12px 48px;
+  }
+
+  .review {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .review .side {
+    display: none;
+  }
+}
+
+.main .bar h2 {
+  margin: 0;
+  font-size: 18px;
 }

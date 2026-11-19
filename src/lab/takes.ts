@@ -1,11 +1,14 @@
 // Tagningarna så som Labbet ser dem: hämtade från servern (/api/tagningar, src/server/tagningar.ts), med namnen som
 // stegen Dealer och Klipp visar och läget för varje kort i kartan. Labbet läser inte servern, så formen står här.
 
+import { cardName, cardWords, viewWord, type Seat } from './names.ts';
 import { mediaUrl } from './registry.ts';
 
-export type Seat = number | 'D';
+export type { Seat };
 export type Judged = { key: string; what: string; value: unknown; unit: string; limit: string; verdict: string };
-export type TakeFile = 'referens.mp4' | 'ark.jpg' | 'bevis.mp4' | 'klippet.mp4';
+export type TakeFile = 'referens.mp4' | 'ark.jpg' | 'bevis.mp4' | 'klippet.mp4' | 'forsta.png' | 'sista.png' | 'ark-docka.jpg' | 'referensklipp.mp4';
+/** Filmen som skickades med första och sista bilden: dockans film, ett godkänt klipp i dess ställe, eller ingen (sentOf i src/server/tagningar.ts). */
+export type Sent = { kind: 'docka' | 'klipp' | 'ingen'; role: 'referenceVideos' | 'referenceVideo' | null; asset: string | null; frames: number | null; fps: number | null; seconds: number | null };
 
 export type Take = {
   id: string;
@@ -18,6 +21,7 @@ export type Take = {
   action: string;
   take: number | null;
   move: string | null;
+  variant: string | null;
   anchor: string | null;
   status: string;
   statusBy: string | null;
@@ -32,7 +36,9 @@ export type Take = {
   soundInDownload: boolean | null;
   times: { clip: Record<string, number | null>; doll: Record<string, number | null> } | null;
   judged: { inside: number; total: number; shown: Judged[] } | null;
+  /** Dockans film i paketet, skickad eller inte. */
   reference: { frames: number | null; fps: number | null; seconds: number | null } | null;
+  sent: Sent;
   request: { model: string | null; resolution: string | null; duration: number | null; ratio: string | null; made: string | null };
   order: { at: string | null; model: string; credits: number | null; basis: string; seconds: number | null; received: boolean } | null;
   eye: unknown;
@@ -40,7 +46,7 @@ export type Take = {
   place: unknown;
   lands: unknown;
 };
-export type Waiting = { id: string; dealer: string | null; view: string | null; seat: Seat | null; index: number | null; action: string; take: number | null; move: string | null; anchor: string | null; clip: string | null; made: string | null };
+export type Waiting = { id: string; dealer: string | null; view: string | null; seat: Seat | null; index: number | null; action: string; take: number | null; move: string | null; anchor: string | null; clip: string | null; made: string | null; sent: Sent['kind'] };
 export type Takes = { takes: Take[]; waiting: Waiting[] };
 
 export async function fetchTakes(): Promise<Takes> {
@@ -53,49 +59,6 @@ export async function fetchTakes(): Promise<Takes> {
 export const takeUrl = (id: string, name: TakeFile): string => `/tagning/${encodeURIComponent(id)}/${name}`;
 /** Klippet: ur assets/ när det står där, annars det arkiverade ur paketets väg. Null när inget av dem finns. */
 export const clipUrl = (take: Take): string | null => (take.present ? mediaUrl(take.file) : take.files.includes('klippet.mp4') ? takeUrl(take.id, 'klippet.mp4') : null);
-
-// ---------------------------------------------------------------------------------------------------------------------
-// Namnen
-
-const ORDINAL = ['första', 'andra', 'tredje', 'fjärde', 'femte', 'sjätte'];
-
-/** Kortets namn: P4 C0 är plats 4, kort 0; D C0 dealerns öppna kort; D hålkort, D vändning; Väntan. */
-export function cardName(seat: Seat | null, index: number | null, action: string): string {
-  if (action === 'wait') return 'Väntan';
-  if (seat === 'D') return action === 'hole' ? 'D hålkort' : action === 'flip' ? 'D vändning' : `D C${index ?? '?'}`;
-  return `P${seat ?? '?'} C${index ?? '?'}`;
-}
-
-/** Kortet i ord. */
-export function cardWords(seat: Seat | null, index: number | null, action: string): string {
-  if (action === 'wait') return 'spelas medan spelet väntar';
-  const nth = index === null ? 'okänt' : (ORDINAL[index] ?? `${index + 1}:e`);
-  if (seat === 'D') {
-    if (action === 'hole') return 'dealerns andra kort, baksidan upp';
-    if (action === 'flip') return 'hålkortet vänds';
-    return index === 0 ? 'dealerns öppna kort' : `dealerns ${nth} kort`;
-  }
-  return `plats ${seat ?? '?'}, ${nth} kortet`;
-}
-
-/** Vyn ett klipp är gjort i, som ett ord: spelaren eller plats-N. */
-export function viewWord(view: unknown): string {
-  const seen = view as { kind?: unknown; seat?: unknown } | null | undefined;
-  return seen?.kind === 'plats' && Number.isInteger(seen.seat) ? `plats-${seen.seat}` : 'spelaren';
-}
-export const viewLabel = (word: string): string => (word === 'spelaren' ? 'Spelaren' : `Plats ${word.split('-')[1]}`);
-
-/** REDO-ankarets namn: A2 med versionen ur filnamnet (spelaren-redo-3.png är A2.3, utan siffra version 1). */
-export function anchorLabel(file: string | null | undefined): string {
-  if (!file) return 'okänt ankare';
-  return `A2.${/-redo-(\d+)\.png$/.exec(file)?.[1] ?? '1'}`;
-}
-
-/** Cykelns kortnamn ur dess beskrivning i content/moves/ ("Variant E: …" är E), annars namnet. */
-export function cycleLabel(move: string | null, about: string | undefined): string {
-  const variant = about ? /^Variant (\S+?):/.exec(about)?.[1] : undefined;
-  return variant ? `${variant} (${move})` : (move ?? 'okänd cykel');
-}
 
 const SEAT_ORDER = (seat: Seat | null): number => (seat === 'D' ? 8 : (seat ?? 9));
 /** Dealerns kort i kartans ordning: öppet kort, hålkort, vändning, extrakorten, väntan sist. */
@@ -164,4 +127,12 @@ export function nodeOf(view: string, anchor: string | null, card: SeriesCard, ta
   }
   if (queued.length > 0) return { ...base, state: 'paket väntar', take: queued[0]!.take, open: null, note: queuedWords };
   return { ...base, state: 'saknas', take: null, open: null, note: null };
+}
+
+/** Vad som skickades som film med första och sista bilden, i ord. */
+export function sentWords(sent: Sent): string {
+  const clip = sent.asset ? `klippet ${sent.asset.split('/').at(-1)}` : 'ett godkänt klipp';
+  if (sent.kind === 'ingen') return 'ingen film: bara första och sista bilden och texten';
+  if (sent.kind === 'docka') return 'dockans film, som rörelsereferens';
+  return sent.role === 'referenceVideo' ? `${clip}, som filmen som görs om (video till video), i stället för dockans film` : `${clip}, som rörelsereferens i stället för dockans film`;
 }

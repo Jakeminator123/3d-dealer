@@ -3,6 +3,7 @@
 import type { SeatView } from '../scene/build.ts';
 import type { FilmNote, OneClipNote } from '../scene/dealer.ts';
 import { dealsOf, madeWith, planRound, roundFilm, type DealtRound, type Plan, type Round } from '../scene/round.ts';
+import { shownText } from './names.ts';
 import { kindOf, sectionsOf, type Asset, type Item, type Registry } from './registry.ts';
 
 /**
@@ -88,7 +89,7 @@ export function dealerChoices(registry: Registry, dealer: string): DealerChoice[
     if (!asset.present || asset.status === 'utgår') return [];
     const view = asset.use === 'dealerfilm' && asset.dealer === dealer ? madeIn(asset) : null;
     const lands = landing(asset);
-    return view ? [{ dealer: { kind: 'film', file: asset.file, view }, label: asset.title, film: kindOf(asset.file) === 'film', ...(lands ? { lands } : {}), made: madeWith(asset) }] : [];
+    return view ? [{ dealer: { kind: 'film', file: asset.file, view }, label: shownText(asset.title), film: kindOf(asset.file) === 'film', ...(lands ? { lands } : {}), made: madeWith(asset) }] : [];
   });
   return [...made.filter((choice) => choice.film), ...made.filter((choice) => !choice.film)];
 }
