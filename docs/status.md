@@ -11,7 +11,7 @@ Serien ur vyn Spelaren är gjord med cykeln E (`cykel-nyp-rask`, 3,0 s, ankaret 
 - **Ett färdigt klipp som referens** (två prov, `output/work/referensprov/`): Kling kopierar klippet nästan ruta för ruta vad texten än säger, och det gröna mörknar för varje generation, så första och sista rutan klarar inte gränsen mot REDO. Receptet används inte.
 - **Ingen referensfilm** (`output/work/friprov/`): i en fri cykel gör modellen en egen rörelse, kortet landar rätt, och första och sista rutan ligger strax under gränsen mot REDO. Två kort i en tagning landar båda rätt, men bitarna kedjar bara i den ordning de filmades. En friare modell (Seedance) med klippet som lös referens kopierade klippet. Jakob samma dag: den fria cykeln är "faktiskt mycket bra" och följden "mycket bra", men den vilande högerarmen är fixerad och kanske i onaturlig vinkel. En text som låter armen leva får handen att röra sig, men vinkeln sitter i ankaret, och det provet blev sämre i övrigt (kortet vänds sent, det gröna glider).
 - **Rörelsefångst ur film** (`output/work/mansklig-docka/`, `rapport.md` och `prov-a/resultat.md`): MediaPipe Holistic på två egna klipp klarade inte gränserna som sattes före mätningen. Handen tappas i nypet vid skon, och djupet går inte att få ur en kamera framifrån; kropp, armar och den bärande handen följer med.
-- **SAM 3D Body på den fria cykeln** (`output/work/figur/fangst-1/`, `resultat.md` och `granskning/dom.json`): klarade ingen av gränserna. Nätet följer henne i bild och kroppens mått håller mellan rutorna, men handen som når fram får fel djup (den hamnar under filten) och fingrarna i nypet ligger fel. Brännvidden som verktyget självt skattar hoppar mellan rutorna: klippets öga ur registret används.
+- **SAM 3D Body på den fria cykeln** (`output/work/figur/fangst-1/`, `resultat.md` och `granskning/dom.json`): klarade ingen av gränserna. Nätet följer henne i bild och kroppens mått håller mellan rutorna, men handen som når fram får fel djup (den hamnar under filten) och fingrarna i nypet ligger fel. Brännvidden som verktyget självt skattar hoppar mellan rutorna: klippets öga ur registret används. Samma fångst passad mot scenens villkor (`output/work/figur/fangst-2/`) ger en rörelse som dockan spelar ur alla vyer: handens och kortets väg håller, fingrarna i nypet inte.
 
 ## Finns
 
@@ -74,7 +74,7 @@ Prövat med film som referens: ingen modell som Runway når gör en naturligare 
 
 ### Spåret Figuren
 
-Målet: samma naturliga giv ur fler vyer än Spelaren. Filerna: `src/scene/doll.ts`, `dollPose.ts`, `content/doll.json`, `content/moves/`, nya filer i `src/pipeline` för fångsten, `glb/` och `output/work/figur/`. Inga krediter utan att Jakob har sett kostnaden. Arbetet görs i huvudmappen: grenen `figuren` fördes in i `main` 2026-11-19 ([decisions.md](decisions.md), Arbetssättet).
+Målet: samma naturliga giv ur fler vyer än Spelaren. Filerna: `src/scene/doll.ts`, `dollPose.ts`, `content/doll.json`, `content/moves/`, `content/tagning-justerad.json` med `src/pipeline/justerat.ts`, nya filer i `src/pipeline` för fångsten, `glb/` och `output/work/figur/`. Inga krediter utan att Jakob har sett kostnaden. Arbetet görs i huvudmappen ([decisions.md](decisions.md), Arbetssättet).
 
 Jakob 2026-11-19, efter dagens prov: arbetet ska vara enhetligt och inte spreta ("Vad ska vi ha allt till?"). Spåret har därför en fråga i taget, och den som gäller nu är punkt 1.
 
@@ -86,22 +86,22 @@ Underlaget:
 Prövat 2026-11-19, utan krediter, vart och ett i sin mapp under `output/work/figur/` med `resultat.md`:
 
 - `fangst-1/`: SAM 3D Body ensamt höll inte gränserna (Var vi står).
+- `fangst-2/`: samma fångst passad mot scenen. Lederna ligger på strålarna genom sina bildpunkter från klippets öga, handens djup tas ur kortets storlek i bild, och REDO, kortplatsen, filten och skon är villkor. Dockan spelar rörelsen till plats 4 utan kodändring (`fangst-2-plats-4.json`, inte införd i `content/moves/`). Greppet mot det lagda kortet håller gränsen på 2 cm; fingrarna i nypet gör det inte (dömt av en oberoende granskare, `granskning/dom.json`), eftersom greppet är cykeln E:s och inte hennes, och dockans arm är för kort: den sträcks till sin gräns där hennes är böjd.
 - `vyprov/`: dockan, Meshy-figuren och dagens film ur Spelaren, Plats 1, Plats 4 och Plats 7. Dockan ritas ur alla vyer, och filmen är platt ur en annan vy än sin egen. Dockan lagd över filmen i samma vy sammanfaller med henne i händer, axlar och ansikte (`docka-over-film_spelaren.jpg`, sett och inte mätt): filmen är gjord genom scenens kamera.
 - `jamforelse-paow/`: PAOW i gamla Dealer mot Paulina, läst på Jakobs ord (`jamforelse.md` och två filmer sida vid sida). Också hon är en platt film i en 3D-scen. Gamla Dealer har ett vinkelprov som tonar över mellan en film framifrån och en från sidan, där sidofilmen är gjord ur en färdig film med Runways `edit_video`.
-- `tvahand-redo/`: dockans REDO i tvåhandsställningen, A2.3. `cykel-tva-hander` börjar och slutar i den; godkänd av en oberoende granskare efter en rättning (`granskning/omdome.md`). Underlaget till ankaret är `a23-redo-spelaren.png`. Spåret Filmens punkt 4 väntar alltså inte längre på dockan, utan på ett val av rörelse i `ankare.ts förbered`, på beslutet nedan om blicken, och på hålkortet, vändningen och väntan ur samma REDO.
+- `tvahand-redo/`: dockans REDO i tvåhandsställningen, A2.3. `cykel-tva-hander` börjar och slutar i den; godkänd av en oberoende granskare efter en rättning (`granskning/omdome.md`). Underlaget till ankaret är `a23-redo-spelaren.png`. Att hon ser mot skon är justerat för cykeln i `content/tagning-justerad.json`; originalen i `content/tagning.json` står kvar ([production.md](production.md#filmen)). Spåret Filmens punkt 4 väntar alltså inte längre på dockan, utan på ett val av rörelse i `ankare.ts förbered`, och på hålkortet, vändningen och väntan ur samma REDO. Fem andra av rörelsens gränser faller för cykeln till plats 4 (`tvara`, `vagUt`, `paKortet`, `vagTillbaka`, `tillbakaMotUt`; Labbets steg Dockan, Mått): om det är fel i rörelsen eller gränser gjorda för en hand är inte utrett.
 
 Näst, en sak i taget:
 
-1. Passningen (`fangst-2/`, pågår): samma fångst, men lederna läggs på strålarna genom sina bildpunkter från klippets öga, med fasta benlängder och scenens villkor (greppet vid kortet i mynningen och på kortplatsen, ingen hand under filten), och fingrarna i nypet tas ur dockans grepp. Gränserna är desamma som förut: handen inom 2 cm från sin plats i scenen och fingrarna rätt i minst 90 % av rutorna i nypet. Håller den, spelar dockan rörelsen som en ny rörelse i `content/moves/`, synlig i Labbets steg Dockan ur alla vyer, och Jakob dömer den med ögat. Håller den inte, läggs fångst ur film ned och punkt 2 görs utan den.
-2. Samma giv ur en annan vy, betalt och visat för Jakob först: dockans film ur Plats 7 som referens till Kling, med ett ankare ur den vyn; eller gamla Dealers väg, en sidofilm ur en färdig film med `edit_video`. Ett klipp och ett ankare räcker för att se om vägen håller.
-3. Dockans mått mot hennes kropp ur den stående och den sittande kroppen (armarnas längd, sitthöjd), i `content/doll.json`. I fångsten är armarna 13–15 % längre än dockans, med fångstens egen skala.
-4. Filmen på figuren, så att kameran kan flyttas några tiotal grader ([decisions.md](decisions.md), Projektet): filmen projiceras från klippets öga på den rörliga kroppen. Inte prövat, och väntar på punkt 1.
+1. Jakob ser de två filmerna ur passningen och dömer om den fångade rörelsen lever där E är stel: `output/work/figur/fangst-2/film-spelaren-bredvid.mp4` (dockan bredvid originalet) och `film-plats-7-bredvid.mp4` (samma rörelse ur Plats 7 bredvid E).
+2. Är den värd att gå vidare med: dockan får hennes mått (armarnas längd, sitthöjd; i fångsten är armarna 13–15 % längre än dockans, med fångstens egen skala) och ett grepp efter hennes hand, i `content/doll.json`; passningen görs om och blir ett steg i `src/pipeline` för handens och kortets väg. Det som saknas i dockan för mer än plats 4: ett spår för huvudets riktning, och att rörelsen följer med till andra platser.
+3. Samma giv ur en annan vy, betalt och visat för Jakob först: dockans film ur Plats 7 som referens till Kling, med ett ankare ur den vyn; eller gamla Dealers väg, en sidofilm ur en färdig film med `edit_video`. Ett klipp och ett ankare räcker för att se om vägen håller.
+4. Filmen på figuren, så att kameran kan flyttas några tiotal grader ([decisions.md](decisions.md), Projektet): filmen projiceras från klippets öga på den rörliga kroppen. Inte prövat.
 
 Väntar på Jakob:
 
-- Ställningen A2.3 (`output/work/figur/tvahand-redo/a23-mot-a21.jpg`, och rörelsen `cykel-tva-hander` i Labbets steg Dockan): högerhanden ligger bredvid mynningen och hon vrider sig mindre än i ankarvarianten `a2-3`.
-- Om hon ser på skon i tvåhandsgiven. A2.3 vänder henne mot skon, och gränserna `redoMotSkon` och `huvudMotSkon` i `content/tagning.json` säger att hon aldrig gör det.
-- Om arbetsträdet `C:/Users/jakem/Desktop/3d-dealer-figur` och grenen `figuren` får tas bort. Allt på grenen finns i `main`; i arbetsträdets `output/` ligger bara agenternas arbetskopior.
+- De två filmerna i punkt 1.
+- Ställningen A2.3 (`output/work/figur/tvahand-redo/a23-mot-a21.jpg`, och rörelsen `cykel-tva-hander` i Labbets steg Dockan, tid 0 ur vyn Spelaren): högerhanden ligger bredvid mynningen och hon vrider sig mindre än i ankarvarianten `a2-3`.
 
 ### Väntar
 
@@ -110,6 +110,7 @@ Väntar på Jakob:
 - Det som händer mellan givarna: samla in kort, betala ut, marker.
 - Rörelsefångst ur en film som Jakob gör själv (instruktionen står i `output/work/mansklig-docka/rapport.md`, avsnitt 4). Den behövs först om fångsten ur de fria klippen inte räcker.
 - Rörelserna `cykel-nyp-lugn` och `cykel-nyp-flytande`, som ingen serie använder, tas bort ur `content/moves/` när Jakob har sett dem i steget Dockan.
+- En följd i Labbets steg Dockan. Steget spelar ett kort till en plats åt gången; Jakob 2026-11-19 saknade ett val för flera platser efter varandra, som de två korten i en tagning, eller hela bordet.
 - Smått i Labbet: `tagning.ts` exporterar de prov av dockan som `forbered` gör (servern upprepar dem i `src/server/rorelser.ts`), och en förberedelse som pågår överlever en omstart av servern.
 
 ## Öppet
