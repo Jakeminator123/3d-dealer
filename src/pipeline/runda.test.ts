@@ -20,6 +20,7 @@ const round: Round = {
   film: { background: 'scene/backgrounds/prov-rum.jpg', fps: 24, hold: 1.5 },
   wait: { most: 4 },
   speed: { clips: 1 },
+  series: { move: 'prov' },
 };
 const deals: Deal[] = [
   { seat: 1, hand: 0, index: 0, face: 'A♠', action: 'deal' },
@@ -44,7 +45,7 @@ const eye = { position: [0, 1, 0], forward: [0, 0, -1], focalPx: 1000 };
 
 test('rundans beställning, med klipp och kort som går självt, går genom samma väg som varje förlaga', () => {
   const scene = readScene(readJson('scene.json'));
-  const plan = planRound(deals, [cycle('prov-1-0.mp4', 1, 0), cycle('prov-1-1.mp4', 1, 1, 3)], 'paulina', { kind: 'spelaren' }, round.fallback);
+  const plan = planRound(deals, [cycle('prov-1-0.mp4', 1, 0), cycle('prov-1-1.mp4', 1, 1, 3)], 'paulina', { kind: 'spelaren' }, round);
   const background = backgroundOf({ file: 'scene/backgrounds/prov-rum.jpg', status: 'godkänd', kind: '360', oldView: { blur: 6, exposure: 0.42, turn: 0, mirror: false } }, scene);
   assert.deepEqual(background, { file: 'scene/backgrounds/prov-rum.jpg', kind: '360', turn: 0, blur: 6, exposure: 0.42, mirror: false, lift: scene.background.liftDeg, height: scene.room.captureHeight, radius: scene.room.radius });
   const order = roundOrder(plan, round, { kind: 'spelaren' }, background, 'runda-paulina-prov', true);
@@ -67,7 +68,7 @@ test('rundans beställning, med klipp och kort som går självt, går genom samm
 });
 
 test('arket visar första rutan och sista rutan i varje del, klipp eller fallback, med kortet den lade', () => {
-  const plan = planRound(deals, [cycle('prov-1-0.mp4', 1, 0), cycle('prov-1-1.mp4', 1, 1, 3)], 'paulina', { kind: 'spelaren' }, round.fallback);
+  const plan = planRound(deals, [cycle('prov-1-0.mp4', 1, 0), cycle('prov-1-1.mp4', 1, 1, 3)], 'paulina', { kind: 'spelaren' }, round);
   assert.deepEqual(plan.dealt.map((deal) => deal.seconds), [4.04, 1.2, 3, 1.2, 0.8]);
   const ends = clipEnds(plan, 1.5);
   assert.deepEqual(ends.map((end) => Math.round(end * 1000) / 1000), [4.04, 5.24, 8.24, 9.44, 10.24]);

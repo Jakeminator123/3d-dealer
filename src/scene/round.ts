@@ -44,6 +44,7 @@ export type DealtRound = {
  * (`turn`) och flyttat när en hand delas (`move`). `film` är hur rundan sparas som film. `wait.most` är hur länge ett
  * nytt kort högst väntar på att väntans varv ska gå klart (reel.ts, nextStart), i sekunder. `speed.clips` är farten
  * dealerns klipp spelas i, inom PLAN_LIMITS.speed (plan.ts; FilmNote `speed`); vänta-klippet går alltid i 1.
+ * `series.move` är rörelsen (content/moves/) som seriens steg 2-klipp är gjorda med: bara den spelas i steg 2 (chooseClip).
  */
 export type Round = {
   deal: { seed: string; bets: { seat: number; main: number }[]; hitBelow: number };
@@ -51,6 +52,7 @@ export type Round = {
   film: { background: string; fps: number; hold: number };
   wait: { most: number };
   speed: { clips: number };
+  series: { move: string };
 };
 
 /** Den första handen på en plats, och kortplatsen som ord: `plats 4, kort 1`, `plats 4, hand 2, kort 0`, `dealern, kort 1`. */
@@ -80,6 +82,7 @@ export function readRound(value: unknown): Round {
   need(isPositive(film?.fps) && isNumber(film?.hold) && film.hold >= 0, 'film.fps och film.hold');
   need(isNumber(round.wait?.most) && round.wait.most >= 0, 'wait.most');
   need(isSpeed(round.speed?.clips), `speed.clips ${PLAN_LIMITS.speed[0]} … ${PLAN_LIMITS.speed[1]}`);
+  need(typeof round.series?.move === 'string' && /^[a-z0-9][a-z0-9-]{0,79}$/.test(round.series.move), 'series.move: rörelsen seriens klipp är gjorda med, ett namn i content/moves/');
   if (wrong.length > 0) throw new RoundError(`Rundan i content/runda.json går inte att använda: ${wrong.join('; ')}`);
   return {
     deal: { seed: deal!.seed, bets: bets.map((bet) => ({ seat: bet.seat, main: bet.main })), hitBelow: deal!.hitBelow },
@@ -87,6 +90,7 @@ export function readRound(value: unknown): Round {
     film: { background: film!.background, fps: film!.fps, hold: film!.hold },
     wait: { most: round.wait!.most },
     speed: { clips: round.speed!.clips },
+    series: { move: round.series!.move },
   };
 }
 
@@ -210,6 +214,87 @@ export function anchorOf(entry: RoundEntry): string | null {
   return ANCHOR_NAME.exec(what)?.[0] ?? what;
 }
 
+/**
+ * Filmens steg på vägen till slutfilmen (docs/architecture.md, Orden): 1 är dockans film, 2 ett klipp gjort med dockans
+ * film som rörelsereferens (prototypen, som följer dockan), 3 ett klipp gjort utan den: fritt, utan referensfilm, eller
+ * med ett färdigt klipp som referens (slutfilmen). Räknas ur postens `source.references`, filerna som skickades med så
+ * som tagningen tog emot dem (samma fält som anchorOf läser): en referensfilm som inte är ett klipp är dockans film. Ett
+ * klipp i registret är aldrig steg 1: dockans film ligger i paketet. Rundan väljer efter steget (chooseClip), och
+ * servern och Labbet visar det härifrån.
+ */
+export function filmStep(entry: RoundEntry): 2 | 3 {
+  const references = (entry.source as { references?: unknown } | undefined)?.references;
+  const videos = (Array.isArray(references) ? references : []).filter((one) => /^referenceVideo/.test(String((one as { role?: unknown })?.role ?? '')));
+  return videos.some((one) => !CLIP_SENT.test(String((one as { what?: unknown }).what ?? ''))) ? 2 : 3;
+}
+// En referensfilm som är ett klipp: ett klipp i registret, eller paketets kopia av det (referensklipp.mp4).
+const CLIP_SENT = /dealers\/[a-z0-9-]+\/clips\/[^\s:()]+\.mp4|referensklipp\.mp4/;
+
+/** Ett godkänt klipp som kan spelas för ett kort: posten, vad den gör, tagningens nummer och platsen i registret. */
+type Candidate = { entry: RoundEntry; take: Take; number: number; order: number };
+
+/**
+ * Klippet rundan spelar för ett kort, bland godkända klipp ur ett och samma ankare som gör kortet: ett steg 3-klipp före
+ * ett steg 2-klipp (filmStep); i steg 2 bara klipp med seriens rörelse (`series.move` i content/runda.json, postens
+ * `move`), så att en annan rörelse aldrig spelas av misstag fast den är godkänd; inom steget den högsta tagningen och vid
+ * lika den senast införda. `passed` säger varför ett godkänt klipp i fel steg eller med fel rörelse inte spelas; en
+ * tidigare tagning i samma steg är bara ersatt och räknas inte upp.
+ */
+export function chooseClip<T extends { entry: RoundEntry; number: number; order: number }>(candidates: T[], series: Round['series']): { chosen: T | null; passed: { file: string; why: string }[] } {
+  const passed: { file: string; why: string }[] = [];
+  const allowed = candidates.filter((one) => {
+    if (filmStep(one.entry) === 3 || one.entry.move === series.move) return true;
+    passed.push({ file: one.entry.file, why: `steg 2, annan rörelse än serien (${String(one.entry.move ?? 'ingen rörelse')}, serien är ${series.move})` });
+    return false;
+  });
+  const finals = allowed.filter((one) => filmStep(one.entry) === 3);
+  const pool = finals.length > 0 ? finals : allowed;
+  const chosen = pool.reduce<T | null>((best, one) => (!best || one.number > best.number || (one.number === best.number && one.order > best.order) ? one : best), null);
+  // En tidigare tagning i samma steg är ersatt och räknas inte upp; ett steg 2-klipp som ett steg 3-klipp går före gör det.
+  if (finals.length > 0) for (const one of allowed) if (filmStep(one.entry) === 2) passed.push({ file: one.entry.file, why: `ett steg 3-klipp finns (${chosen!.entry.file})` });
+  return { chosen, passed };
+}
+
+/** Per ankare: rundans val för varje kort som ankaret har godkända klipp till, och klippen som inte spelas med skälet. */
+type Choices = { best: Map<string, Candidate>; approved: number; latest: number };
+
+function choicesOf(entries: RoundEntry[], dealer: string, view: SeatView, series: Round['series']): { sets: Map<string | null, Choices>; skipped: { file: string; why: string; anchor: string | null; key: string | null }[] } {
+  const sets = new Map<string | null, Choices & { candidates: Map<string, Candidate[]> }>();
+  const skipped: { file: string; why: string; anchor: string | null; key: string | null }[] = [];
+  entries.forEach((entry, order) => {
+    if (entry.dealer !== dealer || entry.use !== 'dealerfilm' || !sameView(entry.view, view) || !isCycle(entry)) return;
+    // En väntan lägger inget kort och spelas inte i följden (waitClip).
+    if (entry.action === 'wait') return;
+    const anchor = anchorOf(entry);
+    const take = takeOf(entry);
+    if (typeof take === 'string') return void skipped.push({ file: entry.file, why: take, anchor, key: null });
+    const key = clipKey(take.seat, take.index, take.action);
+    if (entry.status !== PLAYED) return void skipped.push({ file: entry.file, why: `status ${entry.status}`, anchor, key });
+    if (entry.present === false) return void skipped.push({ file: entry.file, why: 'filen saknas i assets/', anchor, key });
+    const set = sets.get(anchor) ?? { best: new Map(), approved: 0, latest: -1, candidates: new Map() };
+    sets.set(anchor, set);
+    set.approved += 1;
+    set.latest = Math.max(set.latest, order);
+    set.candidates.set(key, [...(set.candidates.get(key) ?? []), { entry, take, number: isNumber(entry.take) ? entry.take : 0, order }]);
+  });
+  for (const [anchor, set] of sets) {
+    for (const [key, candidates] of set.candidates) {
+      const { chosen, passed } = chooseClip(candidates, series);
+      if (chosen) set.best.set(key, chosen);
+      skipped.push(...passed.map((one) => ({ ...one, anchor, key })));
+    }
+  }
+  return { sets, skipped };
+}
+
+/**
+ * Klippet rundan spelar för kortet `card` ur REDO-ankaret `anchor`: samma val som planRound gör (chooseClip). Steget
+ * Dealer och `runda.ts --plan` visar det härifrån. Null när ankaret inte har något godkänt klipp som spelas för kortet.
+ */
+export function clipFor(entries: RoundEntry[], dealer: string, view: SeatView, anchor: string | null, card: { seat: number | 'D'; index: number; action: CardAction }, series: Round['series']): string | null {
+  return choicesOf(entries, dealer, view, series).sets.get(anchor)?.best.get(clipKey(card.seat, card.index, card.action))?.entry.file ?? null;
+}
+
 /** Det som spelas: följden, och för varje kort klippet som lägger det, eller null när kortet går självt. */
 export type Plan = {
   clips: FilmClip[];
@@ -229,49 +314,28 @@ export type Plan = {
 
 /**
  * Rundan för dealern `dealer` ur vyn `view`: för varje kort i `deals` det godkända cykelklippet ur registret som gör
- * just det (plats, kortets nummer, action), den senaste tagningen före en tidigare. Alla klipp i en följd är gjorda ur
+ * just det (plats, kortets nummer, action), valt som chooseClip väljer: steg 3 före steg 2, i steg 2 bara seriens
+ * rörelse (`round.series`), och den senaste tagningen före en tidigare. Alla klipp i en följd är gjorda ur
  * samma REDO-ankare (anchorOf): det ankare vars godkända klipp täcker flest av rundans kort, vid lika det med flest
  * godkända klipp ur vyn, och sedan det senast införda. Ett kort på en delad hand (hand 2 och framåt) har inget klipp:
  * klippen lägger på platsens första hand. Saknas klippet går kortet självt från skon på `fallback.seconds` (vänds på
  * `fallback.turn`), medan dealern står i REDO; ett kort som flyttas när en hand delas går på `fallback.move`. En post
  * vars fil saknas (`present: false`) spelas inte.
  */
-export function planRound(deals: Deal[], entries: RoundEntry[], dealer: string, view: SeatView, fallback: Round['fallback']): Plan {
+export function planRound(deals: Deal[], entries: RoundEntry[], dealer: string, view: SeatView, round: Pick<Round, 'fallback' | 'series'>): Plan {
+  const { fallback } = round;
   const wanted = new Set(deals.filter((deal) => deal.action !== 'move' && deal.hand === 0).map((deal) => clipKey(deal.seat, deal.index, deal.action as CardAction)));
-  // Per ankare: det bästa klippet för varje kort i rundan, hur många godkända klipp ankaret har ur vyn, och när dess
-  // senaste post fördes in. Klippen som inte spelas, med ankaret de hör till.
-  type Group = { best: Map<string, { take: Take; number: number; order: number }>; approved: number; latest: number };
-  const sets = new Map<string | null, Group>();
-  const skipped: (Plan['unusable'][number] & { anchor: string | null })[] = [];
-  entries.forEach((entry, order) => {
-    if (entry.dealer !== dealer || entry.use !== 'dealerfilm' || !sameView(entry.view, view) || !isCycle(entry)) return;
-    // En väntan lägger inget kort och spelas inte i följden (waitClip).
-    if (entry.action === 'wait') return;
-    const anchor = anchorOf(entry);
-    const take = takeOf(entry);
-    if (typeof take === 'string') return void skipped.push({ file: entry.file, why: take, anchor });
-    const key = clipKey(take.seat, take.index, take.action);
-    const playable = entry.status === PLAYED && entry.present !== false;
-    if (playable) {
-      const set = sets.get(anchor) ?? { best: new Map(), approved: 0, latest: -1 };
-      sets.set(anchor, set);
-      set.approved += 1;
-      set.latest = Math.max(set.latest, order);
-    }
-    if (!wanted.has(key)) return;
-    if (entry.status !== PLAYED) return void skipped.push({ file: entry.file, why: `status ${entry.status}`, anchor });
-    if (entry.present === false) return void skipped.push({ file: entry.file, why: 'filen saknas i assets/', anchor });
-    const best = sets.get(anchor)!.best;
-    const number = isNumber(entry.take) ? entry.take : 0;
-    const known = best.get(key);
-    if (!known || number > known.number || (number === known.number && order > known.order)) best.set(key, { take, number, order });
-  });
+  // Per ankare rundans val för varje kort (choicesOf, chooseClip), hur många godkända klipp ankaret har ur vyn, och när
+  // dess senaste post fördes in. Ett ankare räknas efter hur många av rundans kort det har ett klipp till.
+  const { sets: all, skipped } = choicesOf(entries, dealer, view, round.series);
+  const sets = new Map([...all].map(([anchor, set]) => [anchor, { ...set, best: new Map([...set.best].filter(([key]) => wanted.has(key))) }]));
   const ranked = [...sets.entries()]
     .filter(([, set]) => set.best.size > 0)
     .sort(([, a], [, b]) => b.best.size - a.best.size || b.approved - a.approved || b.latest - a.latest);
   const anchor = ranked[0]?.[0] ?? null;
-  const best = ranked[0]?.[1].best ?? new Map<string, { take: Take; number: number; order: number }>();
-  const unusable = skipped.filter((item) => ranked.length === 0 || item.anchor === anchor).map(({ file, why }) => ({ file, why }));
+  const best = ranked[0]?.[1].best ?? new Map<string, Candidate>();
+  // Det som inte spelas, för rundans kort (eller utan plats och kort i posten), ur det valda ankaret.
+  const unusable = skipped.filter((item) => (ranked.length === 0 || item.anchor === anchor) && (item.key === null || wanted.has(item.key))).map(({ file, why }) => ({ file, why }));
 
   const clips: FilmClip[] = [];
   const dealt: Plan['dealt'] = [];
@@ -377,7 +441,7 @@ export function waitClip(entries: RoundEntry[], dealer: string, view: SeatView, 
  * kort som ankaret har ett klipp till (plats, kortets nummer, action) det klipp som planRound väljer, och vänta-klippet
  * (waitClip). Så vet det statiska bygget (src/statisk) vilka filer det behöver.
  */
-export function clipsOf(entries: RoundEntry[], dealer: string, view: SeatView, anchor: string | null): string[] {
+export function clipsOf(entries: RoundEntry[], dealer: string, view: SeatView, anchor: string | null, series: Round['series']): string[] {
   const own = entries.filter((entry) => anchorOf(entry) === anchor);
   const deals = new Map<string, Deal>();
   for (const entry of own) {
@@ -385,7 +449,7 @@ export function clipsOf(entries: RoundEntry[], dealer: string, view: SeatView, a
     const take = takeOf(entry);
     if (typeof take !== 'string') deals.set(clipKey(take.seat, take.index, take.action), { seat: take.seat, hand: 0, index: take.index, face: null, action: take.action });
   }
-  const plan = planRound([...deals.values()], own, dealer, view, { seconds: 1, turn: 1, move: 1 });
+  const plan = planRound([...deals.values()], own, dealer, view, { fallback: { seconds: 1, turn: 1, move: 1 }, series });
   const wait = waitClip(own, dealer, view, anchor);
   return [...new Set([...plan.dealt.flatMap((deal) => (deal.file ? [deal.file] : [])), ...(wait ? [wait] : [])])];
 }

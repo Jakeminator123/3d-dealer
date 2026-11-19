@@ -106,7 +106,7 @@ export function roundChoices(registry: Registry, dealer: string, dealt: DealtRou
   const views: SeatView[] = [{ kind: 'spelaren' }, ...seats.map((seat): SeatView => ({ kind: 'plats', seat }))];
   const deals = dealsOf(dealt.steps);
   return views.flatMap((view): RoundChoice[] => {
-    const plan = planRound(deals, registry.assets, dealer, view, round.fallback);
+    const plan = planRound(deals, registry.assets, dealer, view, round);
     const filmed = plan.dealt.filter((deal) => deal.file !== null).length;
     if (filmed === 0) return [];
     const name = view.kind === 'plats' ? `Plats ${view.seat}` : 'Spelaren';

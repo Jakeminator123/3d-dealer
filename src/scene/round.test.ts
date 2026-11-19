@@ -11,13 +11,13 @@ import { test } from 'node:test';
 import { readScene } from './description.ts';
 import { planOf, withPlan } from './plan.ts';
 import { flyingAt, lyingAt, makeReel } from './reel.ts';
-import { dealName, dealsOf, planPlace, planRound, readRound, readyClip, roundFilm, spotPlace, waitClip, type Deal, type Round, type RoundEntry, type RoundStep } from './round.ts';
+import { clipFor, dealName, dealsOf, filmStep, planPlace, planRound, readRound, readyClip, roundFilm, spotPlace, waitClip, type Deal, type Round, type RoundEntry, type RoundStep } from './round.ts';
 
 const project = resolve(import.meta.dirname, '..', '..');
 const readJson = (file: string): unknown => JSON.parse(readFileSync(join(project, 'content', file), 'utf8'));
 const FALLBACK = { seconds: 1.2, turn: 0.8, move: 0.8 };
 const rounded = (flying: ReturnType<typeof flyingAt>) => flying && { ...flying, progress: Math.round(flying.progress * 1e6) / 1e6 };
-const round: Round = { deal: { seed: 'prov', bets: [{ seat: 4, main: 10 }], hitBelow: 15 }, fallback: FALLBACK, film: { background: 'scene/backgrounds/prov-rum.jpg', fps: 24, hold: 1.5 }, wait: { most: 4 }, speed: { clips: 1 } };
+const round: Round = { deal: { seed: 'prov', bets: [{ seat: 4, main: 10 }], hitBelow: 15 }, fallback: FALLBACK, film: { background: 'scene/backgrounds/prov-rum.jpg', fps: 24, hold: 1.5 }, wait: { most: 4 }, speed: { clips: 1 }, series: { move: 'prov' } };
 
 // Spelkärnans händelser och vy, i den form seats.ts ger dem. Bara det rundan läser är ifyllt.
 const card = (face: string, shoeDraw: number) => ({ r: face.slice(0, -1), s: face.slice(-1), serial: shoeDraw, shoeDraw });
@@ -74,7 +74,7 @@ test('korten ur spelkärnans händelser: plats, hand och kortets nummer, valöre
 });
 
 test('varje kort får det godkända klippet som gör just det: seat, index och action, och en post utan action är en utdelning', () => {
-  const plan = planRound(dealsOf(STEPS), ENTRIES, 'paulina', { kind: 'spelaren' }, FALLBACK);
+  const plan = planRound(dealsOf(STEPS), ENTRIES, 'paulina', { kind: 'spelaren' }, { fallback: FALLBACK, series: round.series });
   assert.deepEqual(plan.clips, [
     { file: 'dealers/paulina/clips/prov-4-0.mp4', card: { seat: 4, index: 0, face: '10♠', at: 1.9 } },
     { file: 'dealers/paulina/clips/prov-d-0.mp4', card: { seat: 'D', index: 0, face: '9♣', at: 2.0 } },
@@ -92,7 +92,7 @@ test('varje kort får det godkända klippet som gör just det: seat, index och a
 
 test('utan dealerns klipp går hans kort självt, och hålkortet vänds där det ligger', () => {
   const players = ENTRIES.filter((entry) => !entry.file.includes('-d-'));
-  const plan = planRound(dealsOf(STEPS), players, 'paulina', { kind: 'spelaren' }, FALLBACK);
+  const plan = planRound(dealsOf(STEPS), players, 'paulina', { kind: 'spelaren' }, { fallback: FALLBACK, series: round.series });
   assert.deepEqual(
     plan.clips.map((part) => (part.file === null ? [part.from, part.seconds, part.card.face] : part.file.split('/').at(-1))),
     ['prov-4-0.mp4', ['skon', 1.2, '9♣'], 'prov-4-1.mp4', ['skon', 1.2, null], ['skon', 1.2, '3♣'], [{ seat: 'D', index: 1 }, 0.8, '7♥'], ['skon', 1.2, '5♠']],
@@ -112,7 +112,7 @@ test('bara godkända klipp spelas, ur rätt vy och för rätt dealer; den senast
     clip('prov-4-1-utan-tid.mp4', { seat: 4, index: 1, lands: {} }),
     clip('prov-4-1-saknas.mp4', { seat: 4, index: 1, present: false, lands: { at: 1.8 } }),
   ];
-  const plan = planRound(dealsOf(STEPS), entries, 'paulina', { kind: 'spelaren' }, FALLBACK);
+  const plan = planRound(dealsOf(STEPS), entries, 'paulina', { kind: 'spelaren' }, { fallback: FALLBACK, series: round.series });
   assert.deepEqual(plan.dealt.map((deal) => deal.file?.split('/').at(-1) ?? null), ['prov-4-0-t2.mp4', null, null, null, null, null, null]);
   assert.deepEqual(
     plan.unusable.map((item) => [item.file.split('/').at(-1), item.why]),
@@ -137,13 +137,55 @@ test('väntan: klippet med action wait ur följdens ankare spelas medan spelet v
     clip('ny-vanta-t3.mp4', { ...made('ny.png'), seat: 'D', index: 0, action: 'wait', take: 3, status: 'att granska' }),
     clip('gammal-vanta.mp4', { ...made('gammal.png'), seat: 'D', index: 0, action: 'wait', take: 9 }),
   ];
-  const plan = planRound(dealsOf(STEPS), entries, 'paulina', { kind: 'spelaren' }, FALLBACK);
+  const plan = planRound(dealsOf(STEPS), entries, 'paulina', { kind: 'spelaren' }, { fallback: FALLBACK, series: round.series });
   assert.equal(plan.anchor, 'dealers/paulina/anchors/ny.png');
   assert.ok(plan.clips.every((one) => !one.file?.includes('vanta')), 'väntan spelas inte som ett kort');
   assert.ok(plan.unusable.every((one) => !one.file.includes('vanta')), 'och räknas inte som oanvändbar');
   assert.equal(waitClip(entries, 'paulina', { kind: 'spelaren' }, plan.anchor), 'dealers/paulina/clips/ny-vanta-t2.mp4', 'den senaste godkända ur följdens ankare');
   assert.equal(waitClip(entries, 'paulina', { kind: 'spelaren' }), 'dealers/paulina/clips/gammal-vanta.mp4', 'utan ankare: den senaste tagningen');
   assert.equal(waitClip(entries, 'paulina', { kind: 'plats', seat: 3 }, plan.anchor), null);
+});
+
+test('filmens steg räknas ur klippets post: dockans film som referens är steg 2, annars steg 3', () => {
+  const post = (...references: { role: string; what: string }[]): RoundEntry => ({ file: 'x.mp4', status: 'godkänd', source: { references: [{ role: 'startFrame', what: 'dealers/paulina/anchors/prov-redo.png' }, ...references] } });
+  const doll = { role: 'referenceVideos[0]', what: 'output/tagningar/p/referens.mp4 (förlagan output/forlagor/docka.mp4): dockan gör rorelse' };
+  const clipRef = { role: 'referenceVideos[0]', what: 'output/tagningar/p/referensklipp.mp4: det godkända klippet dealers/paulina/clips/prov-4-0.mp4' };
+  assert.equal(filmStep(post(doll)), 2, 'prototypen följer dockan');
+  assert.equal(filmStep(post()), 3, 'fritt, utan referensfilm');
+  assert.equal(filmStep(post(clipRef)), 3, 'ett klipp som rörelsereferens');
+  assert.equal(filmStep(post({ role: 'referenceVideo', what: 'det godkända klippet dealers/paulina/clips/prov-4-0.mp4 som filmen som görs om' })), 3, 'video till video');
+  assert.equal(filmStep(post({ role: 'referenceImages[0]', what: 'output/tagningar/p/forsta.png' }, clipRef)), 3, 'en referensbild är ingen film');
+  assert.equal(filmStep({ file: 'x.mp4', status: 'godkänd' }), 3, 'en post utan referenser');
+});
+
+test('per kort spelas steg 3 före steg 2, och i steg 2 bara seriens rörelse, med skälet för det som inte spelas', () => {
+  const doll = { role: 'referenceVideos[0]', what: 'output/tagningar/p/referens.mp4: dockan gör seriens rörelse' };
+  const anchor = { role: 'startFrame', what: 'dealers/paulina/anchors/prov-redo.png' };
+  const card = (file: string, more: Record<string, unknown>) => clip(file, { seat: 4, index: 0, lands: { at: 1.9 }, take: 1, ...more });
+  const series = card('serie-4-0.mp4', { move: 'serien', source: { references: [anchor, doll] } });
+  const two = card('tva-4-0.mp4', { move: 'tva-hander', source: { references: [anchor, doll] } });
+  const free = card('fri-4-0.mp4', { move: 'serien', source: { references: [anchor] } });
+  const ROUND = { fallback: FALLBACK, series: { move: 'serien' } };
+  const one: Deal[] = [{ seat: 4, hand: 0, index: 0, face: 'A♠', action: 'deal' }];
+  const played = (entries: RoundEntry[]) => planRound(one, entries, 'paulina', { kind: 'spelaren' }, ROUND);
+
+  // En annan rörelse i steg 2 spelas aldrig, fast den är godkänd och senare införd.
+  let plan = played([series, two]);
+  assert.equal(plan.dealt[0]!.file, series.file);
+  assert.deepEqual(plan.unusable, [{ file: two.file, why: 'steg 2, annan rörelse än serien (tva-hander, serien är serien)' }]);
+  // Ensam spelas den inte heller: kortet går självt.
+  assert.deepEqual([played([two]).dealt[0]!.file, played([two]).missing.length], [null, 1]);
+  // Ett steg 3-klipp spelas före seriens steg 2-klipp, också när det har en lägre tagning och är tidigare infört.
+  plan = played([{ ...free, take: 1 }, { ...series, take: 2 }, two]);
+  assert.equal(plan.dealt[0]!.file, free.file);
+  assert.deepEqual(new Set(plan.unusable.map((item) => item.why)), new Set([`ett steg 3-klipp finns (${free.file})`, 'steg 2, annan rörelse än serien (tva-hander, serien är serien)']));
+  // Inom ett steg som förut: den högsta tagningen, och vid lika den senast införda.
+  const later = card('fri-4-0_t2.mp4', { source: { references: [anchor] }, take: 2 });
+  assert.equal(played([later, free]).dealt[0]!.file, later.file);
+  assert.equal(played([free, { ...later, take: 1 }]).dealt[0]!.file, later.file);
+  // Samma val för ett ensamt kort, som steget Dealer visar det.
+  assert.equal(clipFor([series, two, free], 'paulina', { kind: 'spelaren' }, 'dealers/paulina/anchors/prov-redo.png', { seat: 4, index: 0, action: 'deal' }, ROUND.series), free.file);
+  assert.equal(clipFor([series, two], 'paulina', { kind: 'spelaren' }, 'dealers/paulina/anchors/prov-redo.png', { seat: 4, index: 0, action: 'deal' }, ROUND.series), series.file);
 });
 
 test('en följd blandar aldrig klipp ur olika REDO-ankare: ankaret med flest godkända klipp för rundan väljs', () => {
@@ -170,7 +212,7 @@ test('en följd blandar aldrig klipp ur olika REDO-ankare: ankaret med flest god
   ];
   // Det nya ankaret har klipp till fyra av rundans kort, det gamla till tre: alla klipp i följden är ur det nya, också
   // när det gamla har ett klipp till ett kort som det nya saknar (dealerns öppna kort).
-  const plan = planRound(dealsOf(STEPS), entries, 'paulina', { kind: 'spelaren' }, FALLBACK);
+  const plan = planRound(dealsOf(STEPS), entries, 'paulina', { kind: 'spelaren' }, { fallback: FALLBACK, series: round.series });
   assert.equal(plan.anchor, 'dealers/paulina/anchors/prov-redo-ny.png');
   assert.deepEqual(plan.anchors, [
     { anchor: 'dealers/paulina/anchors/prov-redo-ny.png', clips: 4 },
@@ -181,15 +223,15 @@ test('en följd blandar aldrig klipp ur olika REDO-ankare: ankaret med flest god
   assert.deepEqual(plan.unusable, [{ file: 'dealers/paulina/clips/ny-4-2.mp4', why: 'status att granska' }]);
   // Lika många klipp till rundan: det ankare som har flest godkända klipp ur vyn, och sedan det senast införda.
   const even = entries.filter((entry) => /-4-[01]\.mp4$/.test(entry.file));
-  assert.equal(planRound(dealsOf(STEPS), even, 'paulina', { kind: 'spelaren' }, FALLBACK).anchor, 'dealers/paulina/anchors/prov-redo-ny.png');
-  assert.equal(planRound(dealsOf(STEPS), [...even, old('gammal-6-0.mp4', { seat: 6, index: 0, lands: { at: 1.9 } })], 'paulina', { kind: 'spelaren' }, FALLBACK).anchor, 'dealers/paulina/anchors/prov-redo.png');
+  assert.equal(planRound(dealsOf(STEPS), even, 'paulina', { kind: 'spelaren' }, { fallback: FALLBACK, series: round.series }).anchor, 'dealers/paulina/anchors/prov-redo-ny.png');
+  assert.equal(planRound(dealsOf(STEPS), [...even, old('gammal-6-0.mp4', { seat: 6, index: 0, lands: { at: 1.9 } })], 'paulina', { kind: 'spelaren' }, { fallback: FALLBACK, series: round.series }).anchor, 'dealers/paulina/anchors/prov-redo.png');
   // Dealern i REDO utan runda är ur ankaret med flest godkända klipp ur vyn.
   assert.equal(readyClip(entries, 'paulina', { kind: 'spelaren' }), 'dealers/paulina/clips/ny-4-0.mp4');
   assert.equal(readyClip([...even, old('gammal-6-0.mp4', { seat: 6, index: 0, lands: { at: 1.9 } })], 'paulina', { kind: 'spelaren' }), 'dealers/paulina/clips/gammal-4-0.mp4');
 });
 
 test('hålkortet ligger med baksidan upp på bordet tills vändningen har landat; då ligger det uppvända kortet där', () => {
-  const plan = planRound(dealsOf(STEPS), ENTRIES, 'paulina', { kind: 'spelaren' }, FALLBACK);
+  const plan = planRound(dealsOf(STEPS), ENTRIES, 'paulina', { kind: 'spelaren' }, { fallback: FALLBACK, series: round.series });
   const reel = makeReel(plan.clips.map((part) => (part.file === null ? { seconds: part.seconds, card: part.card, from: part.from } : { seconds: 4, ...(part.card ? { card: part.card } : {}) })));
   const faceAt = (time: number) => lyingAt(reel, time).map((index) => reel.parts[index]!.card!.face);
   // Hålkortet landar 2,1 s in i fjärde delen: med baksidan upp.
@@ -219,7 +261,7 @@ test('ett kort som flyttas när handen delas går från sin gamla kortplats till
     { seat: 2, hand: 0, index: 1, face: '3♦', action: 'deal' },
     { seat: 2, hand: 1, index: 1, face: '2♣', action: 'deal' },
   ] satisfies Deal[]);
-  const plan = planRound(deals, [clip('prov-2-1.mp4', { seat: 2, index: 1, lands: { at: 1.8 } })], 'paulina', { kind: 'spelaren' }, FALLBACK);
+  const plan = planRound(deals, [clip('prov-2-1.mp4', { seat: 2, index: 1, lands: { at: 1.8 } })], 'paulina', { kind: 'spelaren' }, { fallback: FALLBACK, series: round.series });
   // Flyttningen har inget klipp och räknas inte som saknad; den andra handens kort har inget klipp (klippen lägger på platsens första hand).
   assert.deepEqual(plan.clips.slice(4), [
     { file: null, seconds: 0.8, card: { seat: 2, index: 0, hand: 1, face: '8♥', at: 0.8 }, from: { seat: 2, hand: 0, index: 1 } },
@@ -273,7 +315,7 @@ test('content/runda.json går att läsa, och en runda som inte går att använda
 });
 
 test('rundans dealerfilm spelar klippen i rundans fart, och säger ingen fart i 1', () => {
-  const plan = planRound([{ seat: 4, hand: 0, index: 0, face: 'A♠', action: 'deal' }], [clip('a.mp4', { seat: 4, index: 0, lands: { seat: 4, index: 0, at: 1.9 } })], 'paulina', { kind: 'spelaren' }, FALLBACK);
+  const plan = planRound([{ seat: 4, hand: 0, index: 0, face: 'A♠', action: 'deal' }], [clip('a.mp4', { seat: 4, index: 0, lands: { seat: 4, index: 0, at: 1.9 } })], 'paulina', { kind: 'spelaren' }, { fallback: FALLBACK, series: round.series });
   assert.equal('speed' in roundFilm(plan, round, { kind: 'spelaren' }), false);
   assert.equal(roundFilm(plan, { ...round, speed: { clips: 1.5 } }, { kind: 'spelaren' }).speed, 1.5);
 });
@@ -288,7 +330,7 @@ test('ett klipp som bär sitt öga, sin sko och var kortet landar spelas så, oc
     made('gammal-4-1.mp4', { seat: 4, index: 1, lands: { at: 1.8 }, place: [0.0191, -1.46] }),
   ];
   const scene = readScene(readJson('scene.json'));
-  const plan = planRound(dealsOf(STEPS), entries, 'paulina', { kind: 'spelaren' }, FALLBACK);
+  const plan = planRound(dealsOf(STEPS), entries, 'paulina', { kind: 'spelaren' }, { fallback: FALLBACK, series: round.series });
   assert.deepEqual(plan.clips[0], { file: 'dealers/paulina/clips/gammal-4-0.mp4', card: { seat: 4, index: 0, face: '10♠', at: 1.9, place: [-0.019, -1.4468] } });
   const film = roundFilm(plan, round, { kind: 'spelaren' }, false);
   assert.deepEqual([film.eye, film.shoe], [eye, shoe], 'följden läggs genom ögat klippen gjordes i, med skon de bär');
@@ -297,7 +339,7 @@ test('ett klipp som bär sitt öga, sin sko och var kortet landar spelas så, oc
   assert.notDeepEqual(spotPlace(scene, { seat: 4, index: 0 }), [-0.019, -1.4468]);
   assert.deepEqual(spotPlace(scene, plan.clips[4]!.card!), scene.places.seats.find((entry) => entry.seat === 4)!.cards[2]);
   // Ett klipp utan öga i posten läggs genom vyns närbild i dag (inget eye i följden).
-  assert.equal(roundFilm(planRound(dealsOf(STEPS), ENTRIES, 'paulina', { kind: 'spelaren' }, FALLBACK), round, { kind: 'spelaren' }).eye, undefined);
+  assert.equal(roundFilm(planRound(dealsOf(STEPS), ENTRIES, 'paulina', { kind: 'spelaren' }, { fallback: FALLBACK, series: round.series }), round, { kind: 'spelaren' }).eye, undefined);
 });
 
 test('ett klipps kort landar där handen lade det, och har sin plats i dagens kortplan, som följer planen när den ställs om', () => {

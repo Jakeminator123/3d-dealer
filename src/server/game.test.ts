@@ -50,7 +50,7 @@ test('varje kort i spelkärnans händelser blir ett klipp eller en fallback, med
   for (const seed of ['prov-runda', 'prov-a', 'prov-b', 'prov-c', round.deal.seed]) {
     const dealt = dealRound({ ...deal, seed });
     const events = dealt.steps.flatMap((step) => step.events);
-    const plan = planRound(dealsOf(dealt.steps), ENTRIES, 'paulina', { kind: 'spelaren' }, round.fallback);
+    const plan = planRound(dealsOf(dealt.steps), ENTRIES, 'paulina', { kind: 'spelaren' }, round);
     // Kärnans kort, i spelordning: varje utdelning och vändningen.
     const cards = events.flatMap((event) =>
       event.type === 'deal' ? [{ seat: event.to === 'dealer' ? 'D' : event.seat, index: event.cardIndex, face: event.card ? `${event.card.r}${event.card.s}` : null }] : event.type === 'reveal' ? [{ seat: 'D', index: event.cardIndex, face: `${event.card.r}${event.card.s}` }] : [],

@@ -39,7 +39,7 @@ export type Take = {
   /** Dockans film i paketet, skickad eller inte. */
   reference: { frames: number | null; fps: number | null; seconds: number | null } | null;
   sent: Sent;
-  /** Filmens steg, som servern räknar det (filmStep i src/server/tagningar.ts): 2 följer dockan, 3 är gjord utan henne. */
+  /** Filmens steg, som servern räknar det (filmStep i src/scene/round.ts): 2 följer dockan, 3 är gjord utan henne. */
   step: 2 | 3;
   request: { model: string | null; resolution: string | null; duration: number | null; ratio: string | null; made: string | null };
   order: { at: string | null; model: string; credits: number | null; basis: string; seconds: number | null; received: boolean } | null;

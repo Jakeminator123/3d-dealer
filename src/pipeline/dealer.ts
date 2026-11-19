@@ -12,7 +12,7 @@
 
 import { existsSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { anchorOf } from '../scene/round.ts';
+import { anchorOf, clipFor, readRound, waitClip, type CardAction, type Round } from '../scene/round.ts';
 import { studioRoot, viewRegistry, type RegistryEntry } from './registry.ts';
 
 export class DealerError extends Error {}
@@ -260,6 +260,8 @@ const viewWord = (view: unknown): string | null => {
   if (seen?.kind === 'plats' && Number.isInteger(seen.seat)) return `plats-${seen.seat}`;
   return null;
 };
+/** Vyn som rundan läser den ur ett ord: spelaren eller plats-N. */
+const viewOf = (word: string): { kind: 'spelaren' } | { kind: 'plats'; seat: number } => (word.startsWith('plats-') ? { kind: 'plats', seat: Number(word.slice('plats-'.length)) } : { kind: 'spelaren' });
 const shown = (entry: Entry): Shown => ({ file: entry.file, status: entry.status, present: entry.present !== false, title: String(entry.title ?? '') });
 /** REDO-ankaret ett klipp är gjort ur, som rundan läser det (src/scene/round.ts, anchorOf). Servern läser det härifrån. */
 export const clipAnchor = (entry: Entry): string | null => anchorOf(entry);
@@ -308,6 +310,13 @@ export function dealerState(root: string, id: string, entries?: Entry[]): Dealer
   for (const entry of all) if (entry.group === 'identity' && !listed.has(entry.file) && entry.status !== 'utgår') problems.push(`${entry.file} är en identitetsbild för ${id} i registret men står inte i dealerns fil`);
 
   const series = [...mall.series.first.map((text) => ({ ...seriesCard(text)!, first: true })), ...mall.series.then.map((text) => ({ ...seriesCard(text)!, first: false }))];
+  // Rörelsen seriens steg 2-klipp är gjorda med (content/runda.json, series): kartan visar det klipp rundan spelar.
+  let round: Round['series'] | null = null;
+  try {
+    round = readRound(JSON.parse(readFileSync(join(root, 'content', 'runda.json'), 'utf8'))).series;
+  } catch (error) {
+    problems.push(`content/runda.json går inte att läsa, så kartan kan inte visa vilka klipp rundan spelar: ${(error as Error).message}`);
+  }
   const words = new Set(['spelaren', ...Object.keys(dealer?.anchors.redo ?? {})]);
   for (const entry of all) if ((entry.group === 'anchors' || entry.group === 'clips') && entry.use === 'dealerfilm') words.add(viewWord(entry.view) ?? 'spelaren');
   const views: ViewState[] = [...words].sort((a, b) => (a === 'spelaren' ? -1 : b === 'spelaren' ? 1 : a.localeCompare(b))).map((view) => {
@@ -325,7 +334,10 @@ export function dealerState(root: string, id: string, entries?: Entry[]): Dealer
         return (entry.seat ?? lands.seat) === card.seat && (entry.index ?? lands.index) === card.index && String(entry.action ?? 'deal') === card.action && entry.status !== 'utgår';
       });
       const own = matching.filter((entry) => chosen !== null && clipAnchor(entry) === chosen);
-      const best = [...own].sort((a, b) => Number(b.status === GOOD) - Number(a.status === GOOD) || Number(b.take ?? 0) - Number(a.take ?? 0))[0];
+      // Det klipp rundan spelar för kortet ur vyns ankare (src/scene/round.ts: clipFor, och waitClip för väntan), annars
+      // den senaste tagningen som väntar på omdöme. Ett godkänt klipp som rundan inte spelar visas inte som kortets.
+      const played = chosen === null || round === null ? null : card.action === 'wait' ? waitClip(all, id, viewOf(view), chosen) : clipFor(all, id, viewOf(view), chosen, { seat: card.seat, index: card.index, action: card.action as CardAction }, round);
+      const best = played ? byFile.get(played) : [...own].filter((entry) => entry.status !== GOOD).sort((a, b) => Number(b.take ?? 0) - Number(a.take ?? 0))[0];
       return {
         ...card,
         label: cardLabel(card),

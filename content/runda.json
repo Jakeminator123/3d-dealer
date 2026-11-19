@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "about": "Rundan: den giv som spelkärnan delar när ingen spelar, hur länge ett kort utan klipp går självt, och hur rundan sparas som film. Läses av servern (/api/runda, src/game/game.ts), som delar rundan med spelkärnan, och av src/scene/round.ts, som väljer dealerns klipp för den i Labbet, Casinot och src/pipeline/runda.ts. Ingenting här avgör spelet: kort, ordning, pengar och utfall är spelkärnans.",
   "deal": {
     "seed": "sju-8",
@@ -34,6 +34,11 @@
     "most": 4,
     "basis": "antaget",
     "source": "Valt av agenten 2026-11-18 efter Jakobs ord om att dealern inte ska frysa medan spelet väntar. När följden väntar (vänta-klippet, action wait, spelas om och om efter sista klippet) och nästa kort kommer, går det pågående varvet klart innan kortets klipp börjar, så att bytet sker i REDO (src/scene/reel.ts, nextStart). most är hur många sekunder ett nytt kort högst väntar på det: är mer kvar av varvet börjar kortets klipp direkt, med ett hopp. 4 är ett varv av vänta-klippet som det är beställt (4 s), så att korten, pengarna och knapparna aldrig dröjer mer än ett varv. Ingenting är mätt."
+  },
+  "series": {
+    "move": "cykel-nyp-rask",
+    "basis": "antaget",
+    "source": "Satt av agenten 2026-11-19 efter Jakobs ord om att ett steg 2-klipp ska kunna godkännas \"för just vad det är\" utan att spelas av misstag. move är rörelsen i content/moves/ som seriens steg 2-klipp är gjorda med (registrets move), serien E. Per kort spelar rundan ett godkänt steg 3-klipp när det finns, annars ett steg 2-klipp med den här rörelsen; ett godkänt steg 2-klipp med en annan rörelse, som tvåhandsprovet (cykel-tva-hander), spelas aldrig (src/scene/round.ts, chooseClip). Vilka kort serien har står i content/dealer.json (series)."
   },
   "speed": {
     "clips": 1,

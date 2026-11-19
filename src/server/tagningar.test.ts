@@ -12,7 +12,7 @@ import { after, before, test } from 'node:test';
 import { addEntry, addOrder, archive, createRegister, setStatus } from '../pipeline/registry.ts';
 import { createApi } from './api.ts';
 import { handler } from './main.ts';
-import { filmStep, sentOf, type Takes } from './tagningar.ts';
+import { sentOf, type Takes } from './tagningar.ts';
 
 let root: string;
 let server: Server;
@@ -176,18 +176,7 @@ test('filmen som skickades läses ur beställningen: dockans film, ett klipp i d
   assert.deepEqual(sentOf({ inputs: { startFrame: {}, endFrame: {} } }), { kind: 'ingen', role: null, asset: null, frames: null, fps: null, seconds: null });
 });
 
-test('filmens steg räknas ur klippets post: dockans film som referens är steg 2, annars steg 3', async () => {
-  const post = (...references: { role: string; what: string }[]) => ({ source: { references: [{ role: 'startFrame', what: ANCHOR }, ...references] } });
-  const doll = { role: 'referenceVideos[0]', what: 'output/tagningar/p/referens.mp4 (förlagan output/forlagor/docka.mp4): dockan gör rorelse' };
-  const clip = { role: 'referenceVideos[0]', what: `output/tagningar/p/referensklipp.mp4: det godkända klippet ${KEPT}` };
-  assert.equal(filmStep(post(doll)), 2, 'prototypen följer dockan');
-  assert.equal(filmStep(post()), 3, 'fritt, utan referensfilm');
-  assert.equal(filmStep(post(clip)), 3, 'ett klipp som rörelsereferens');
-  assert.equal(filmStep(post({ role: 'referenceVideo', what: `det godkända klippet ${KEPT} som filmen som görs om` })), 3, 'video till video');
-  assert.equal(filmStep(post({ role: 'referenceImages[0]', what: 'output/tagningar/p/forsta.png' }, clip)), 3, 'en referensbild är ingen film');
-  assert.equal(filmStep({}), 3, 'en post utan referenser');
-
-  // Servern bär steget till Labbet: i tagningarna och i registret.
+test('servern bär filmens steg till Labbet, räknat av rundans regel (filmStep i src/scene/round.ts)', async () => {
   const { takes } = (await (await fetch(`${base}/api/tagningar`)).json()) as Takes;
   assert.deepEqual(takes.map((take) => take.step), [3, 3], 'provets klipp har ingen referensfilm i sina poster');
   const registry = (await (await fetch(`${base}/api/registry`)).json()) as { assets: { file: string; step?: number }[] };

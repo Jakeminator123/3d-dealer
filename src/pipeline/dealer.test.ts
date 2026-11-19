@@ -76,6 +76,8 @@ test('var en dealer står: från en bild till spelbar, med nästa steg och komma
   try {
     mkdirSync(join(dir, 'content', 'dealers'), { recursive: true });
     copyFileSync(join(root, 'content', 'dealer.json'), join(dir, 'content', 'dealer.json'));
+    // Rundan säger vilken rörelse seriens klipp är gjorda med: kartan visar det klipp rundan spelar.
+    copyFileSync(join(root, 'content', 'runda.json'), join(dir, 'content', 'runda.json'));
     createRegister(dir, { about: 'prov', statuses: { 'att granska': 'inte dömd', godkänd: 'godkänd', utgår: 'utgår' }, asksWhy: [], groups: { identity: 'identitet', anchors: 'ankare', clips: 'klipp' }, sources: { runway: { what: 'Runway' }, jakob: { what: 'Jakob' } } });
     // Ingen fil: första steget är att skriva den ur en bild.
     let state = dealerState(dir, 'prov');
@@ -116,13 +118,24 @@ test('var en dealer står: från en bild till spelbar, med nästa steg och komma
     state = dealerState(dir, 'prov');
     assert.match(state.next[0]!.commands[0]!, /tagning\.ts forbered prov spelaren 4 0/);
     const references = [{ role: 'startFrame', what: 'dealers/prov/anchors/spelaren-redo.png' }];
-    await add('dealers/prov/clips/cykel-nyp-4-0_spelaren_t1.mp4', 'clips', { use: 'dealerfilm', view: { kind: 'spelaren' }, pose: 'redo → redo', seat: 4, index: 0, action: 'deal', take: 1, status: 'godkänd', source: { from: 'runway', references } });
+    await add('dealers/prov/clips/cykel-nyp-4-0_spelaren_t1.mp4', 'clips', { use: 'dealerfilm', view: { kind: 'spelaren' }, pose: 'redo → redo', seat: 4, index: 0, action: 'deal', take: 1, lands: { seat: 4, index: 0, at: 1.8 }, status: 'godkänd', source: { from: 'runway', references } });
     state = dealerState(dir, 'prov');
     const card = state.views[0]!.cards.find((one) => one.key === '4/0/deal')!;
     assert.equal(card.clip?.status, 'godkänd');
     assert.match(state.next[0]!.what, /17 av seriens 18 kort saknar klipp/);
     assert.match(state.next[0]!.commands[0]!, /forbered prov spelaren (1|7) 0/);
     assert.equal(state.views[0]!.playable, false);
+    // Kartan visar det klipp rundan spelar (src/scene/round.ts, clipFor): ett steg 3-klipp före seriens steg 2-klipp,
+    // och aldrig ett godkänt steg 2-klipp med en annan rörelse än serien.
+    const doll = [...references, { role: 'referenceVideos[0]', what: 'output/tagningar/prov/referens.mp4: dockan gör rörelsen' }];
+    const series = JSON.parse(readFileSync(join(dir, 'content', 'runda.json'), 'utf8')).series.move as string;
+    const clip = { use: 'dealerfilm', view: { kind: 'spelaren' }, pose: 'redo → redo', action: 'deal', status: 'godkänd' };
+    await add('dealers/prov/clips/serie-4-0_spelaren_t2.mp4', 'clips', { ...clip, seat: 4, index: 0, take: 2, lands: { seat: 4, index: 0, at: 1.8 }, move: series, source: { from: 'runway', references: doll } });
+    await add('dealers/prov/clips/annan-1-0_spelaren_t1.mp4', 'clips', { ...clip, seat: 1, index: 0, take: 1, lands: { seat: 1, index: 0, at: 1.8 }, move: 'en-annan-rorelse', source: { from: 'runway', references: doll } });
+    state = dealerState(dir, 'prov');
+    const shown = (key: string) => state.views[0]!.cards.find((one) => one.key === key)!.clip?.file ?? null;
+    assert.equal(shown('4/0/deal'), 'dealers/prov/clips/cykel-nyp-4-0_spelaren_t1.mp4', 'steg 3 före steg 2, fast steg 2 har en senare tagning');
+    assert.equal(shown('1/0/deal'), null, 'en annan rörelse i steg 2 spelas inte och visas inte som kortets');
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

@@ -32,6 +32,9 @@ export {
   anchorName,
   anchorOf,
   backgroundOf,
+  chooseClip,
+  clipFor,
+  filmStep,
   dealName,
   dealsOf,
   planRound,
@@ -233,7 +236,7 @@ if (import.meta.main) {
     server = process.env.SHOOT_SERVER ? { url: process.env.SHOOT_SERVER.replace(/\/$/, ''), stop: () => {} } : await startServer();
     const dealt = await fetchRound(server.url, seed);
     const registry = readRegistry(root);
-    const plan = planRound(dealsOf(dealt.steps), registry.assets, dealer, view, round.fallback);
+    const plan = planRound(dealsOf(dealt.steps), registry.assets, dealer, view, round);
     const played = plan.dealt.filter((deal) => deal.file !== null).length;
     console.log(`Rundan för ${dealer} ur ${viewWord}, frö ${dealt.seed}, insatser ${dealt.bets.map((bet) => `plats ${bet.seat}: ${bet.main}`).join(', ')}, Hit under ${dealt.hitBelow}.`);
     console.log(`Spelkärnan: ${dealt.steps.map((step) => [step.op, step.action].filter(Boolean).join(' ')).join(' → ')}. ${plan.dealt.length} kort, ${played} med dealerns klipp.`);

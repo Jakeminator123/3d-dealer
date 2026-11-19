@@ -70,14 +70,14 @@ export type Chosen = { anchor: string; extract: RoundEntry[]; files: string[]; n
  */
 export function choose(entries: RoundEntry[], round: Round, dealt: DealtRound, scene: SceneDescription): Chosen {
   const deals = dealsOf(dealt.steps);
-  const plan = planRound(deals, entries, DEALER, VIEW, round.fallback);
+  const plan = planRound(deals, entries, DEALER, VIEW, round);
   if (plan.anchor === null) throw new SelectError('Hela given har inget godkänt klipp ur Spelaren: Casinot har ingen dealer att visa');
-  const clips = clipsOf(entries, DEALER, VIEW, plan.anchor);
+  const clips = clipsOf(entries, DEALER, VIEW, plan.anchor, round.series);
   const room = entries.find((entry) => entry.file === round.film.background);
   if (!room || room.present === false) throw new SelectError(`Rummet ${round.film.background} (content/runda.json film.background) saknas i registret eller i assets/`);
   const extract = [...entries.filter((entry) => clips.includes(entry.file)).map(clipEntry), roomEntry(room)];
 
-  const again = planRound(deals, extract, DEALER, VIEW, round.fallback);
+  const again = planRound(deals, extract, DEALER, VIEW, round);
   const files = (one: typeof plan) => one.clips.map((clip) => clip.file);
   if (JSON.stringify(files(again)) !== JSON.stringify(files(plan)) || again.anchor !== plan.anchor) {
     throw new SelectError('Med utdraget ur registret väljer hela given andra klipp än med hela registret');

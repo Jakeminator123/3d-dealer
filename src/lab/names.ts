@@ -93,7 +93,7 @@ export const cardKey = (seat: Seat | null, index: number | null, action: string)
 
 /**
  * Filmens tre steg på vägen till slutfilmen (docs/architecture.md, Orden). Vilket steg ett klipp hör till räknar servern
- * ur klippets post (filmStep i src/server/tagningar.ts); här står bara vad stegen heter och betyder.
+ * ur klippets post med rundans regel (filmStep i src/scene/round.ts); här står bara vad stegen heter och betyder.
  */
 export const FILM_STEPS = [
   { step: 1, name: 'Dockan', line: 'Dockans film: förlagan i varje paket, som klippen görs efter och mäts mot.' },

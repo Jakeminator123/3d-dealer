@@ -25,7 +25,7 @@ const OUTCOME_LABELS = { blackjack: 'Blackjack', win: 'Vinst', push: 'Lika', los
 
 const comma = (value: number): string => String(value).replace('.', ',');
 
-const planOf = (content: Content, table: Table): Plan => planRound(dealsOf(table.steps), content.entries, DEALER, VIEW, content.round.fallback);
+const planOf = (content: Content, table: Table): Plan => planRound(dealsOf(table.steps), content.entries, DEALER, VIEW, content.round);
 
 /**
  * Casinot med spelsessionen `game` och filerna `files`. `lab` är adressen till Labbet; utan den (det statiska bygget,
