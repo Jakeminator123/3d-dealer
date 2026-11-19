@@ -53,6 +53,7 @@ import { ACTIONS, cardPlace, poseAt, type Action, type Seat } from '../scene/dol
 import { see, viewEye, type Eye, type SeatView } from '../scene/geometry.ts';
 import { dealerFile, fillText, placeholdersOf, readDealer, readMall, wordKeys, wordsOf, type Words } from './dealer.ts';
 import { closeView, cycleEye, cycleMove, paintedPicture, placeWords, readCycleParts, type CycleCard, type CycleParts } from './cykel.ts';
+import { limitsFor, readAdjusted } from './justerat.ts';
 import { dollMotion, filmMotion, MotionError, motionNumbers, screenOf, type MotionMeasure } from './rorelse.ts';
 import {
   countIn,
@@ -595,13 +596,15 @@ async function prepare(spec: Spec, options: PrepareOptions, made: { dir?: string
   const { doll } = await measureDoll(root, dir, layout, content.measure, true);
 
   const wrist = dollWrist(parts, card);
-  const checks = content.limits.dockansHandled ? [judgeOne('dockansHandled', wrist, content.limits.dockansHandled)] : [];
+  // Cykeln prövas mot originalen, med det som är justerat för just den i originalets ställe (justerat.ts).
+  const limits = limitsFor(content.limits, readAdjusted(root), parts.cycle.id);
+  const checks = limits.dockansHandled ? [judgeOne('dockansHandled', wrist, limits.dockansHandled)] : [];
   // Dockans rörelse mot rörelsens gränser (rorelse.ts), innan något beställs: en stel docka ger ett stelt klipp.
   const moved = cycleMove(parts, card);
   const motion = motionNumbers(dollMotion(parts, moved, content.motion, content.reference.fps));
   // Ett mått som inte gäller slaget saknas (null) och prövas inte: en väntan har ingen väg ut och tillbaka, en vändning inga
   // tider för en giv, och ordningen mellan huvud och hand mäts bara när huvudet vrids (motion.orderTurn).
-  for (const [key, value] of Object.entries(motion)) if (content.limits[key] && value !== null) checks.push(judgeOne(key, value, content.limits[key]!));
+  for (const [key, value] of Object.entries(motion)) if (limits[key] && value !== null) checks.push(judgeOne(key, value, limits[key]!));
   const pkg = posix(relative(root, dir));
   const kind = moveKind(spec, cycle);
   const dollVideo = {

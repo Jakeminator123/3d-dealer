@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "about": "Gränser som en cykel avviker från med avsikt. Originalen står orörda i content/tagning.json (limits), satta efter den mätta verkliga dealern och proven; här står bara det som är justerat, per cykel (cykelns id i content/moves/), med den nya gränsen och vem som sade det. src/pipeline/justerat.ts lägger justeringen i originalets ställe när just den cykeln prövas (tagning.ts forbered och måtten i Labbets steg Dockan); alla andra cykler prövas mot originalet. En justering har en gräns (is, least eller most, och see när den finns) och en källa; vad måttet är och dess enhet tas ur originalet.",
+  "cycles": {
+    "cykel-tva-hander": {
+      "redoMotSkon": {
+        "least": 0,
+        "source": "Jakob 2026-11-19: originalet ska behållas och det som avviker stå i en justerad fil (\"om tagning.json är tagen från youtubefilmen ska orginalet behållas, men kan skapas en typ json som kanske är justerad\"). Tvåhandsgivens REDO, A2.3, är vänd mot skon med avsikt: huvudet står 6,5° från kortet i mynningen (mätt av granskaren, output/work/figur/tvahand-redo/granskning/omdome.md). Gränsen att hon aldrig ser på skon gäller därför inte den här cykeln"
+      },
+      "huvudMotSkon": {
+        "least": 0,
+        "source": "Jakob 2026-11-19, som redoMotSkon: cykeln börjar och slutar vänd mot skon, så huvudets minsta vinkel mot kortet i mynningen är den i REDO"
+      }
+    }
+  }
+}

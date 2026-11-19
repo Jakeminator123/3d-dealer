@@ -207,13 +207,15 @@ export type Measured = {
 export async function measureMove(root: string, body: unknown): Promise<Measured> {
   const asked = (body ?? {}) as Json;
   const card = cardOf(asked);
-  const [{ cycleMove }, { dollMotion }, { dollWrist, readTagning }, { judgeOne }] = await Promise.all([
+  const [{ cycleMove }, { dollMotion }, { dollWrist, readTagning }, { judgeOne }, { limitsFor, readAdjusted }] = await Promise.all([
     import('../pipeline/cykel.ts'),
     import('../pipeline/rorelse.ts'),
     import('../pipeline/tagning.ts'),
     import('../pipeline/matning.ts'),
+    import('../pipeline/justerat.ts'),
   ]);
   const content = readTagning(root);
+  const adjusted = readAdjusted(root);
   return withCycle(root, asked.cycle, (parts) => {
     let moved;
     try {
@@ -223,8 +225,10 @@ export async function measureMove(root: string, body: unknown): Promise<Measured
     }
     const values = dollMotion(parts, moved, content.motion, content.reference.fps);
     const judged = [];
-    if (content.limits.dockansHandled) judged.push(judgeOne('dockansHandled', dollWrist(parts, card), content.limits.dockansHandled));
-    for (const [key, { value }] of Object.entries(values)) if (content.limits[key] && value !== null) judged.push(judgeOne(key, value, content.limits[key]!));
+    // Originalen, med det som är justerat för just den här cykeln i originalets ställe (justerat.ts), som i forbered.
+    const limits = limitsFor(content.limits, adjusted, parts.cycle.id);
+    if (limits.dockansHandled) judged.push(judgeOne('dockansHandled', dollWrist(parts, card), limits.dockansHandled));
+    for (const [key, { value }] of Object.entries(values)) if (limits[key] && value !== null) judged.push(judgeOne(key, value, limits[key]!));
     // Gränsens källa är lång och står i content/tagning.json; Labbet visar vad måttet är, värdet och gränsen.
     return { checks: judged.map(({ source: _source, ...rest }) => rest), values };
   });
