@@ -36,7 +36,7 @@ Läs [README.md](README.md) och [docs/status.md](docs/status.md) först. Orden s
 - En agent skriver omdömen och svar med `npm run reg -- status <fil> <status> "<vem och varför>"` och `npm run reg -- reply <fil> "<svar>"`, aldrig med Labbets knappar eller motiveringsruta: de bär Jakobs namn.
 - Fråga inte Jakob om det en agent kan avgöra. Avgör inom logiska ramar, skriv vad som avgjordes och varför, och låt honom ändra det.
 - Underagenter körs med Opus 5.5 på extra hög ansträngning.
-- Om en rörelse ser mänsklig ut avgör Jakob med ögat. Inför en ny rörelse, dealer eller vy får han provklipp att välja mellan innan en serie beställs, och resultat skickas till honom när de finns (han följer ofta arbetet från mobilen, där Labbet inte går att nå).
+- Om en rörelse ser mänsklig ut avgör Jakob med ögat. Inför en ny rörelse, dealer eller vy får han provklipp att välja mellan innan en serie beställs, och resultat skickas till honom som filer när de finns (han följer ofta arbetet från mobilen, där Labbet inte går att nå).
 - Gamla Dealer (`C:\Users\jakem\dev\super-feature-sg\dealer`) är Codex arbetsyta: den läses inte utan Jakobs ord, och dess grenar, arbetsträd och `D:\dealer-scratch` rörs aldrig. En gren eller ett arbetsträd med opushade commits tas aldrig bort utan Jakobs ja för just den, och aldrig i ett annat repo än det här.
 - Ingenting pushas utan Jakobs ord. Publicering, lipsync och ljud väntar tills han säger till.
 
@@ -48,7 +48,7 @@ Jakob 2026-11-18: "se till att detta arbetssätt går på". En ny chatt som tar 
 - Det en agent har gjort döms av en annan, som inte har gjort det, mäter och ser i full storlek.
 - Betalda beställningar går i steg: ett prov, sedan en liten omgång med ytterlägena, sedan resten. Saldot läses före och efter, och kontot delas med Codex.
 - Huvudagenten committar efter varje agents rapport, när `npm test` och `npm run typecheck` är gröna.
-- Jakob får resultaten som filer och på mobilsidan (källan i `output/work/mobilsida/`), med vad som är mätt och vad som väntar på honom.
+- Jakob får resultaten som filer, med vad som är mätt och vad som väntar på honom. Labbet är det enda stället att granska på: det han vill kunna se byggs in där, inte på en egen sida för mobilen.
 - Riktningen är en mall som gör en spelbar dealer ur enkel indata: en bild av en person ska räcka för att ta henne genom Identitet, Ankare, Film och Spela.
 
 ## Hushållning med läsning
