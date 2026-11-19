@@ -54,16 +54,41 @@ Identitetsbilden `original-sida-kavaj.png` har `utgår` men står kvar så läng
 
 ## Näst
 
-1. Jakob väljer REDO-ställning bland ankarvarianterna (`output/work/friprov/ankare-varianter.jpg`, och i Labbet): `arm-a` och `arm-b` har bara den vilande armen ändrad (i b är handen 1,59 gånger för stor), och `a2-3-b` är tvåhandsställningen, där högerhanden arbetar i stället för att ligga (kortet ligger 17 bildpunkter fel och högerhanden är för stor: den behöver ankarets lokala steg innan film görs ur den). Den valda blir ett nytt REDO, och alla klipp görs då ur den, eftersom klipp ur olika ankare inte kedjas. Den fria rörelsen utan referensfilm är vägen (Jakob 2026-11-19). I steget Dockan kan han se rörelserna `cykel-nyp-lugn` och `cykel-nyp-flytande`, som ingen serie använder; de tas bort ur `content/moves/` när han har sett dem.
-2. Ur det valda ankaret: fria cykler till ytterlägena (plats 1, plats 7 och dealerns kort), sedan en hel fri serie med ett klipp per kort (cirka 1 460 krediter, på Jakobs ja). En följd till hela bordet (Jakobs förslag) trappas upp, två kort, fyra, sju, efter det gamla Dealer lärde sig ([production.md](production.md), Visat och inte visat); 15 s kostar 260–320 krediter, och varje steg över 100 visas för Jakob först. Det som måste lösas är greppet (i följden bars kortet framför handen), skarven mot REDO (text, omtagning eller en kort lokal övergång) och att en följd bara kedjar i filmad ordning, vilket passar ett fullsatt bord men inte en ensam plats i Casinot.
-3. En mänskligare docka (`output/work/mansklig-docka/rapport.md`): den vilande handen, pausen vid skon, en bål i två delar och skuldran; greppet med tummen på kortets ena sida och fingrarna på den andra; och rörelsefångst ur en film som Jakob gör med två mobiler (instruktionen står i rapportens avsnitt 4). Väntar på Jakob: filmen, ja eller nej till paketet `@mediapipe/tasks-vision`, och åtkomsten till SAM 3D Body, som han ordnar.
-4. Två händer: Jakob ser provklippet bredvid E och väljer. En serie med två händer kostar ungefär som serien E. Gamla Dealers tvåhandsgiv till alla åtta kort (`dealer3d/src/two-hand.ts` där) kan kopieras in med ursprung när han har valt. Jakob har föreslagit att flera rörelsemönster godkänns bredvid varandra; rundan väljer i dag den senaste godkända tagningen per kort, och att den väljer bland flera är inte byggt.
-5. Filmen på dockan, det första steget mot en dealer som håller när kameran dras runt (Jakobs ursprungliga tanke, [decisions.md](decisions.md), Projektet). Ett prov utan krediter på ett klipp som finns: filmen projiceras från klippets öga (registrets `eye`) på den rörliga dockan, och kameran flyttas några tiotal grader. Sedan en film från vänster och en från höger som tonar över i varandra, och Meshy-figuren av henne (`glb/paow/`, riggen saknar fingerleder) som bärare. Inget av det är prövat.
-6. Mätfelen som granskarna har pekat ut (`output/work/granskning-e-2/omdome.json`, "matten") rättas i `src/pipeline/matning.ts` och `rorelse.ts`, och fasmåtten får en form som gäller en tvåhandsgiv.
-7. Mallen prövas med en andra dealer ur en enda bild, som Jakob ger, och ankarets steg för lagning vid givhanden läggs till i `ankare.ts`. Agentens förslag är att vänta tills rörelsen sitter, eftersom en ny dealer ärver dockan.
-8. Mätningen för sidovyer, och ett nytt ankare och en serie ur Plats 7 på den nya geometrin.
-9. Det som händer mellan givarna.
-10. Smått i Labbet: `tagning.ts` exporterar de prov av dockan som `forbered` gör (servern upprepar dem i `src/server/rorelser.ts`), och en förberedelse som pågår överlever en omstart av servern.
+Arbetet går i två spår, så att två chattar kan arbeta samtidigt utan att röra samma filer (Jakob 2026-11-19: "samla hela projektet lite så vi inte spretar"). Varje chatt committar bara sina egna filer, med sökvägar och aldrig `git add -A`, skriver om sitt eget stycke här, och skriver i registret bara genom `npm run reg`. Det som inte står i ett spår väntar.
+
+### Spåret Filmen
+
+Målet: Paulina spelbar ur Spelaren med den fria rörelsen. Filerna: `src/pipeline/tagning.ts`, `ankare.ts`, `foljd.ts`, `vila.ts`, `matning.ts` och `rorelse.ts`, `content/tagning.json`, `content/ankare.json`, `content/dealers/`, `assets/dealers/`, och Runways krediter.
+
+1. Hela bordet i en tagning (Jakobs förslag): plats 1–7 och dealerns öppna kort, med REDO mellan givarna, ur dagens ankare A2.1 och utan referensfilm. 16 s kostar cirka 280 krediter (17–18 per sekund, mätt på två prov) och väntar på Jakobs ja. Mätt i provet med två kort: båda landar rätt, bitarna kedjar bara i filmad ordning, och kortet bars framför handen.
+2. Ankaret. Jakob om varianterna (`output/work/friprov/ankare-varianter.jpg`): `arm-a` och `arm-b` är inte bättre; tvåhandsställningarna `a2-3` och `a2-3-b` är "okej" men har för mycket skugga vid hennes högerarm, och förebilden ur gamla Dealer har annat grönt och annat perspektiv (den är gjord i gamla Dealers kamera: 1,11 m över filten och lutad 25 grader, mot 0,60 m och 15 grader här). Ett A2.3 görs därför på riktigt genom vår kamera: dockans tvåhandsställning som underlag och hela ankarets väg med de lokala stegen (händernas storlek, kortet, det gröna, inga skuggor), cirka 30 krediter. Jakob väljer sedan mellan A2.1 och A2.3 på en fri cykel ur var och en; han är osäker på om två händer blir för många rörelser. Ett nytt REDO betyder att alla klipp görs ur det, eftersom klipp ur olika ankare inte kedjas.
+3. Fria cykler till ytterlägena (plats 1, plats 7, dealerns kort, hålkortet och vändningen), cirka 54 krediter styck, och sedan en hel fri serie med ett klipp per kort (cirka 1 460 krediter, på Jakobs ja). Enskilda klipp behövs för en ensam plats i Casinot. Det som måste lösas: greppet (tummen på kortets ena sida och fingrarna på den andra), den vilande högerarmen, som Jakob finner stel, och skarven mot REDO (text, omtagning eller en kort lokal övergång).
+4. Spelet spelar en följd: rundan väljer i dag ett klipp per kort (`src/scene/round.ts`), och ett klipp med flera kort saknar plats och kort i registret.
+5. Mätfelen som granskarna har pekat ut (`output/work/granskning-e-2/omdome.json`, "matten") rättas i `src/pipeline/matning.ts` och `rorelse.ts`.
+### Spåret Figuren
+
+Målet: Paulinas kropp och rörelse i 3D, så att samma naturliga giv går att visa ur vilken vy som helst. Filerna: `src/scene/doll.ts`, `dollPose.ts`, `content/doll.json`, `content/moves/`, nya filer i `src/pipeline` för fångsten, `glb/` och `output/work/figur/`. Inga krediter utan att Jakob har sett kostnaden.
+
+Det som finns att börja med:
+
+- SAM 3D Body (Meta) är installerat av Jakob 2026-11-19 i `C:/Users/jakem/dev/sam-3d-body`, och fungerar på datorns grafikkort: en bild in, en 3D-kropp med händer ut, i kamerans koordinater. Hur det körs, vad det lämnar och vad som inte är prövat (film, export till 3D-fil) står i `PROJEKT-GUIDE.md` där. Mappen är ett eget projekt: det körs och läses, och ändras inte härifrån.
+- Två kroppar ur SAM 3D Body ligger i `C:/Users/jakem/Desktop/body` (`keystone-hel` och `keystone-sittande`, var och en `person_0.glb`), gjorda ur identitetsbilderna `helkropp-staende.png` och `sittande-vid-bord.png`. Mätt: ett nät med 18 439 hörn och skelettet som lösa stavar; ingen rigg, ingen textur och ingen rörelse; den stående är 1,66 m lång. De är alltså hennes form och ställning, inte en färdig figur. Meshy-figuren i `glb/paow/` har textur men saknar fingerleder.
+- Dagens fynd som spåret bygger på: en fri film utan referens rör sig naturligt (Jakob: "faktiskt mycket bra"), och Kling kopierar en referensfilm nästan ruta för ruta. MediaPipe klarade inte nypet eller djupet (`output/work/mansklig-docka/prov-a/resultat.md`), och utredningen om vad som gör dockan stel står i `output/work/mansklig-docka/rapport.md`.
+
+1. Fångsten, utan krediter: SAM 3D Body körs ruta för ruta på den fria cykeln Jakob tyckte om (`dealers/paulina/clips/cykel-nyp-rask-fri-4-0_spelaren_t1.mp4`) och läggs i scenen genom klippets öga (registrets `eye`). Gränserna sätts före mätningen, de samma som för MediaPipe: handen inom 2 cm från sin plats i scenen, och fingrarna rätt i minst 90 % av rutorna i nypet.
+2. Håller fångsten: dockan spelar den fångade rörelsen som en ny rörelse i `content/moves/`, synlig i Labbets steg Dockan ur alla vyer, och Jakob dömer den med ögat.
+3. Dockans mått passas mot hennes kropp ur den stående och den sittande kroppen (axelbredd, armarnas längd, sitthöjd), i `content/doll.json`.
+4. Samma giv ur en annan vy: dockans film ur Plats 7 som referens till Kling, med ett ankare ur den vyn. Betalt, och visas för Jakob först.
+5. Filmen på figuren, det första steget mot en dealer som håller när kameran dras runt (Jakobs ursprungliga tanke, [decisions.md](decisions.md), Projektet): filmen projiceras från klippets öga på den rörliga kroppen, och kameran flyttas några tiotal grader. Inte prövat.
+
+### Väntar
+
+- En andra dealer ur 1–5 bilder genom mallen. En ny dealer ärver dockan och rörelsen, så den väntar tills Paulina sitter.
+- Serier ur andra vyer än Spelaren, och ett nytt ankare ur Plats 7 på den nya geometrin.
+- Det som händer mellan givarna: samla in kort, betala ut, marker.
+- Rörelsefångst ur en film som Jakob gör själv (instruktionen står i `output/work/mansklig-docka/rapport.md`, avsnitt 4). Den behövs först om fångsten ur de fria klippen inte räcker.
+- Rörelserna `cykel-nyp-lugn` och `cykel-nyp-flytande`, som ingen serie använder, tas bort ur `content/moves/` när Jakob har sett dem i steget Dockan.
+- Smått i Labbet: `tagning.ts` exporterar de prov av dockan som `forbered` gör (servern upprepar dem i `src/server/rorelser.ts`), och en förberedelse som pågår överlever en omstart av servern.
 
 ## Öppet
 
