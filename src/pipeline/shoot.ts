@@ -185,15 +185,27 @@ export async function shootAll(shots: Shot[], said: (text: string) => void = () 
       const tab = await openTab(browser.port, `${server.url}/lab/forlaga.html?order=${encodeURIComponent(JSON.stringify(shot))}`);
       try {
         let told = '';
-        const answer = await until(`Förlaga ${index + 1}`, SHOT_PATIENCE, async () => {
+        // Tålamodet gäller en förlaga som står still: det börjar om varje gång en ny ruta är klar, så att en lång film hinner
+        // klart medan en som har fastnat stoppas.
+        let seen = '';
+        let end = Date.now() + SHOT_PATIENCE;
+        let answer: ShotResult | null = null;
+        while (!answer) {
           const state = JSON.parse(String((await tab.evaluate('JSON.stringify({ shot: window.shot ?? null, progress: window.progress ?? null })')) ?? '{}')) as {
             shot?: ShotResult | null;
             progress?: { done: number; of: number } | null;
           };
           const progress = state.progress ? `${state.progress.done}/${state.progress.of}` : '';
+          if (progress !== seen) {
+            seen = progress;
+            end = Date.now() + SHOT_PATIENCE;
+          }
           if (progress && progress !== told && state.progress!.done % 30 === 0) said(`förlaga ${index + 1}: ruta ${(told = progress)}`);
-          return state.shot ?? null;
-        });
+          answer = state.shot ?? null;
+          if (answer) break;
+          if (Date.now() > end) throw new ShootError(`Förlaga ${index + 1} kom inte framåt på ${Math.round(SHOT_PATIENCE / 1000)} s`);
+          await sleep(POLL);
+        }
         results.push(answer.ok ? answer : { ...answer, problems: [...answer.problems, ...tab.errors] });
       } catch (error) {
         results.push({ ok: false, error: (error as Error).message, problems: tab.errors });

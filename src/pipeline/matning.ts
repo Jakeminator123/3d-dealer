@@ -57,6 +57,7 @@ export type Measure = {
   dark: number;
   proofReach: number;
   visibleShare: number;
+  coveredLongest: number;
   nextShare: number;
   nextAround: number;
   nextGrow: number;

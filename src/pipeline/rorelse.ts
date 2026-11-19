@@ -877,6 +877,7 @@ export function dollMotion(parts: Pick<CycleParts, 'scene' | 'doll'>, move: Para
 /** En film av en dealer på skärm mätt i bild, i huvudbredder. `cyclic`: filmen är en cykel som kedjas. */
 export async function filmMotion(path: string, measure: MotionMeasure, screen: Screen, cyclic = true, phases = true): Promise<{ values: Record<string, Value>; tracks: Tracks; headWidth: number; frames: number; fps: number }> {
   const { tracks, fps, frames, headWidth } = await filmTracks(path, screen, measure.handBlend);
+  if (!tracks[FILM_ROLES.hand]) throw new MotionError(`${path}: ingen hand att följa`);
   return { values: motionValues(tracks, { ...FILM_ROLES, yawScale: measure.yawPerShare }, { ...measure, scale: headWidth, smooth: 1, cyclic, phases }), tracks, headWidth, frames, fps };
 }
 

@@ -11,7 +11,7 @@ import sharp from 'sharp';
 import { probe } from './matning.ts';
 import { about, createRegister, getEntry, importAsset, sha256Of } from './registry.ts';
 import { readDealer, readMall, wordsOf } from './dealer.ts';
-import { cardWords, clipFile, forbered, formatFor, matOm, namedText, nextTake, packageId, promptFor, readTagning, registrera, taEmot, type PostFile } from './tagning.ts';
+import { cardWords, clipFile, forbered, formatFor, matOm, namedText, nextTake, packageId, promptFor, readTagning, registrera, sceneClipsOf, taEmot, type PostFile } from './tagning.ts';
 import { readScene } from '../scene/description.ts';
 import { cardPlace, type Seat } from '../scene/dollPose.ts';
 import { cardCorners, see, viewEye, type Eye } from '../scene/geometry.ts';
@@ -355,7 +355,7 @@ test('en annan modell med bilderna som referens: paketet säger vad som skickas,
   assert.deepEqual(result.post.uploads, [{ file: redoAnchor, url: 'https://d2jqrm6oza8nb6.cloudfront.net/datasets/bild.png', assetId: 'b1', at: '2026-11-19 12:00' }]);
 });
 
-test('en följd: två kort i samma tagning, bilderna mellan givarna, och en post som rundan aldrig tar för ett kort', async () => {
+test('en följd: två kort i samma tagning, mätta i den ordning filmen lägger dem, och en post som rundan aldrig tar för ett kort', async () => {
   const sequence = { ...spec, index: 0, variant: 'foljd', then: [{ seat: 5, index: 0 }] };
   const made = await forbered(sequence, { root: project, noReference: true, textName: 'foljd-2', duration: 4, say: quiet });
   assert.equal(made.id, 'paulina_spelaren_cykel-nyp-foljd_4-0-5-0_t1');
@@ -363,10 +363,10 @@ test('en följd: två kort i samma tagning, bilderna mellan givarna, och en post
   assert.deepEqual(Object.keys(order.inputs), ['startFrame', 'endFrame']);
   assert.deepEqual([order.duration, order.noReference, order.doll, order.clip], [4, true, null, 'dealers/paulina/clips/cykel-nyp-foljd-4-0-5-0_spelaren_t1.mp4']);
   assert.deepEqual(order.cards.map((card: { seat: number; index: number }) => `${card.seat}-${card.index}`), ['4-0', '5-0']);
-  assert.equal(order.middle.length, 1);
+  assert.ok(!('middle' in order), 'inga bilder mellan givarna');
   assert.ok(!existsSync(join(made.dir, 'referens.mp4')), 'ingen dockfilm');
-  // Mellanbilden har det första kortet, sista bilden båda: de skiljer bara där det andra kortet ligger.
-  const middle = await sharp(join(made.dir, 'mitt-1.png')).raw().toBuffer();
+  assert.deepEqual(readdirSync(made.dir).filter((file) => file.endsWith('.png')).sort(), ['forsta.png', 'sista.png'], 'bilderna däremellan är borttagna');
+  // Sista bilden har båda korten: den skiljer från den första där de två ligger.
   const last = await sharp(join(made.dir, 'sista.png')).raw().toBuffer();
   const first = await sharp(join(made.dir, 'forsta.png')).raw().toBuffer();
   const differ = (a: Buffer, b: Buffer): number => {
@@ -375,13 +375,19 @@ test('en följd: två kort i samma tagning, bilderna mellan givarna, och en post
     return n;
   };
   // En kantpunkt som täcks lite kan få samma färg som förut: målad men inte ändrad.
-  assert.ok(Math.abs(differ(first, middle) - order.inputs.endFrame.painted[0]) <= 2, 'mellanbilden har det första kortet');
-  assert.ok(Math.abs(differ(middle, last) - order.inputs.endFrame.painted[1]) <= 2, 'sista bilden har också det andra');
+  assert.ok(Math.abs(differ(first, last) - order.inputs.endFrame.painted[0] - order.inputs.endFrame.painted[1]) <= 4, 'sista bilden har båda korten');
   // Det som vägras: en följd med referensfilm, och en följd utan text.
   await assert.rejects(forbered(sequence, { root: project, reference: 'docka.mp4', say: quiet }), /utan referensfilm/);
   await assert.rejects(forbered(sequence, { root: project, noReference: true, say: quiet }), /ingen text i mallen/);
 
-  film(join(project, 'foljd.mp4'), '0x02b630', 1, true);
+  // En film som lägger korten i omvänd ordning: REDO (8 rutor), REDO med det andra kortet (8), REDO med båda (8).
+  const box = (corners: number[][]) => ({ x0: Math.min(...corners.map((c) => c[0]!)) - 3, x1: Math.max(...corners.map((c) => c[0]!)) + 3, y0: Math.min(...corners.map((c) => c[1]!)) - 3, y1: Math.max(...corners.map((c) => c[1]!)) + 3 });
+  const second = box(order.cards[1].corners);
+  const between = Buffer.from(first);
+  for (let y = Math.floor(second.y0); y < Math.ceil(second.y1); y++) last.copy(between, (y * 1920 + Math.floor(second.x0)) * 3, (y * 1920 + Math.floor(second.x0)) * 3, (y * 1920 + Math.ceil(second.x1)) * 3);
+  await sharp(between, { raw: { width: 1920, height: 1080, channels: 3 } }).png().toFile(join(project, 'mellan.png'));
+  const still = (file: string) => ['-loop', '1', '-framerate', '24', '-i', file];
+  execFileSync('ffmpeg', ['-v', 'error', '-y', ...still(join(made.dir, 'forsta.png')), ...still(join(project, 'mellan.png')), ...still(join(made.dir, 'sista.png')), '-filter_complex', '[0:v]trim=end_frame=8,setpts=PTS-STARTPTS[a];[1:v]trim=end_frame=8,setpts=PTS-STARTPTS[b];[2:v]trim=end_frame=8,setpts=PTS-STARTPTS[c];[a][b][c]concat=n=3:v=1:a=0,format=yuv420p[v]', '-map', '[v]', '-r', '24', '-c:v', 'libx264', join(project, 'foljd.mp4')]);
   const result = await taEmot(made.id, join(project, 'foljd.mp4'), { taskId: 'task-4', credits: 72, before: 1000, after: 928 }, { root: project, proof: false, register: false, say: quiet });
   const { post } = result.post;
   assert.ok(!('seat' in post) && !('index' in post) && !('lands' in post), 'inget enskilt kort');
@@ -389,10 +395,27 @@ test('en följd: två kort i samma tagning, bilderna mellan givarna, och en post
   assert.match(String(post.title), /^Följd: plats 4, kort 0, sedan plats 5, kort 0/);
   assert.equal(post.pose, 'redo → kortet lagt → redo → kortet lagt → redo');
   const matning = JSON.parse(readFileSync(join(made.dir, 'matning.json'), 'utf8'));
-  assert.equal(matning.pieces.length, 2);
+  assert.deepEqual(matning.order, [1, 0], 'det andra kortet läggs först');
+  assert.deepEqual(matning.cards.map((card: { laidFrame: number }) => card.laidFrame), [16, 8]);
+  assert.equal(matning.middles.length, 1);
+  assert.ok(matning.middles[0].frame >= 8 && matning.middles[0].frame <= 15 && matning.middles[0].after === 1, 'REDO mellan läggningarna, efter det andra kortet');
+  assert.ok(matning.middles[0].psnr > 33, `REDO med det andra kortet känns igen (${matning.middles[0].psnr} dB)`);
+  assert.deepEqual(matning.pieces.map((piece: { card: number }) => piece.card), [1, 0], 'bit 1 lägger det andra kortet');
+  assert.equal(result.values.lagdOrdning, '2 1');
   assert.deepEqual(matning.seams.map((seam: { from: number; to: number }) => `${seam.from}-${seam.to}`), ['1-1', '2-1', '2-2']);
   for (const file of ['bit-1.mp4', 'bit-2.mp4', 'baklanges.mp4', 'ark.jpg']) assert.ok(existsSync(join(made.dir, file)), file);
   assert.ok(result.judged.some((entry) => entry.key === 'mittRutan1') && result.judged.some((entry) => entry.key === 'skarvBit2Bit1'));
+});
+
+test('en följds bitar i scenen: varje bit lägger kortet filmen lägger i den, från rutan det läggs', () => {
+  const ordered = { dealer: 'prov', id: 'prov_spelaren_foljd', cards: [{ seat: 4, index: 0, action: 'deal' as const, words: '', place: [0, 0] as [number, number] }, { seat: 'D' as const, index: 0, action: 'deal' as const, words: '', place: [0, 0] as [number, number] }] };
+  // Filmen lägger dealerns kort först (ruta 24), sedan plats 4 (ruta 60); ett kort som inte läggs i sin bit läggs i bitens sista ruta.
+  const read = { pieces: [{ from: 0, to: 48, card: 1, file: 'bit-1.mp4' }, { from: 48, to: 96, card: 0, file: 'bit-2.mp4' }], cards: [{ laidFrame: 60 }, { laidFrame: 24 }] } as never;
+  const clips = sceneClipsOf('paket', ordered, read, 24, ['3♠', '2♦']);
+  assert.deepEqual(clips.map((one) => one.card), [{ seat: 'D', index: 0, face: '2♦', at: 1 }, { seat: 4, index: 0, face: '3♠', at: 0.5 }]);
+  assert.equal(clips[1]!.asset, 'dealers/prov/clips/prov_spelaren_foljd-bit-2.mp4');
+  const late = { pieces: [{ from: 0, to: 48, card: 0, file: 'bit-1.mp4' }, { from: 48, to: 96, card: null, file: 'bit-2.mp4' }], cards: [{ laidFrame: null }, { laidFrame: null }] } as never;
+  assert.deepEqual(sceneClipsOf('paket', ordered, late, 24, '3♠').map((one) => one.card.at), [2], 'inget kort i en bit utan kort');
 });
 
 let received: PostFile | null = null;

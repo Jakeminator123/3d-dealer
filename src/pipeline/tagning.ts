@@ -19,7 +19,7 @@
 //     [--utan-referens] skickar ingen film alls: rörelsen är filmmodellens egen, styrd av första och sista bilden och
 //     texten. Dockans film sparas ändå i paketet och mäts, som baslinje. Också den tagningen har en egen variant.
 //     [--sedan 5-0,6-0] gör en följd: fler kort i samma tagning, med REDO emellan, utan referensfilm. Sista bilden har
-//     alla korten målade, och mitt-k.png är REDO med de k första, som rutan mellan givarna mäts mot (foljd.ts).
+//     alla korten målade; REDO mellan givarna mäts mot första och sista bilden, efter de kort filmen då har lagt (foljd.ts).
 //     [--langd <s>] ger filmen en annan längd i hela sekunder än cyklernas. [--modell <id> --upplosning <r>] en annan
 //     filmmodell, och [--bilder referens] skickar första bilden som referensbild och ingen sista bild, för en modell som
 //     inte tar dem tillsammans med en referensfilm; en film i en annan upplösning mäts i en kopia skalad till rutan.
@@ -81,7 +81,7 @@ import {
 } from './matning.ts';
 import { anchorOf as clipAnchorOf, type RoundEntry } from '../scene/round.ts';
 import { about, addMeasurement, addOrder, addUpload, dropMeasurements, getEntry, importAsset, registerPath, sha256Of, stamp, studioRoot, unsigned, type Order, type Post, type RegistryEntry } from './registry.ts';
-import { measureSequence } from './foljd.ts';
+import { measureSequence, type SequenceRead } from './foljd.ts';
 import { restMotion, restPlaces } from './vila.ts';
 import { shootAll } from './shoot.ts';
 
@@ -739,8 +739,7 @@ type SequenceContext = {
 };
 
 /**
- * Paketet för en följd: första bilden (REDO), bilderna mellan givarna (mitt-k.png: REDO med de k första korten målade
- * där de ligger), sista bilden (alla korten), texten och bestallning.json. Ingen film skickas och ingen dockfilm görs:
+ * Paketet för en följd: första bilden (REDO), sista bilden (alla korten), texten och bestallning.json. Ingen film skickas och ingen dockfilm görs:
  * dockan har ingen film av en följd. Tagningen mäts mot bilderna (foljd.ts).
  */
 async function prepareSequence(context: SequenceContext): Promise<Prepared> {
@@ -748,23 +747,27 @@ async function prepareSequence(context: SequenceContext): Promise<Prepared> {
   const at = (file: string) => join(dir, file);
   const pkg = posix(relative(root, dir));
   const { scene } = parts;
-  // Korten målas ett i taget, vart och ett på bilden före: mitt-1.png har det första, sista.png alla.
+  // Korten målas ett i taget, vart och ett på bilden före, och sista.png har alla. Bilderna däremellan tas bort: REDO
+  // mellan givarna mäts mot första och sista bilden, efter de kort filmen då har lagt (foljd.ts).
   const painted: NonNullable<Awaited<ReturnType<typeof paintedPicture>>>[] = [];
+  const steps: string[] = [];
   let source = anchor;
   for (const [k, card] of cards.entries()) {
-    const file = k === cards.length - 1 ? 'sista.png' : `mitt-${k + 1}.png`;
+    const file = k === cards.length - 1 ? 'sista.png' : `steg-${k + 1}.png`;
     const made = await paintedPicture(seen, source, card, 'last', at(file), { ...view, close: true });
     if (!made) throw new TagningError(`${cardWords(card.seat, card.index)}: cykeln lägger inget kort`);
     painted.push(made);
     source = at(file);
+    if (file !== 'sista.png') steps.push(at(file));
   }
+  for (const step of steps) rmSync(step, { force: true });
   const allWords = cards.map((card) => cardWords(card.seat, card.index)).join(', sedan ');
   const text = context.text ?? (context.textName ? namedText(content, context.textName, 'deal', context.words) : null);
   if (!text) throw new TagningError('En följd har ingen text i mallen: skriv --textnamn <namn> eller --text <fil>');
   writeFileSync(at('text.txt'), text);
   const seconds = cards.reduce((sum, card) => sum + cycleMove(parts, card).seconds, 0);
   const order = {
-    about: 'Beställningen av en följd, gjord av src/pipeline/tagning.ts forbered: flera kort i samma tagning, med REDO emellan. Allt Runways generate_video behöver: modell, upplösning, längd, text, startFrame och endFrame (inputs: det som skickas, och inget annat; ingen film skickas). middle är bilderna av REDO mellan givarna, som tagningen mäts mot (foljd.ts); de skickas inte.',
+    about: 'Beställningen av en följd, gjord av src/pipeline/tagning.ts forbered: flera kort i samma tagning, med REDO emellan. Allt Runways generate_video behöver: modell, upplösning, längd, text, startFrame och endFrame (inputs: det som skickas, och inget annat; ingen film skickas). REDO mellan givarna mäts mot första och sista bilden, efter de kort filmen då har lagt (foljd.ts).',
     id,
     made: stamp(),
     dealer: spec.dealer,
@@ -799,7 +802,6 @@ async function prepareSequence(context: SequenceContext): Promise<Prepared> {
         spared: painted.map((one) => one.spared),
       },
     },
-    middle: painted.slice(0, -1).map((_, k) => ({ after: k + 1, file: `${pkg}/mitt-${k + 1}.png`, sha256: sha256Of(at(`mitt-${k + 1}.png`)), note: `REDO med ${cards.slice(0, k + 1).map((card) => cardWords(card.seat, card.index)).join(' och ')} målade, som rutan mellan givarna mäts mot` })),
     doll: null,
     scene: {
       shoe: shoeOf(scene.shoe),
@@ -814,7 +816,6 @@ async function prepareSequence(context: SequenceContext): Promise<Prepared> {
   write(at('bestallning.json'), order);
   say(`Paket: ${pkg} (en följd: ${allWords})`);
   say(`  första bild   forsta.png   (${anchorFile})`);
-  for (const [k] of painted.slice(0, -1).entries()) say(`  mellan givar  mitt-${k + 1}.png  (REDO med ${k + 1} kort, mäts mot, skickas inte)`);
   say(`  sista bild    sista.png    (${cards.length} märkkort, ${painted.map((one) => one.painted).join(' + ')} bp målade)`);
   say(`  text          text.txt${context.textName ? ` (content/tagning.json, prompt.named.${context.textName})` : ''}`);
   say('  ingen film skickas och ingen dockfilm görs: dockan har ingen film av en följd');
@@ -832,13 +833,16 @@ async function prepareSequence(context: SequenceContext): Promise<Prepared> {
 
 type Proof = { file: string; frames: number; cyanMost: number; cyanFrames: number; corners: { x: number; y: number }[] | null; cornerError: number | null; sheet: string };
 
+/** Ett klipp att spela i scenen: filen, namnet scenen läser det under, och kortet det lägger (plats, kort, valör, tid). */
+export type SceneClip = { path: string; asset: string; card: { seat: Seat; index: number; face: string | null; at: number } };
+
 /**
- * Klippet nycklat i scenen ur vyns närbild, med rummet, kortplatserna utritade och scenens kort lagt från `landsAt`:
- * med framsidan upp, eller för hålkortet med baksidan (face null). Klippet är en följd med ett klipp (FilmNote).
- * Scenen läser filmen ur en egen datamapp i paketet (STUDIO_DATA), så att assets/ inte rörs; mappen tas bort efteråt.
- * Mätt: blått eller cyan kring kort och hand i varje ruta där kortet ligger, och scenens korthörn i sista rutan.
+ * Klippen spelade efter varandra i scenen ur vyns närbild, nycklade, med rummet, kortplatserna utritade och varje kort
+ * lagt från sin tid i sitt klipp (en följd, FilmNote), sparade som `out` i paketet `dir`. Scenen har skon där klippen
+ * gjordes. Scenen läser filmerna ur en egen datamapp i paketet (STUDIO_DATA), så att assets/ inte rörs; mappen tas
+ * bort efteråt.
  */
-async function proofOf(root: string, dir: string, clip: string, asset: string, view: SeatView, card: CycleCard, landsAt: number, layout: Layout, content: TagningContent, shoe: Shoe, say: (text: string) => void): Promise<Proof> {
+export async function playInScene(root: string, dir: string, clips: SceneClip[], view: SeatView, content: TagningContent, shoe: Shoe, out: string, say: (text: string) => void): Promise<string> {
   // Scenen med skon där klippet gjordes (partsOf), och dockans mått: där kortet i skons mynning står, som nyckeln målar
   // kortets kant efter (src/scene/marker.ts).
   const written = JSON.parse(readFileSync(join(root, 'content', 'scene.json'), 'utf8'));
@@ -859,10 +863,9 @@ async function proofOf(root: string, dir: string, clip: string, asset: string, v
     }
   };
   for (const file of [scene.table.file, scene.shoe.file, content.proof.background.file]) link(join(root, 'assets', file), file);
-  link(clip, asset);
-  const face = card.action === 'hole' ? null : content.proof.face;
+  for (const clip of clips) link(clip.path, clip.asset);
   const order = {
-    dealer: { kind: 'film', view, clips: [{ file: asset, card: { seat: card.seat, index: card.index, face, at: landsAt } }] },
+    dealer: { kind: 'film', view, clips: clips.map((clip) => ({ file: clip.asset, card: clip.card })) },
     background: { ...content.proof.background, lift: scene.background.liftDeg, height: scene.room.captureHeight, radius: scene.room.radius },
     studio: null,
     shoe: true,
@@ -872,12 +875,23 @@ async function proofOf(root: string, dir: string, clip: string, asset: string, v
     fps: content.proof.fps,
     label: 'bevis',
   };
-  say('Beviset i scenen sparas …');
+  say(`${clips.length > 1 ? `${clips.length} klipp` : 'Klippet'} i scenen sparas …`);
   const [result] = await shootAll([order], say, { data });
-  if (!result?.ok) throw new TagningError(`Beviset gick inte att spara: ${result && !result.ok ? result.error : 'inget svar'}`);
-  const file = join(dir, 'bevis.mp4');
+  if (!result?.ok) throw new TagningError(`Filmen i scenen gick inte att spara: ${result && !result.ok ? result.error : 'inget svar'}`);
+  const file = join(dir, out);
   renameSync(join(data, result.saved.file), file);
   rmSync(data, { recursive: true, force: true });
+  return file;
+}
+
+/**
+ * Klippet nycklat i scenen ur vyns närbild (playInScene), med scenens kort lagt från `landsAt`: med framsidan upp, eller
+ * för hålkortet med baksidan (face null). Mätt: blått eller cyan kring kort och hand i varje ruta där kortet ligger, och
+ * scenens korthörn i sista rutan.
+ */
+async function proofOf(root: string, dir: string, clip: string, asset: string, view: SeatView, card: CycleCard, landsAt: number, layout: Layout, content: TagningContent, shoe: Shoe, say: (text: string) => void): Promise<Proof> {
+  const face = card.action === 'hole' ? null : content.proof.face;
+  const file = await playInScene(root, dir, [{ path: clip, asset, card: { seat: card.seat, index: card.index, face, at: landsAt } }], view, content, shoe, 'bevis.mp4', say);
 
   const film = await probe(file);
   const sheet = sheetCollector(film.frames, film.fps, 6, 'bevis');
@@ -911,9 +925,8 @@ type Ordered = {
   id: string; dealer: string; view: SeatView; viewWord: string; seat: Seat; index: number; action?: Action; take: number; cycle: string; clip: string; anchor?: string;
   /** Varianten och klippet som skickades i stället för dockans film, när paketet gjordes med --referensklipp. */
   variant?: string; motionFrom?: { file: string; role: ClipRole; status: string }; noReference?: boolean;
-  /** En följd: korten i ordning, och bilderna av REDO mellan givarna (prepareSequence). */
+  /** En följd: korten i given ordning (prepareSequence). */
   cards?: { seat: Seat; index: number; action: Action; words: string; place: [number, number] }[];
-  middle?: { after: number; file: string }[];
   model: string; resolution: string; duration: number; ratio: string; prompt: string; promptName?: string;
   /** Det som skickades: dockans film eller ett klipp (asset) som referenceVideos, eller ett klipp som referenceVideo. */
   inputs: { startFrame?: { file: string; asset?: string }; endFrame?: { file: string }; referenceImages?: { file: string; asset?: string }[]; referenceVideos?: SentVideo[]; referenceVideo?: SentVideo };
@@ -1030,19 +1043,17 @@ const isSequence = (ordered: Ordered): boolean => (ordered.cards?.length ?? 0) >
  * Mäter en följd (foljd.ts) mot sina bilder: första, de mellan givarna och sista. Skriver matning.json och arket. Inget
  * bevis i scenen: det ritar ett kort i taget.
  */
-async function measureSequenceTake(root: string, dir: string, ordered: Ordered, clip: string, film: Probe, heard: boolean, content: TagningContent, parts: CycleParts, say: (text: string) => void): Promise<Measured> {
+async function measureSequenceTake(root: string, dir: string, ordered: Ordered, clip: string, film: Probe, heard: boolean, content: TagningContent, parts: CycleParts, proofToo: boolean, say: (text: string) => void): Promise<Measured> {
   const at = (file: string) => join(dir, file);
   const layouts = ordered.cards!.map((card) => layoutFor(parts, ordered.view, { seat: card.seat, index: card.index, action: 'deal' }, content.measure));
-  const images = {
-    first: await readPicture(at('forsta.png')),
-    middles: await Promise.all((ordered.middle ?? []).map((middle) => readPicture(join(root, middle.file)))),
-    last: await readPicture(at('sista.png')),
-  };
+  const images = { first: await readPicture(at('forsta.png')), last: await readPicture(at('sista.png')) };
   const key = parts.scene.studio.colours.screen as [number, number, number];
   const read = await measureSequence({ clip, dir, film, layouts, images, key, measure: content.measure, motion: content.motion, screen: screenOf(content.reference.studio), limits: content.limits, say });
   const sheet = sheetCollector(film.frames, film.fps, 6, 'klipp');
   await eachFrame(clip, layouts[0]!.frame, (picture, index) => sheet.take(picture, index));
   await makeSheet(await Promise.all(sheet.tiles), at('ark.jpg'));
+  // Bitarna i scenen: ett klipp per kort, kortet lagt från tiden det landar i sin bit (i-scenen.mp4).
+  const scene = proofToo ? await playInScene(root, dir, sceneClipsOf(dir, ordered, read, film.fps, content.proof.face), ordered.view, content, parts.scene.shoe, 'i-scenen.mp4', say) : null;
   const limits = formatFor(content.limits, ordered.duration, content.order.duration);
   const firstCard: CycleCard = { seat: ordered.cards![0]!.seat, index: ordered.cards![0]!.index, action: 'deal' };
   const rest = await restMotion(clip, layouts[0]!.frame, film.fps, restPlaces(parts, ordered.view, firstCard, await firstFrame(clip, layouts[0]!.frame), key), key);
@@ -1051,7 +1062,7 @@ async function measureSequenceTake(root: string, dir: string, ordered: Ordered, 
   const outside = judged.filter((entry) => entry.verdict !== 'inom');
   const summary = outside.length === 0 ? `alla ${judged.length} mått inom gränserna` : `${judged.length - outside.length} av ${judged.length} mått inom gränserna; ${outside.map((entry) => `${entry.key} ${shown(entry.value)} (${entry.verdict})`).join(', ')}`;
   write(at('matning.json'), {
-    about: 'En följd mätt av src/pipeline/tagning.ts ta-emot eller mät-om (src/pipeline/foljd.ts, gränserna i content/tagning.json). cards: när varje kort landar (s, ruta), IoU och tyngdpunkt mot sista bilden, och hur stilla det ligger. middles: rutan närmast REDO mellan givarna, med PSNR mot mitt-k.png. pieces: bitarna när tagningen klipps där, som filmer i paketet; seams: skarven när en bit följs av en annan, i huvud, bål, vilande hand, mynning och sko. Rörelsen är mätt i varje bit (BitN). Mätt, inte antaget.',
+    about: 'En följd mätt av src/pipeline/tagning.ts ta-emot eller mät-om (src/pipeline/foljd.ts, gränserna i content/tagning.json). cards, i given ordning: när varje kort läggs där det sedan ligger (laid, laidFrame), hur många stunder det blå ligger på platsen (stays) och när det ligger kvar otäckt till slutet (lands, frame), IoU och tyngdpunkt mot sista bilden, och hur stilla det ligger. order: korten (från 0, i given ordning) i den ordning filmen lägger dem. middles: rutan närmast REDO mellan två läggningar, med PSNR mot första bilden med de lagda kortens rutor ur sista bilden, och kortet som lades före (after). pieces: bitarna när tagningen klipps där, som filmer i paketet, och kortet varje bit lägger; seams: skarven när en bit följs av en annan, i huvud, bål, vilande hand, mynning och sko. Rörelsen är mätt i varje bit (BitN). Mätt, inte antaget.',
     measured: stamp(),
     clip: posix(relative(root, clip)),
     sha256: sha256Of(clip),
@@ -1060,18 +1071,40 @@ async function measureSequenceTake(root: string, dir: string, ordered: Ordered, 
     values,
     judged,
     cards: read.cards,
+    order: read.order,
     middles: read.middles,
     pieces: read.pieces,
     seams: read.seams,
     chain: read.chain,
+    scene: scene ? posix(relative(root, scene)) : null,
     shoe: shoeOf(parts.scene.shoe),
   });
   return { values, judged, summary, landsAt: null, proof: null };
 }
 
+/**
+ * En följds bitar som klipp i scenen: bit j lägger kortet den lägger i filmen (`piece.card`, nummer i given ordning)
+ * från rutan det läggs där det sedan ligger, med valören `faces[kortet]` (eller samma för alla). Ett kort som inte läggs i sin bit
+ * läggs i bitens sista ruta.
+ */
+export function sceneClipsOf(dir: string, ordered: Pick<Ordered, 'dealer' | 'id' | 'cards'>, read: Pick<SequenceRead, 'pieces' | 'cards'>, fps: number, faces: string | string[]): SceneClip[] {
+  return read.pieces.flatMap((piece, j) => {
+    if (piece.card === null) return [];
+    const card = ordered.cards![piece.card]!;
+    const laid = read.cards[piece.card]?.laidFrame;
+    const inPiece = laid !== null && laid !== undefined && laid >= piece.from && laid <= piece.to ? laid : piece.to;
+    const at = (inPiece - piece.from) / fps;
+    return [{
+      path: join(dir, piece.file),
+      asset: `dealers/${ordered.dealer}/clips/${ordered.id}-bit-${j + 1}.mp4`,
+      card: { seat: card.seat, index: card.index, face: Array.isArray(faces) ? faces[piece.card]! : faces, at: Math.max(0, Number(at.toFixed(3))) },
+    }];
+  });
+}
+
 /** En tagning mätt: en följd mot sina bilder (foljd.ts), annars en cykel mot dockan och scenen (measureTake). */
 const measureAny = (root: string, dir: string, ordered: Ordered, clip: string, film: Probe, heard: boolean, content: TagningContent, parts: CycleParts, proofToo: boolean, say: (text: string) => void): Promise<Measured> =>
-  isSequence(ordered) ? measureSequenceTake(root, dir, ordered, clip, film, heard, content, parts, say) : measureTake(root, dir, ordered, clip, film, heard, content, parts, proofToo, say);
+  isSequence(ordered) ? measureSequenceTake(root, dir, ordered, clip, film, heard, content, parts, proofToo, say) : measureTake(root, dir, ordered, clip, film, heard, content, parts, proofToo, say);
 
 /**
  * Måtten som registret tar emot dem: varje mått med gräns, och de som bara visas. En följds egna mått utan gräns (när
@@ -1079,10 +1112,16 @@ const measureAny = (root: string, dir: string, ordered: Ordered, clip: string, f
  */
 function measurementsOf(file: string, judged: Judged[], values: Values, scene: CycleParts['scene']): PostFile['measurements'] {
   const judgedKeys = new Set(judged.map((entry) => entry.key));
-  const sequenceShown = Object.keys(values).filter((key) => /^(kort\d+(Ligger|Synligt)|mittRutan\d+Ruta)$/.test(key) && !judgedKeys.has(key));
+  const sequenceShown = Object.keys(values).filter((key) => /^(kort\d+(Lagd|Stunder|Ligger|Synligt|Minst)|mittRutan\d+Ruta|losaBla(Flest|Sist)|lagdOrdning)$/.test(key) && !judgedKeys.has(key));
   const sequenceWhat = (key: string): string => {
+    if (key === 'losaBlaFlest') return 'blå kort utanför alla kortplatser, flest i en ruta (1 är kortet som bärs)';
+    if (key === 'losaBlaSist') return 'blå kort utanför alla kortplatser i sista rutan';
+    if (key === 'lagdOrdning') return 'korten (nummer i given ordning) i den ordning filmen lägger dem';
     const n = key.match(/\d+/)![0];
-    return key.endsWith('Ligger') ? `när kort ${n} ligger kvar på sin plats till slutet, s` : key.endsWith('Synligt') ? `när kort ${n} är helt synligt till slutet, s` : `rutan närmast REDO efter kort ${n}`;
+    if (key.endsWith('Minst')) return `kort ${n}: minsta andel av dess blå i sista rutan som syns från att det är helt synligt till slutet`;
+    if (key.endsWith('Lagd')) return `när kort ${n} läggs där det sedan ligger, s`;
+    if (key.endsWith('Stunder')) return `hur många stunder det blå ligger på kort ${n}s plats (1: lagt en gång och kvar; fler: ett kort som vänds där eller flyttas därifrån)`;
+    return key.endsWith('Ligger') ? `när kort ${n} ligger kvar på sin plats till slutet, s` : key.endsWith('Synligt') ? `när kort ${n} är helt synligt till slutet, s` : `rutan närmast REDO efter läggning ${n}`;
   };
   return [
     ...sequenceShown.map((key) => ({ file, what: `${key}: ${sequenceWhat(key)}`, value: { value: values[key] }, who: WHO, basis: 'mätt' as const, note: 'utan gräns' })),

@@ -1,8 +1,10 @@
 // Följden: en tagning där dealern lägger flera kort i rad och står i REDO mellan givarna (tagning.ts forbered med fler
-// kort, utan referensfilm). Här mäts den: första och sista rutan mot bilderna, rutan närmast REDO mellan givarna mot
-// REDO med de kort som då ligger (mitt-k.png), när och var varje kort landar, det gröna, givhanden i REDO, och om
-// tagningen går att klippa vid REDO i bitar som kedjar i vilken ordning som helst. Bitarna skrivs som filmer i paketet,
-// och rörelsen mäts i var och en (rorelse.ts), eftersom var och en är en cykel REDO → kortet lagt → REDO.
+// kort, utan referensfilm). Här mäts den: första och sista rutan mot bilderna, när varje kort läggs där det sedan ligger
+// och hur många stunder det blå ligger på platsen, rutan närmast REDO mellan två läggningar mot REDO med de kort som då ligger (första bilden med de
+// lagda kortens rutor ur sista bilden), det gröna, givhanden i REDO, och om tagningen går att klippa vid REDO i bitar som
+// kedjar i vilken ordning som helst. Korten följs i den ordning filmen lägger dem, som kan skilja från den givna. Bitarna
+// skrivs som filmer i paketet, och rörelsen mäts i var och en (rorelse.ts), eftersom var och en är en cykel REDO →
+// kortet lagt → REDO.
 //
 // Skarven mellan två bitar mäts som skarven i en vanlig tagning (matning.ts, seamSteps): steget från den ena bitens sista
 // ruta till den andras första mot stegen intill, i huvud, bål, vilande hand, mynning och sko. Korten på bordet räknas
@@ -20,6 +22,8 @@ import {
   handIn,
   inQuad,
   isBlue,
+  clipBox,
+  parts,
   judgeOne,
   otherSkin,
   quadArea,
@@ -47,8 +51,8 @@ export type SequenceInput = {
   film: Probe;
   /** En layout per kort, i given ordning (matning.ts, layoutFor). Regionerna är desamma för alla. */
   layouts: Layout[];
-  /** Första bilden (REDO), bilderna mellan givarna (REDO med de k första korten) och sista bilden (alla kort). */
-  images: { first: Picture; middles: Picture[]; last: Picture };
+  /** Första bilden (REDO) och sista bilden (alla kort). REDO mellan givarna sätts ihop ur dem efter de kort som då ligger. */
+  images: { first: Picture; last: Picture };
   key: Rgb;
   measure: Measure;
   motion: MotionMeasure;
@@ -57,15 +61,25 @@ export type SequenceInput = {
   say: (text: string) => void;
 };
 
-export type SequenceCardRead = { lands: number | null; frame: number | null; visible: number | null; overlap: number | null; centre: number | null; still: number | null };
+/**
+ * Ett kort i följden: när det läggs där det sedan ligger (`laid`, `laidFrame`; settledFrame), hur många stunder det
+ * blå ligger på platsen (`stays`; 1 när kortet läggs en gång och ligger kvar), när det ligger kvar där till slutet utan
+ * att täckas (`lands`, `frame`), när det är helt synligt, och hur väl och hur stilla det ligger.
+ */
+export type SequenceCardRead = { laid: number | null; laidFrame: number | null; stays: number; lands: number | null; frame: number | null; visible: number | null; least: number | null; overlap: number | null; centre: number | null; still: number | null };
 export type SequenceRead = {
   values: Values;
   judged: Judged[];
   cards: SequenceCardRead[];
-  /** Rutan närmast REDO mellan givarna, en per mellanrum, med PSNR mot mitt-k.png. */
-  middles: { frame: number; at: number; psnr: number }[];
-  /** Bitarnas första och sista ruta, och filerna i paketet. */
-  pieces: { from: number; to: number; file: string }[];
+  /** Korten (deras nummer i given ordning, från 0) i den ordning de läggs där de sedan ligger. */
+  order: number[];
+  /**
+   * Rutan närmast REDO mellan två läggningar i tidsordning, med PSNR mot REDO med de kort som då ligger (första bilden
+   * med de lagda kortens rutor ur sista bilden), och vilket kort som lades före.
+   */
+  middles: { frame: number; at: number; psnr: number; after: number }[];
+  /** Bitarnas första och sista ruta, kortet biten lägger (nummer i given ordning; null när filmen inget lägger) och filerna i paketet. */
+  pieces: { from: number; to: number; card: number | null; file: string }[];
   /** Skarven när bit `from` följs av bit `to`, i huvudet, bålen, den vilande handen, mynningen och skon: den värsta. */
   seams: { from: number; to: number; beyond: number; region: string }[];
   chain: string;
@@ -84,11 +98,28 @@ export function landingFrame(inside: number[], least: number): number | null {
   return at;
 }
 
-/** Rutan med störst värde mellan `from` och `to` (båda med), eller null när fönstret är tomt. */
-export function bestIn(scores: number[], from: number, to: number): { frame: number; score: number } | null {
-  let best: { frame: number; score: number } | null = null;
-  for (let k = Math.max(0, from); k <= Math.min(scores.length - 1, to); k++) if (!best || scores[k]! > best.score) best = { frame: k, score: scores[k]! };
-  return best;
+/**
+ * Stunderna kortet ligger på sin plats (minst `least` blå bildpunkter där), med uppehåll på högst `gap` rutor räknade
+ * som samma stund (en hand som går över kortet). Varje stund är [första, sista] ruta.
+ */
+export function staysOf(inside: number[], least: number, gap: number): [number, number][] {
+  const stays: [number, number][] = [];
+  for (const [k, n] of inside.entries()) {
+    if (n < least) continue;
+    const latest = stays.at(-1);
+    if (latest && k - latest[1] - 1 <= gap) latest[1] = k;
+    else stays.push([k, k]);
+  }
+  return stays;
+}
+
+/**
+ * Rutan kortet läggs där det sedan ligger: början på den sista stunden det ligger på sin plats, när den räcker till
+ * slutet (staysOf). Null när kortet inte ligger där i slutet.
+ */
+export function settledFrame(inside: number[], least: number, gap: number): number | null {
+  const latest = staysOf(inside, least, gap).at(-1);
+  return latest && latest[1] === inside.length - 1 ? latest[0] : null;
 }
 
 /**
@@ -98,6 +129,24 @@ export function bestIn(scores: number[], from: number, to: number): { frame: num
 export function piecesOf(frames: number, cuts: number[]): { from: number; to: number }[] {
   const bounds = [0, ...cuts, frames - 1];
   return bounds.slice(0, -1).map((from, j) => ({ from, to: bounds[j + 1]! }));
+}
+
+/** Korten (nummer från 0) i den ordning de läggs (rutorna `laid`); ett kort som inte läggs (null) står inte med. */
+export function layingOrder(laid: (number | null)[]): number[] {
+  return laid.map((frame, c) => ({ frame, c })).filter((one): one is { frame: number; c: number } => one.frame !== null).sort((a, b) => a.frame - b.frame || a.c - b.c).map((one) => one.c);
+}
+
+/** Första bilden med rutorna `boxes` ur sista bilden: REDO med de kort som då ligger. */
+export function withCards(first: Picture, last: Picture, boxes: Box[]): Picture {
+  const out: Picture = { data: Buffer.from(first.data), width: first.width, height: first.height };
+  for (const box of boxes) {
+    for (let y = Math.max(0, box.y0); y < Math.min(first.height, box.y1); y++) {
+      const from = (y * first.width + Math.max(0, box.x0)) * 3;
+      const to = (y * first.width + Math.min(first.width, box.x1)) * 3;
+      last.data.copy(out.data, from, from, to);
+    }
+  }
+  return out;
 }
 
 const REGIONS = ['head', 'torso', 'rest', 'mouth', 'shoe'] as const;
@@ -114,16 +163,19 @@ export async function measureSequence(input: SequenceInput): Promise<SequenceRea
   const cardsBox = grow(union(...layouts.map((layout) => layout.cardBox)), 12);
   const places = layouts.map((layout) => ({ quad: layout.corners, box: grow(layout.cardBox, measure.placeGrow + 2), area: quadArea(layout.corners) }));
 
-  // Första genomgången: varje ruta mot bilderna mellan givarna, det blå på varje kortplats och det gröna.
-  const toMiddle: number[][] = images.middles.map(() => []);
+  // Första genomgången: det blå på varje kortplats, lösa blå kort och det gröna.
   const inside: number[][] = layouts.map(() => []);
   const centres: ({ x: number; y: number } | null)[][] = layouts.map(() => []);
   let green = 0;
   let firstPsnr: number | null = null;
   let lastPicture: Picture | null = null;
+  // Blå kort utanför alla kortplatser i varje ruta, på bordet under axlarna: kortet som bärs (när det har vänts) och ett
+  // kort som har dubblerats eller flyttat från sin plats.
+  const table = clipBox({ x0: 0, y0: Math.min(...layouts.map((layout) => layout.low.y0)), x1: frame.width, y1: frame.height }, frame);
+  const loose: number[] = [];
   const count = await eachFrame(clip, frame, (picture, k) => {
+    loose.push(parts(picture, table, isBlue, measure.cardPart).filter((part) => !places.some((place) => inQuad(place.quad, part.c.x, part.c.y, measure.placeGrow + 6))).length);
     if (k === 0) firstPsnr = difference(picture, images.first).psnr;
-    images.middles.forEach((middle, j) => toMiddle[j]!.push(difference(picture, middle).psnr));
     places.forEach((place, c) => {
       let n = 0;
       let sx = 0;
@@ -167,7 +219,14 @@ export async function measureSequence(input: SequenceInput): Promise<SequenceRea
     return n ? { x: sx / n, y: sy / n } : null;
   };
   const cards: SequenceCardRead[] = places.map((place, c) => {
-    const at = landingFrame(inside[c]!, measure.coverShare * place.area);
+    const least = measure.coverShare * place.area;
+    const at = landingFrame(inside[c]!, least);
+    // När kortet läggs där det sedan ligger: början på den sista stunden det ligger på platsen, med en hand som går över
+    // det högst coveredLongest s (då flyttas `lands`, men inte läggningen). Ett blått kort som ligger där en stund och
+    // flyttas därifrån räknas i `stays`: en plats där kort vänds, eller ett kort som flyttas efter att det lagts.
+    const gap = Math.round(measure.coveredLongest * film.fps);
+    const laid = settledFrame(inside[c]!, least, gap);
+    const stays = staysOf(inside[c]!, least, gap).length;
     // Hur stilla kortet ligger mäts som i en vanlig tagning från att det är helt synligt (measure.visibleShare av det blå i
     // sista rutan, och så till slutet): fingrar som knuffar kortet flyttar det blås tyngdpunkt.
     const visible = landingFrame(inside[c]!, measure.visibleShare * (inside[c]!.at(-1) ?? 0));
@@ -178,28 +237,46 @@ export async function measureSequence(input: SequenceInput): Promise<SequenceRea
       const point = centres[c]![k];
       if (point) still = Math.max(still ?? 0, Math.hypot(point.x - seen.x, point.y - seen.y));
     }
+    // Den minsta andelen av kortets blå i sista rutan som syns från att det är helt synligt till slutet: under 1 när något
+    // täcker kortet eller det försvinner en stund.
+    const final = inside[c]!.at(-1) ?? 0;
+    const shown = visible !== null && final > 0 ? Math.min(...inside[c]!.slice(visible).map((n) => n / final)) : null;
     return {
+      laid: laid === null ? null : round(laid / film.fps, 3),
+      laidFrame: laid,
+      stays,
       lands: at === null ? null : round(at / film.fps, 3),
       frame: at,
       visible: visible === null ? null : round(visible / film.fps, 3),
+      least: shown === null ? null : round(shown, 3),
       overlap: blueOverlap(last, images.last, place.box),
       centre: painted && seen ? round(Math.hypot(painted.x - seen.x, painted.y - seen.y), 1) : null,
       still: still === null ? null : round(still, 1),
     };
   });
 
-  // Rutan närmast REDO mellan givarna: mellan att kort k och kort k + 1 landar, eller i sin del av tagningen när ett
-  // kort inte landar.
-  const share = count / layouts.length;
-  const middles = images.middles.map((_, j) => {
-    const from = cards[j]!.frame ?? Math.round(share * (j + 0.5));
-    const to = (cards[j + 1]!.frame ?? Math.round(share * (j + 1.5))) - 1;
-    const best = bestIn(toMiddle[j]!, from, to) ?? bestIn(toMiddle[j]!, 1, count - 2)!;
-    return { frame: best.frame, at: round(best.frame / film.fps, 3), psnr: best.score };
+  // Korten i den ordning de läggs, som filmen visar den (den kan skilja från den givna). Ett kort som aldrig läggs har
+  // ingen bit.
+  const order = layingOrder(cards.map((card) => card.laidFrame));
+  // REDO mellan två läggningar: rutan mellan dem som ligger närmast REDO med de kort som då ligger, i en andra genomgång.
+  const expected = order.slice(0, -1).map((_, g) => withCards(images.first, images.last, order.slice(0, g + 1).map((c) => places[c]!.box)));
+  const windows = order.slice(0, -1).map((c, g) => ({ from: cards[c]!.laidFrame!, to: cards[order[g + 1]!]!.laidFrame! - 1 }));
+  const best: ({ frame: number; score: number } | null)[] = windows.map(() => null);
+  await eachFrame(clip, frame, (picture, k) => {
+    windows.forEach((window, g) => {
+      if (k < window.from || k > window.to) return;
+      const score = difference(picture, expected[g]!).psnr;
+      if (!best[g] || score > best[g]!.score) best[g] = { frame: k, score };
+    });
+  });
+  const middles = best.map((found, g) => {
+    const chosen = found ?? { frame: windows[g]!.from, score: 0 };
+    return { frame: chosen.frame, at: round(chosen.frame / film.fps, 3), psnr: chosen.score, after: order[g]! };
   });
 
-  // Bitarna och rutorna intill deras ändar, i en andra genomgång.
-  const pieces = piecesOf(count, middles.map((middle) => middle.frame));
+  // Bitarna och rutorna intill deras ändar, i en tredje genomgång. Bit j lägger kort order[j]; lägger filmen inget kort
+  // är hela tagningen en bit utan kort.
+  const pieces = piecesOf(count, middles.map((middle) => middle.frame)).map((piece, j) => ({ ...piece, card: order[j] ?? null }));
   const wanted = new Set(pieces.flatMap((piece) => [piece.from, piece.from + 1, piece.to - 1, piece.to]));
   const kept = new Map<number, Picture>();
   await eachFrame(clip, frame, (picture, k) => {
@@ -248,16 +325,23 @@ export async function measureSequence(input: SequenceInput): Promise<SequenceRea
   };
   for (const name of ['forstaRutan', 'sistaRutan', 'gront', 'handIRedo'] as const) if (limits[name]) judged.push(judgeOne(name, values[name] as number | null, limits[name]!));
   middles.forEach((middle, j) => {
-    named(`mittRutan${j + 1}`, 'forstaRutan', middle.psnr, `rutan närmast REDO efter kort ${j + 1} (ruta ${middle.frame}, ${String(middle.at).replace('.', ',')} s) mot REDO med de kort som då ligger (mitt-${j + 1}.png), hela rutan`);
+    named(`mittRutan${j + 1}`, 'forstaRutan', middle.psnr, `rutan närmast REDO efter läggning ${j + 1} (kort ${middle.after + 1}; ruta ${middle.frame}, ${String(middle.at).replace('.', ',')} s) mot första bilden med de ${j + 1} kort som då ligger ur sista bilden, hela rutan`);
     values[`mittRutan${j + 1}Ruta`] = middle.frame;
   });
+  values.lagdOrdning = order.map((c) => c + 1).join(' ');
   cards.forEach((card, c) => {
+    values[`kort${c + 1}Lagd`] = card.laid;
+    values[`kort${c + 1}Stunder`] = card.stays;
     values[`kort${c + 1}Ligger`] = card.lands;
     values[`kort${c + 1}Synligt`] = card.visible;
+    values[`kort${c + 1}Minst`] = card.least;
     named(`kort${c + 1}Overlapp`, 'kortetsOverlapp', card.overlap, `kort ${c + 1}: det blå i sista rutan mot märkkortet i sista bilden (IoU)`);
     named(`kort${c + 1}Mitt`, 'kortetsMitt', card.centre, `kort ${c + 1}: det blås tyngdpunkt i sista rutan mot märkkortets i sista bilden`);
     named(`kort${c + 1}Rorelse`, 'kortetsRorelse', card.still, `kort ${c + 1}: det blås tyngdpunkt från att kortet är helt synligt till slutet, längst från sista rutans`);
   });
+  // Lösa blå kort: flest i en ruta (1 är kortet som bärs), och kvar i sista rutan (0: inget kort utanför sin plats).
+  values.losaBlaFlest = loose.length ? Math.max(...loose) : null;
+  values.losaBlaSist = loose.at(-1) ?? null;
   for (const seam of seams) named(`skarvBit${seam.from}Bit${seam.to}`, 'skarvRegion', seam.beyond, `skarven när bit ${seam.from} följs av bit ${seam.to}: steget utöver grannstegen, värsta region (${seam.region})`);
   for (const [j, piece] of files.entries()) {
     try {
@@ -268,5 +352,5 @@ export async function measureSequence(input: SequenceInput): Promise<SequenceRea
       say(`Rörelsen i bit ${j + 1} gick inte att mäta: ${error.message}`);
     }
   }
-  return { values, judged, cards, middles, pieces: files, seams, chain };
+  return { values, judged, cards, order, middles, pieces: files, seams, chain };
 }
