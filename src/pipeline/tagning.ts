@@ -82,6 +82,7 @@ import {
 import { anchorOf as clipAnchorOf, type RoundEntry } from '../scene/round.ts';
 import { about, addMeasurement, addOrder, addUpload, dropMeasurements, getEntry, importAsset, registerPath, sha256Of, stamp, studioRoot, unsigned, type Order, type Post, type RegistryEntry } from './registry.ts';
 import { measureSequence } from './foljd.ts';
+import { restMotion, restPlaces } from './vila.ts';
 import { shootAll } from './shoot.ts';
 
 export class TagningError extends Error {}
@@ -974,6 +975,8 @@ async function measureTake(root: string, dir: string, ordered: Ordered, clip: st
   const read = await readFilm(sized, film.fps, { layout, measure: content.measure, key, start: images.first, shoeFree }, (picture, index) => sheet.take(picture, index));
   await makeSheet(await Promise.all(sheet.tiles), at('ark.jpg'));
   const { values, times, seconds } = valuesOf(read, film, film.audio, layout, content.measure, images, doll);
+  // Den vilande armen (vila.ts): handen, fingrarna och armbågen, i bp och cm.
+  Object.assign(values, await restMotion(sized, layout.frame, film.fps, restPlaces(parts, view, cardOf(ordered), read.first, key), key));
   // Rörelsen i klippet (rorelse.ts): stillhet, knyckar och ordningen mellan huvud, bål och hand. Går den inte att spåra
   // (ingen dealer i bild) saknas måtten, och det syns i omdömet.
   try {
@@ -1041,7 +1044,9 @@ async function measureSequenceTake(root: string, dir: string, ordered: Ordered, 
   await eachFrame(clip, layouts[0]!.frame, (picture, index) => sheet.take(picture, index));
   await makeSheet(await Promise.all(sheet.tiles), at('ark.jpg'));
   const limits = formatFor(content.limits, ordered.duration, content.order.duration);
-  const values: Values = { format: `${film.width}×${film.height} ${film.fps}/s ${film.frames}`, ljud: film.audio, ...read.values };
+  const firstCard: CycleCard = { seat: ordered.cards![0]!.seat, index: ordered.cards![0]!.index, action: 'deal' };
+  const rest = await restMotion(clip, layouts[0]!.frame, film.fps, restPlaces(parts, ordered.view, firstCard, await firstFrame(clip, layouts[0]!.frame), key), key);
+  const values: Values = { format: `${film.width}×${film.height} ${film.fps}/s ${film.frames}`, ljud: film.audio, ...read.values, ...rest };
   const judged = [...(['format', 'ljud'] as const).filter((name) => limits[name]).map((name) => judgeOne(name, values[name], limits[name]!)), ...read.judged];
   const outside = judged.filter((entry) => entry.verdict !== 'inom');
   const summary = outside.length === 0 ? `alla ${judged.length} mått inom gränserna` : `${judged.length - outside.length} av ${judged.length} mått inom gränserna; ${outside.map((entry) => `${entry.key} ${shown(entry.value)} (${entry.verdict})`).join(', ')}`;
@@ -1116,6 +1121,12 @@ const SHOWN: Record<string, string> = {
   huvudet: 'huvudets vridning: största skillnad i ögonens läge mot huvudets kontur, bp',
   skarvMedel: 'skarven: sista rutan mot första utanför kortet, medelavvikelse per kanal (pilotens mått)',
   bevisHorn: 'beviset i scenen: scenens korthörn i sista rutan mot de räknade, bp',
+  vilaHandBp: 'den vilande handens tyngdpunkt (huden kring dockans vilande hand), längst från sin median, bp (vila.ts)',
+  vilaHandCm: 'den vilande handens tyngdpunkt, längst från sin median, cm vid handens avstånd',
+  vilaHandFart: 'den vilande handens väg per sekund, cm/s (med bildbrus)',
+  vilaFingrar: 'den vilande handens form: 1 − minsta överlapp av huden mot första rutan',
+  vilaArmbageBp: 'den vilande armbågens yttre kant, längst från sin median, bp',
+  vilaArmbageCm: 'den vilande armbågens yttre kant, längst från sin median, cm vid handens avstånd',
 };
 
 /** Flaggor utan värde: ordet efter dem är inget värde. */

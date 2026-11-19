@@ -74,7 +74,15 @@ export type AnkareContent = {
     edges: { every: number; rows: number; least: number; most: number };
   };
   limits: Record<string, Limit>;
+  /** Varianter av ett färdigt ankare där bara en del ändras (variant, variant-ta-emot). */
+  variants?: Record<string, Variant>;
 };
+/**
+ * En variant: vad den ändrar, bildmodellen och texten, var i bilden ändringen får ligga (region: `vilande-arm` eller
+ * `hela`), och referensbilder utöver ankaret (@base), som filer i registret.
+ */
+export type Variant = { what: string; model: string; imageSize: string; ratio: string; credits: number; region: VariantRegion; references?: { tag: string; file: string }[]; text: string[] };
+export type VariantRegion = 'vilande-arm' | 'hela';
 
 const ANKARE_WORDS = ['grid', 'gaze'];
 
@@ -98,9 +106,17 @@ export function readAnkare(root = studioRoot()): AnkareContent {
   }
   const limits = Object.fromEntries(Object.entries(read.limits ?? {}).filter(([key]) => key !== 'basis' && key !== 'source')) as Record<string, Limit>;
   for (const [key, limit] of Object.entries(limits)) if (typeof limit.what !== 'string' || typeof limit.source !== 'string') wrong.push(`limits.${key}: what och source`);
+  const variants = Object.fromEntries(Object.entries(read.variants ?? {}).filter(([key]) => key !== 'basis' && key !== 'source')) as Record<string, Variant>;
+  if (read.variants && !((read.variants as { basis?: unknown }).basis === 'mätt' || (read.variants as { basis?: unknown }).basis === 'antaget')) wrong.push('variants: basis och source');
+  for (const [name, variant] of Object.entries(variants)) {
+    const references = variant.references ?? [];
+    const ok = /^[a-z0-9][a-z0-9-]{0,30}$/.test(name) && typeof variant.what === 'string' && typeof variant.model === 'string' && Number.isFinite(variant.credits) && (variant.region === 'vilande-arm' || variant.region === 'hela') && Array.isArray(variant.text) && references.every((ref) => typeof ref.tag === 'string' && ref.tag !== 'base' && typeof ref.file === 'string');
+    if (!ok) wrong.push(`variants.${name}: what, model, credits, region (vilande-arm eller hela), text och references (tag utom base, file)`);
+    else if (placeholdersOf(variant.text.join(' ')).some((key) => !known.includes(key))) wrong.push(`variants.${name}: okända ord`);
+  }
   if (wrong.length > 0) throw new AnkareError(`content/ankare.json går inte att använda: ${wrong.join('; ')}`);
   const words = Object.fromEntries(Object.entries(read.words).filter(([key]) => key !== 'basis' && key !== 'source')) as Record<string, string>;
-  return { ...read, words, limits };
+  return { ...read, words, limits, variants };
 }
 
 /** Texten för ett bildsteg, fylld med dealerns ord och ankarets egna (rutnätets steg, blicken i REDO). */
@@ -788,6 +804,319 @@ export async function oga(dealerId: string, viewWord: string, options: PrepareOp
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
+// variant: ett färdigt ankare med bara en del ändrad
+
+/** Paketets och filens namn för en variant av vyns ankare: <dealer>_<vy>_<variant> och <ankaret>-<variant>.png. */
+export const variantIdOf = (dealer: string, view: string, name: string): string => `${dealer}_${view}_${name}`;
+export const variantFileOf = (anchor: string, name: string): string => anchor.replace(/\.png$/, `-${name}.png`);
+
+/**
+ * Var en variant får ändra bilden: rutor vars förening är området (de börjar vid bildens kant på den vilande sidan),
+ * åt vilket håll den vilande sidan ligger, och den mjuka kantens bredd mot resten av bilden.
+ */
+export type Region = { boxes: Box[]; side: -1 | 1; feather: number };
+
+/**
+ * Var en variant får ändra bilden. `vilande-arm`: dealerns vilande sida (armen som inte ger) under axlarna, i två rutor:
+ * ovanför blusens spets in till kavajens slag (en bit före huvudets mitt), och från strax ovanför bordskanten och nedåt
+ * in förbi kroppens mitt, så att en hand som läggs närmare mitten ryms. Ansiktet, blusen, givhanden, skon och kortet
+ * ligger utanför. Kanten mot resten av bilden är mjuk, `feather` bp. Räknat ur dockan i REDO genom ankarets öga.
+ */
+export function variantRegion(parts: CycleParts, view: SeatView, doll: DollPoints, content: AnkareContent, kind: VariantRegion = 'vilande-arm', feather = 24): Region {
+  const eye = cycleEye(parts, view);
+  // Hela bilden: bildmodellens bild används som den är, och mäts mot originalet.
+  if (kind === 'hela') return { boxes: [{ x0: 0, y0: 0, x1: eye.frame.width, y1: eye.frame.height }], side: doll.rest.hand.x < doll.head.x ? -1 : 1, feather: 0 };
+  const card: CycleCard = { seat: content.underlag.seat, index: content.underlag.index, action: 'deal' };
+  const move = cycleMove(parts, card);
+  const rest = (move.carry ?? 'left') === 'left' ? 'right' : 'left';
+  const shoulder = see(eye, poseAt(parts.scene, parts.doll, move, 0).arms[rest].shoulder);
+  if (!shoulder) throw new AnkareError('Den vilande axeln ligger bakom ögat');
+  const side: -1 | 1 = shoulder.x < doll.head.x ? -1 : 1;
+  const { width, height } = eye.frame;
+  const top = Math.round(shoulder.y - 0.3 * doll.head.radius);
+  const split = Math.round(edgeRow(doll, doll.head.x) - 30);
+  const upper = Math.round(doll.head.x + side * 0.55 * doll.head.radius);
+  const lower = Math.round(doll.head.x - side * 0.6 * doll.head.radius);
+  const box = (y0: number, y1: number, inner: number): Box => (side < 0 ? { x0: 0, y0, x1: inner, y1 } : { x0: inner, y0, x1: width, y1 });
+  return { boxes: [box(top, split, upper), box(split, height, lower)], side, feather };
+}
+
+/**
+ * Bildmodellens vikt i varje bildpunkt: 1 inne i området, mjukt ned mot 0 närmare än `feather` bp från det som ligger
+ * utanför området (bildens kant räknas inte), 0 utanför. Avståndet räknas i rutnät, åtta grannar.
+ */
+export function regionWeights(region: Region, width: number, height: number): Float32Array {
+  const far = region.feather + 1;
+  const distance = new Float32Array(width * height);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const inside = region.boxes.some((box) => x >= box.x0 && x < box.x1 && y >= box.y0 && y < box.y1);
+      distance[y * width + x] = inside ? far : 0;
+    }
+  }
+  // Två svep: avståndet till närmaste bildpunkt utanför, högst `far`.
+  const diagonal = Math.SQRT2;
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const p = y * width + x;
+      if (distance[p] === 0) continue;
+      let d = distance[p]!;
+      if (x > 0) d = Math.min(d, distance[p - 1]! + 1);
+      if (y > 0) d = Math.min(d, distance[p - width]! + 1);
+      if (x > 0 && y > 0) d = Math.min(d, distance[p - width - 1]! + diagonal);
+      if (x < width - 1 && y > 0) d = Math.min(d, distance[p - width + 1]! + diagonal);
+      distance[p] = d;
+    }
+  }
+  for (let y = height - 1; y >= 0; y--) {
+    for (let x = width - 1; x >= 0; x--) {
+      const p = y * width + x;
+      if (distance[p] === 0) continue;
+      let d = distance[p]!;
+      if (x < width - 1) d = Math.min(d, distance[p + 1]! + 1);
+      if (y < height - 1) d = Math.min(d, distance[p + width]! + 1);
+      if (x < width - 1 && y < height - 1) d = Math.min(d, distance[p + width + 1]! + diagonal);
+      if (x > 0 && y < height - 1) d = Math.min(d, distance[p + width - 1]! + diagonal);
+      distance[p] = d;
+    }
+  }
+  const weights = new Float32Array(width * height);
+  for (let p = 0; p < weights.length; p++) weights[p] = region.feather > 0 ? Math.min(1, distance[p]! / region.feather) : distance[p]! > 0 ? 1 : 0;
+  return weights;
+}
+
+/** Bildmodellens bild inlagd i originalet bara inom området, med mjuk kant. Utanför står originalet kvar orört. */
+export function composeInRegion(original: Picture, edited: Picture, weights: Float32Array): Picture {
+  const out = bild.copyOf(original);
+  for (let p = 0; p < weights.length; p++) {
+    const weight = weights[p]!;
+    if (weight <= 0) continue;
+    for (let c = 0; c < 3; c++) out.data[p * 3 + c] = Math.round(edited.data[p * 3 + c]! * weight + original.data[p * 3 + c]! * (1 - weight));
+  }
+  return out;
+}
+
+/** Rutan kring hela området. */
+const regionBox = (region: Region): Box => union(...region.boxes);
+
+/** Den vilande handens hudyta: den största huddelen i området närmast dockans vilande hand. Null när ingen syns. */
+function restSkin(picture: Picture, region: Region, doll: DollPoints): number | null {
+  const found = partsIn(picture, clipBox(regionBox(region), picture), (r, g, b) => bild.isSkin(r, g, b), 400);
+  const near = [...found].sort((a, b) => Math.hypot(a.c.x - doll.rest.hand.x, a.c.y - doll.rest.hand.y) - Math.hypot(b.c.x - doll.rest.hand.x, b.c.y - doll.rest.hand.y))[0];
+  return near ? near.n : null;
+}
+
+/** Varianten mot originalet: att resten är orört, skon, kortet, bordskanten, det gröna, glipan och den vilande handens storlek. */
+export function measureVariant(picture: Picture, original: Picture, doll: DollPoints, region: Region, weights: Float32Array, content: AnkareContent, key: Rgb, gap: { rows: number; least: number }): { values: Record<string, number | null>; shown: Record<string, unknown>; judged: Judged[] } {
+  let outside = 0;
+  let giving = 0;
+  const give = clipBox(grow({ x0: doll.give.hand.x, y0: doll.give.hand.y, x1: doll.give.hand.x + 1, y1: doll.give.hand.y + 1 }, 120), picture);
+  for (let y = 0; y < picture.height; y++) {
+    for (let x = 0; x < picture.width; x++) {
+      const i = (y * picture.width + x) * 3;
+      const differs = picture.data[i] !== original.data[i] || picture.data[i + 1] !== original.data[i + 1] || picture.data[i + 2] !== original.data[i + 2];
+      if (!differs) continue;
+      if (weights[y * picture.width + x] === 0) outside++;
+      if (x >= give.x0 && x < give.x1 && y >= give.y0 && y < give.y1) giving++;
+    }
+  }
+  const shoe = bild.darkBox(picture, doll.shoe, 400);
+  const originalShoe = bild.darkBox(original, doll.shoe, 400);
+  const card = yellowCard(picture, doll);
+  const originalCard = yellowCard(original, doll);
+  const hand = restSkin(picture, region, doll);
+  const originalHand = restSkin(original, region, doll);
+  const values: Record<string, number | null> = {
+    utanforOmradet: outside,
+    skon: shoe && originalShoe ? bild.boxOffset(shoe, originalShoe) : null,
+    skonOverlapp: bild.silhouetteOverlap(picture, original, doll.shoe, doll.mouthBox),
+    kortet: card && originalCard ? bild.boxOffset(card, originalCard) : null,
+    bordskant: edgeOffset(picture, original, doll, content.local.edges).most,
+    gront: greenOff(picture, key, 8, 12),
+    glipa: gapIn(picture, key, doll.waist, (x) => edgeRow(doll, x), gap.rows, gap.least).cols,
+    vilandeHandenMotOriginal: hand && originalHand ? Math.round((hand / originalHand) * 1000) / 1000 : null,
+  };
+  const shown = { givhandensRutaAndrad: giving, vilandeHandensYta: hand, originaletsVilandeHand: originalHand, skarmExakt: bild.exactScreen(picture, key), omrade: region };
+  const judged = Object.entries(content.limits).filter(([name]) => name in values).map(([name, limit]) => judgeOne(name, values[name], limit));
+  return { values, shown, judged };
+}
+
+type VariantOrder = {
+  id: string; dealer: string; view: SeatView; viewWord: string; variant: string; what: string; from: string; anchor: string;
+  model: string; imageSize: string; ratio: string; credits: number; promptText: string; eye: FilmEye; shoe: unknown; doll: DollPoints; region: Region;
+  referenceImages: { tag: string; file: string; asset: string; sha256: string }[];
+};
+
+/** Gör paketet för en variant av vyns ankare (bara armen ändrad). Se kommandoraden. */
+export async function variantForbered(dealerId: string, viewWord: string, name: string, options: PrepareOptions = {}): Promise<Prepared> {
+  const root = options.root ?? studioRoot();
+  const out = options.out ?? join(root, PACKAGES);
+  const say = options.say ?? ((text: string) => console.log(text));
+  const content = readAnkare(root);
+  const variant = content.variants?.[name];
+  if (!variant) throw new AnkareError(`content/ankare.json har ingen variant som heter ${name} (variants: ${Object.keys(content.variants ?? {}).join(', ') || 'inga'})`);
+  const mall = readMall(root);
+  const dealer = readDealer(root, dealerId, mall);
+  const view = viewOf(viewWord);
+  const current = anchorFor(dealer, viewWord);
+  if (!current) throw new AnkareError(`${dealerFile(dealerId)} har inget ankare ur ${viewWord}`);
+  const entry = getEntry(root, current);
+  const eye = entry?.eye as FilmEye | undefined;
+  if (!eye?.frame) throw new AnkareError(`${current} bär inget öga i registret (eye)`);
+  const id = variantIdOf(dealerId, viewWord, name);
+  const dir = join(out, id);
+  if (existsSync(join(dir, 'mottaget.json'))) throw new AnkareError(`${posix(relative(root, dir))} är redan mottaget`);
+  mkdirSync(dir, { recursive: true });
+  const at = (file: string) => join(dir, file);
+  copyFileSync(join(root, 'assets', current), at('fore.png'));
+  const parts = { ...readCycleParts(content.underlag.move, root), eye: { ...eye } };
+  const doll = dollPoints(parts, view, content, root);
+  const region = variantRegion(parts, view, doll, content, variant.region);
+  // Referensbilder utöver ankaret: filer i registret, kopierade in i paketet så att det som laddas upp är det som står här.
+  const references = (variant.references ?? []).map((ref) => {
+    if (!getEntry(root, ref.file)) throw new AnkareError(`${ref.file} (referensen ${ref.tag}) står inte i registret: för in den med ursprung först`);
+    const local = `${ref.tag}${ref.file.match(/\.[a-z]+$/)?.[0] ?? '.png'}`;
+    copyFileSync(join(root, 'assets', ref.file), at(local));
+    return { tag: ref.tag, file: `${posix(relative(root, dir))}/${local}`, asset: ref.file, sha256: sha256Of(at(local)) };
+  });
+  const promptText = fillParagraphs(variant.text, wordsOf(dealer, mall));
+  writeFileSync(at('text.txt'), promptText);
+  const pkg = posix(relative(root, dir));
+  const order: VariantOrder & Record<string, unknown> = {
+    about: 'En variant av ett färdigt REDO-ankare, gjord av src/pipeline/ankare.ts variant: bildmodellen får ankaret (@base) och texten, och bara området (region) av dess bild läggs in i originalet (variant-ta-emot). Allt generate_image behöver står här.',
+    id, made: stamp(), dealer: dealerId, view, viewWord, variant: name, what: variant.what, from: current, anchor: variantFileOf(current, name),
+    model: variant.model, imageSize: variant.imageSize, ratio: variant.ratio, credits: variant.credits, promptFile: `${pkg}/text.txt`, promptText,
+    referenceImages: [{ tag: 'base', file: `${pkg}/fore.png`, asset: current, sha256: sha256Of(at('fore.png')) }, ...references],
+    eye, shoe: entry?.shoe ?? null, doll, region,
+  };
+  write(at('bestallning.json'), order);
+  // Området ritat på ankaret, att se på innan något beställs.
+  const width = eye.frame.width;
+  const height = eye.frame.height;
+  const rects = region.boxes.map((box) => `<rect x="${box.x0}" y="${box.y0}" width="${box.x1 - box.x0}" height="${box.y1 - box.y0}" fill="#ff00ff" fill-opacity="0.18" stroke="#ff00ff" stroke-width="3"/>`).join('');
+  const drawn = await sharp(at('fore.png')).composite([{ input: Buffer.from(`<svg width="${width}" height="${height}">${rects}</svg>`) }]).png().toBuffer();
+  await sharp(drawn).resize(1440).jpeg({ quality: 85 }).toFile(at('omrade.jpg'));
+  say(`Paket: ${pkg} (${variant.what})`);
+  say(`  ankaret        fore.png (${current}), området i omrade.jpg: ${region.boxes.map((box) => `x ${box.x0}–${box.x1}, y ${box.y0}–${box.y1}`).join(' och ')}`);
+  say(`  text           text.txt`);
+  say('Härnäst, för agenten:');
+  say(`  1. Läs saldot. Ladda upp fore.png${references.map((ref) => ` och ${ref.file.split('/').at(-1)}`).join('')} (init_upload, curl, complete_upload).`);
+  say(`  2. generate_image: ${variant.model}, ${variant.imageSize}, ${variant.ratio}; referenceImages [{ tag: base, fore.png }${references.map((ref) => `, { tag: ${ref.tag}, ${ref.file.split('/').at(-1)} }`).join('')}], texten ur text.txt (cirka ${variant.credits} krediter).`);
+  say(`  3. Läs saldot igen, ladda ned bilden och: node src/pipeline/ankare.ts variant-ta-emot ${id} <bild> --task <taskId> --krediter <n> --saldo-fore <n> --saldo-efter <n>`);
+  return { id, dir, order };
+}
+
+/** Tar emot bildmodellens bild till en variant: lägger in området, mäter mot originalet och för in varianten (att granska). */
+export async function variantTaEmot(id: string, file: string, receipt: Omit<Receipt, 'step' | 'file'>, options: ReceiveOptions = {}): Promise<{ values: Record<string, number | null>; judged: Judged[]; registered: string[] }> {
+  const root = options.root ?? studioRoot();
+  const out = options.out ?? join(root, PACKAGES);
+  const say = options.say ?? ((text: string) => console.log(text));
+  const dir = join(out, id);
+  const at = (name: string) => join(dir, name);
+  if (!existsSync(at('bestallning.json'))) throw new AnkareError(`Paketet ${id} finns inte: kör variant först`);
+  const ordered = JSON.parse(readFileSync(at('bestallning.json'), 'utf8')) as VariantOrder;
+  const content = readAnkare(root);
+  const scene = JSON.parse(readFileSync(join(root, 'content', 'scene.json'), 'utf8')) as { studio: { colours: { screen: Rgb } } };
+  const key = scene.studio.colours.screen;
+  const { width, height } = ordered.eye.frame;
+  const original = await bild.readFitted(at('fore.png'), width, height);
+  const edited = await bild.readFitted(fileOf(root, file), width, height);
+  await bild.savePicture(edited, at('modell.png'));
+  const weights = regionWeights(ordered.region, width, height);
+  const made = composeInRegion(original, edited, weights);
+  // Skärmen plattas inom området, där bildmodellen kan ha gjort den annorlunda grön; utanför står originalet.
+  const sample = content.local.flatten.sample;
+  bild.flattenScreen(made, key, { x0: sample[0] * width, y0: sample[1] * height, x1: sample[2] * width, y1: sample[3] * height }, content.local.flatten);
+  for (let p = 0; p < weights.length; p++) {
+    if (weights[p]! > 0) continue;
+    for (let c = 0; c < 3; c++) made.data[p * 3 + c] = original.data[p * 3 + c]!;
+  }
+  await bild.savePicture(made, at('variant.png'));
+  const measure = readTagning(root).measure;
+  const measured = measureVariant(made, original, ordered.doll, ordered.region, weights, content, key, { rows: measure.gapRows, least: measure.gapLeast });
+  await anchorSheet(at('ark.jpg'), original, edited, made, made, ordered.doll, ['bildmodellens bild', 'varianten (området inlagt)']);
+  const outside = measured.judged.filter((entry) => entry.verdict !== 'inom');
+  const summary = outside.length === 0 ? `alla ${measured.judged.length} mått inom gränserna` : `${measured.judged.length - outside.length} av ${measured.judged.length} mått inom gränserna; ${outside.map((entry) => `${entry.key} ${String(entry.value).replace('.', ',')} (${entry.verdict})`).join(', ')}`;
+  const pkg = posix(relative(root, dir));
+  write(at('matning.json'), { about: 'Varianten mätt av src/pipeline/ankare.ts variant-ta-emot mot originalet (fore.png), gränserna i content/ankare.json. Mätt, inte antaget.', measured: stamp(), values: measured.values, judged: measured.judged, shown: measured.shown });
+  const viewText = ordered.view.kind === 'plats' ? `Plats ${ordered.view.seat}` : 'Spelaren';
+  const basis: 'mätt' | 'antaget' = receipt.credits === receipt.before - receipt.after ? 'mätt' : 'antaget';
+  const post: Post = {
+    from: posix(relative(root, at('variant.png'))),
+    file: ordered.anchor,
+    group: 'anchors',
+    dealer: ordered.dealer,
+    title: `REDO ur ${viewText}, på grönt, variant ${ordered.variant}: ${ordered.what}`,
+    status: 'att granska',
+    note: `Gjord ${stamp()} genom src/pipeline/ankare.ts variant (paketet ${pkg}): ${ordered.from} med bara den vilande armen ändrad (${ordered.what}); ${ordered.model} fick ankaret och texten, och bara området (${ordered.region.boxes.map((box) => `x ${box.x0}–${box.x1}, y ${box.y0}–${box.y1}`).join(' och ')}) av dess bild är inlagt, med mjuk kant. Mätt mot originalet: ${summary}. Inte dömd: Jakob väljer med ögat innan någon film görs.`,
+    pose: 'redo',
+    grip: 'nyp',
+    licence: 'Ingen tredjepartslicens: genererad på Jakobs Runway-konto',
+    use: 'dealerfilm',
+    view: ordered.view,
+    eye: ordered.eye,
+    ...(ordered.shoe ? { shoe: ordered.shoe } : {}),
+    variant: ordered.variant,
+    source: {
+      from: 'runway',
+      derivedFrom: ordered.from,
+      taskId: receipt.taskId,
+      model: ordered.model,
+      imageSize: ordered.imageSize,
+      ratio: ordered.ratio,
+      credits: receipt.credits,
+      balanceBefore: receipt.before,
+      balanceAfter: receipt.after,
+      package: pkg,
+      steps: [
+        { step: 'variant', model: ordered.model, taskId: receipt.taskId, references: ordered.referenceImages.map((ref) => ({ tag: ref.tag, what: ref.asset })), prompt: ordered.promptText },
+        { step: 'lokalt', what: `src/pipeline/ankare.ts composeInRegion och ankarbild.ts flattenScreen: bildmodellens bild inlagd i ${ordered.from} bara inom området (mjuk kant ${ordered.region.feather} bp), skärmen plattad där, originalet orört utanför` },
+      ],
+      measured: Object.fromEntries(measured.judged.map((entry) => [entry.key, entry.value])),
+    },
+  };
+  write(at('post.json'), post);
+  say(`Varianten: ${pkg}/variant.png; arket ${pkg}/ark.jpg`);
+  say(`Mätt mot originalet: ${summary}`);
+  for (const entry of measured.judged) say(`  ${entry.verdict.padEnd(8)} ${entry.key.padEnd(24)} ${String(entry.value ?? '–').replace('.', ',').padStart(8)} ${entry.unit.padEnd(8)} ${entry.limit}`);
+  const registered: string[] = [];
+  if (options.register !== false) {
+    const entry = await importAsset(root, post);
+    registered.push(`Registret: ${entry.file} införd, ${entry.status}.`);
+    const order: Order = {
+      at: receipt.at ?? stamp(),
+      model: ordered.model,
+      kind: 'bild',
+      purpose: `variant ${ordered.variant} av ${ordered.from}: ${ordered.what} (${ordered.anchor})`,
+      inputs: JSON.stringify({ imageSize: ordered.imageSize, ratio: ordered.ratio, references: ordered.referenceImages.map((ref) => ({ tag: ref.tag, what: ref.asset })) }),
+      prompt: ordered.promptText,
+      taskId: receipt.taskId,
+      credits: receipt.credits,
+      balanceBefore: receipt.before,
+      balanceAfter: receipt.after,
+      basis,
+      outcome: `mätt efter de lokala stegen: ${summary}`,
+      result: ordered.anchor,
+      note: `bilden: ${posix(relative(root, fileOf(root, file)))}`,
+    };
+    registered.push(`Registret: beställningen ${receipt.taskId} införd (rad ${addOrder(root, order)}).`);
+    for (const one of measured.judged) addMeasurement(root, { file: ordered.anchor, what: `${one.key}: ${one.what}`, value: { value: one.value, unit: one.unit, limit: one.limit, verdict: one.verdict }, who: WHO, basis: 'mätt', note: `gränsen: ${one.source}` });
+    registered.push(`Registret: ${measured.judged.length} mått införda.`);
+    if (existsSync(at('uppladdat.json'))) {
+      // Varje uppladdning på sin fil i registret: taggen säger vilken (base är ankaret).
+      for (const upload of JSON.parse(readFileSync(at('uppladdat.json'), 'utf8')) as { tag?: string; url: string; assetId?: string; at?: string }[]) {
+        const file = ordered.referenceImages.find((ref) => ref.tag === (upload.tag ?? 'base'))?.asset ?? ordered.from;
+        addUpload(root, { file, url: upload.url.split('?')[0]!, assetId: upload.assetId ?? null, at: upload.at ?? null });
+      }
+      registered.push('Registret: uppladdningen införd.');
+    }
+    write(at('mottaget.json'), { at: stamp(), anchor: ordered.anchor, registered });
+  }
+  for (const line of registered) say(line);
+  return { values: measured.values, judged: measured.judged, registered };
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
 // använd
 
 /** Pekar ut ett godkänt ankare som vyns REDO i dealerns fil. */
@@ -811,7 +1140,10 @@ const USAGE = `Använd:
   node src/pipeline/ankare.ts ta-emot <id> [<ställning> <likhet>]
   node src/pipeline/ankare.ts öga <dealer> <vy> [--underlag <png>]
   node src/pipeline/ankare.ts använd <dealer> <vy> <fil>
-Vyn är spelaren eller plats-N. Receptet: docs/production.md, Ankaret.`;
+  node src/pipeline/ankare.ts variant <dealer> <vy> <namn>
+  node src/pipeline/ankare.ts variant-ta-emot <id> <bild> --task <taskId> --krediter <n> --saldo-fore <n> --saldo-efter <n> [--tid "ÅÅÅÅ-MM-DD TT:MM"]
+Vyn är spelaren eller plats-N. Receptet: docs/production.md, Ankaret. En variant (content/ankare.json, variants) är vyns
+ankare med bara en del ändrad: bildmodellens bild läggs in bara inom variantens område, och varianten förs in att granska.`;
 
 if (import.meta.main) {
   const [word, ...args] = process.argv.slice(2);
@@ -824,7 +1156,17 @@ if (import.meta.main) {
     if ((word === 'förbered' || word === 'forbered') && words.length === 2) await forbered(words[0]!, words[1]!, { underlag: flag('--underlag') });
     else if ((word === 'öga' || word === 'oga') && words.length === 2) await oga(words[0]!, words[1]!, { underlag: flag('--underlag') });
     else if (word === 'ta-emot' && (words.length === 1 || words.length === 3)) await taEmot(words[0]!, words.length === 3 ? { stallning: words[1], likhet: words[2] } : {});
-    else if ((word === 'använd' || word === 'anvand') && words.length === 3) {
+    else if (word === 'variant' && words.length === 3) await variantForbered(words[0]!, words[1]!, words[2]!);
+    else if (word === 'variant-ta-emot' && words.length === 2) {
+      const number = (name: string): number => {
+        const value = flag(name);
+        if (value === undefined || !/^\d+$/.test(value)) throw new AnkareError(`${name} <heltal> saknas`);
+        return Number(value);
+      };
+      const taskId = flag('--task');
+      if (!taskId) throw new AnkareError('--task <taskId> saknas');
+      await variantTaEmot(words[0]!, words[1]!, { taskId, credits: number('--krediter'), before: number('--saldo-fore'), after: number('--saldo-efter'), ...(flag('--tid') ? { at: flag('--tid') } : {}) });
+    } else if ((word === 'använd' || word === 'anvand') && words.length === 3) {
       anvand(words[0]!, words[1]!, words[2]!);
       console.log(`${dealerFile(words[0]!)}: ${words[1]} är nu ${words[2]}`);
     } else {

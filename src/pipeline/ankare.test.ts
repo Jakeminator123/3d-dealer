@@ -8,7 +8,8 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { after, before, test } from 'node:test';
 import sharp from 'sharp';
-import { anchorName, anvand, dollPoints, forbered, modelFor, nextNumber, readAnkare, stepText, taEmot } from './ankare.ts';
+import { anchorName, anvand, composeInRegion, dollPoints, forbered, modelFor, nextNumber, readAnkare, regionWeights, stepText, taEmot, variantFileOf, variantRegion, type Region } from './ankare.ts';
+import { fillParagraphs } from './dealer.ts';
 import { savePicture } from './ankarbild.ts';
 import { forlagaEye, readCycleParts } from './cykel.ts';
 import { readDealer, readMall, wordsOf, type Dealer } from './dealer.ts';
@@ -128,4 +129,46 @@ test('förbered och ta-emot: paketet, de lokala stegen, måtten och posten i reg
   setStatus(dir, 'dealers/prov/anchors/spelaren-redo.png', 'godkänd', 'prov', '2026-11-18 20:05');
   anvand('prov', 'spelaren', 'dealers/prov/anchors/spelaren-redo.png', dir);
   assert.equal(readDealer(dir, 'prov').anchors.redo.spelaren, 'dealers/prov/anchors/spelaren-redo.png');
+});
+
+test('en variant: området, den mjuka kanten och inläggningen; ansiktet, givhanden och skon ligger utanför den vilande armen', () => {
+  // Ett L-format område i en liten bild: utanför 0, långt inne 1, och mjukt mot det som ligger utanför (inte mot bildens kant).
+  const region: Region = { boxes: [{ x0: 0, y0: 10, x1: 40, y1: 30 }, { x0: 0, y0: 30, x1: 70, y1: 60 }], side: -1, feather: 5 };
+  const weights = regionWeights(region, 100, 60);
+  const at = (x: number, y: number) => weights[y * 100 + x]!;
+  assert.equal(at(80, 5), 0);
+  assert.equal(at(2, 58), 1, 'bildens kant räknas inte');
+  assert.ok(at(39, 20) > 0 && at(39, 20) < 0.5, 'mjukt vid den inre kanten');
+  assert.ok(at(50, 31) < 0.5, 'mjukt under det som ligger utanför');
+  assert.equal(at(20, 45), 1);
+  const make = (value: number): Picture => ({ data: Buffer.alloc(100 * 60 * 3, value), width: 100, height: 60 });
+  const mixed = composeInRegion(make(10), make(200), weights);
+  assert.equal(mixed.data[(5 * 100 + 80) * 3], 10, 'utanför står originalet');
+  assert.equal(mixed.data[(45 * 100 + 20) * 3], 200, 'inne är bildmodellens');
+  const whole = regionWeights({ boxes: [{ x0: 0, y0: 0, x1: 100, y1: 60 }], side: -1, feather: 0 }, 100, 60);
+  assert.ok(whole.every((weight) => weight === 1), 'hela: allt är bildmodellens');
+
+  // Den vilande armens område ur dockan genom förlagans öga.
+  const parts = readCycleParts(content.underlag.move, root);
+  const doll = dollPoints(parts, { kind: 'spelaren' }, content, root);
+  const arm = variantRegion(parts, { kind: 'spelaren' }, doll, content);
+  const { width, height } = forlagaEye(parts.scene, { kind: 'spelaren', close: true }).frame;
+  const armWeights = regionWeights(arm, width, height);
+  const weightAt = (point: { x: number; y: number }) => armWeights[Math.round(point.y) * width + Math.round(point.x)]!;
+  assert.equal(weightAt(doll.head), 0, 'ansiktet');
+  assert.equal(weightAt(doll.give.hand), 0, 'givhanden');
+  assert.equal(weightAt({ x: (doll.shoe.x0 + doll.shoe.x1) / 2, y: (doll.shoe.y0 + doll.shoe.y1) / 2 }), 0, 'skon');
+  assert.ok(weightAt(doll.rest.hand) > 0.9, 'den vilande handen');
+  assert.equal(variantFileOf('dealers/prov/anchors/spelaren-redo-3.png', 'arm-a'), 'dealers/prov/anchors/spelaren-redo-3-arm-a.png');
+});
+
+test('varianternas texter fylls med dealerns ord, och referenserna är filer, aldrig base', () => {
+  const mall = readMall(root);
+  const words = wordsOf(readDealer(root, 'paulina', mall), mall);
+  for (const [name, variant] of Object.entries(content.variants ?? {})) {
+    const text = fillParagraphs(variant.text, words);
+    assert.ok(!/[{}]/.test(text) && text.startsWith('Edit @base.'), name);
+    for (const ref of variant.references ?? []) assert.ok(ref.tag !== 'base' && text.includes(`@${ref.tag}`), `${name}: @${ref.tag} i texten`);
+  }
+  assert.ok(['arm-a', 'arm-b', 'a2-3-b'].every((name) => content.variants?.[name]), 'varianterna finns');
 });

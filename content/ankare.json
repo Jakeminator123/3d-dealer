@@ -72,7 +72,67 @@
     "basis": "antaget",
     "source": "Talen ur skripten som gjorde spelaren-redo-2 för hand (output/work/ankare-2/, giv-4/), nu i src/pipeline/ankarbild.ts. flatten (platta-gront.ts med skuggor): skärm när grönheten är minst share av skärmens egen (medianen i rutan sample, andelar av rutan: x0, y0, x1, y1) och grönt över least, eller grönt minst shadow över rött och blått med grönt från shadowLeast. hands (krymp-hand-2.ts, strikt): handen inom reach bp från dockans hand, början inom seek bp, huden sluten med close bp, ärm och sko under ljusheten dark. Skalan är roten ur area × dockans hudyta i underlaget / handens hudyta, inom least … most, och handen står kvar när skalan är minst keep: area 1,2 är valt så att likhetsbilden i ankare-2 får skalan 0,69 och 0,72 (de för hand valda var 0,71 och 0,70, som ger 1,27 och 1,14: dockans händer visar mindre av handryggen än en hand i REDO; mätt med output/work/mall/hander.ts). Givhanden skalas kring där fingrarna rör kortet och läggs där dockans fingrar rör det; den vilande kring sin ände mot ärmen, där den står kvar. head (klistra-huvud.ts): när likheten har flyttat skon eller bordskanten mer än edges.most bp läggs bara dess huvud på ställningens bild, ovanför raden collar × huvudets radie under huvudets mitt, förskjutet inom ±reach bp. waist (fyll-midja.ts): kläderna förs ned till dealerns bordskant + below där de slutar inom reach bp ovanför den, med klädernas färg sample rader ovanför fållen. clean (rent.ts): hål om högst holeMost bp fylls och lösa delar om högst spotMost bp blir skärm; en del under keepLeast bp räknas som fläck, och ett hål under holeSmall bp som grönt i hår eller tatueringar. edges (bordskant.ts): bordskanten mäts var every:e kolumn utanför dealern och skon, inom rows rader från den räknade, där grönt ökar minst least."
   },
+  "variants": {
+    "arm-a": {
+      "what": "den vilande armen närmare kroppen: armbågen lägre och inåt, underarmen längs bordskanten, fingrarna lätt böjda",
+      "model": "nano-banana-pro",
+      "imageSize": "2K",
+      "ratio": "16:9",
+      "credits": 20,
+      "region": "vilande-arm",
+      "text": [
+        "Edit @base. Change only {her} right arm and right hand: the arm on the left side of the picture, which rests on the table edge. Keep everything else in @base exactly as it is, at the same pixels and the same size: the framing, {her} face, hair and expression, the tattoos on {her} neck and chest, the blouse, the jacket, {her} left hand at the card shoe with the yellow card, the black card shoe, and the flat uniform bright green background.",
+        "The change: {her} right arm rests the natural, relaxed way a dealer rests the free arm between deals. The right elbow is lower and closer to {her} side instead of sticking out, and the forearm lies along the table edge in front of {her} body. The right hand rests on the table edge nearer the middle of {her} body, the wrist soft and the fingers gently curved and relaxed.",
+        "The right hand stays small and slender, the same size as now{handMarks?, with the same tattoos on the back of the hand and the fingers}. The jacket sleeve still reaches the table edge. No shadows on the green, no other changes."
+      ]
+    },
+    "arm-b": {
+      "what": "den vilande handen längre in på filten: underarmen framåt på bordet, handleden avslappnad, fingrarna lösa",
+      "model": "nano-banana-pro",
+      "imageSize": "2K",
+      "ratio": "16:9",
+      "credits": 20,
+      "region": "vilande-arm",
+      "text": [
+        "Edit @base. Change only {her} right arm and right hand: the arm on the left side of the picture, which rests on the table edge. Keep everything else in @base exactly as it is, at the same pixels and the same size: the framing, {her} face, hair and expression, the tattoos on {her} neck and chest, the blouse, the jacket, {her} left hand at the card shoe with the yellow card, the black card shoe, and the flat uniform bright green background.",
+        "The change: {her} right arm rests the natural, relaxed way a dealer rests the free arm between deals. The forearm reaches a little forward over the table, so the right hand lies further in on the table top in front of {her}, a little closer to the middle, the wrist relaxed and slightly bent and the fingers loose and slightly apart, resting lightly. The elbow sits naturally at {her} side.",
+        "The right hand stays small and slender, the same size as now{handMarks?, with the same tattoos on the back of the hand and the fingers}. No shadows on the green, no other changes."
+      ]
+    },
+    "a2-3": {
+      "what": "tvåhandsställningen A2.3: vänd och lutad mot skon, vänsterhanden på kortet i mynningen, högerhanden på filten intill skon",
+      "model": "nano-banana-pro",
+      "imageSize": "2K",
+      "ratio": "16:9",
+      "credits": 20,
+      "region": "hela",
+      "references": [{ "tag": "pose", "file": "reference/paulina-a2-3-forebild.png" }],
+      "text": [
+        "Edit @base. @pose is another picture of the same woman, taken with another camera, in the pose wanted here: seated at the table, {her} upper body turned and leaning a little toward the card shoe, {her} left hand on the yellow card in the shoe's opening and {her} right hand flat on the table top right next to the shoe, ready to take the card. Give {her} in @base that pose. Take only {her} pose from @pose, never its camera, framing, table or background.",
+        "Keep from @base exactly, at the same pixels and the same size: the camera, the 16:9 framing and crop, the black card shoe and the yellow card in its opening, the table's front edge where {her} jacket ends, and the flat uniform bright green background. {She} sits where {she} sits in @base, at the same size and distance from the camera, with the same face, hair, expression, clothes and tattoos, and {she} looks down at the table, not at the camera.",
+        "{Her} left hand stays at the yellow card in the shoe's opening as in @base. {Her} right arm reaches across in front of {her} body, and {her} right hand rests flat and relaxed on the green table top just in front of the card shoe, beside its opening. Both hands are small and slender, the same size as {her} left hand in @base{handMarks?, with the same tattoos}. {Her} jacket reaches all the way down to the table's front edge. No shadows on the green, no other objects or cards."
+      ]
+    },
+    "a2-3-b": {
+      "what": "tvåhandsställningen A2.3 med en förebild utan sko och kort: vänd och lutad mot skon, vänsterhanden på kortet i mynningen, högerhanden på filten intill skon",
+      "model": "nano-banana-pro",
+      "imageSize": "2K",
+      "ratio": "16:9",
+      "credits": 20,
+      "region": "hela",
+      "references": [{ "tag": "pose", "file": "reference/paulina-a2-3-forebild-utan-sko.png" }],
+      "text": [
+        "Edit @base. @pose is another picture of the same woman, taken with another camera, in the pose wanted here: seated at the table, {her} upper body turned and leaning a little toward where the card shoe is, {her} left hand reaching to the card and {her} right hand flat on the table top in front of {her}, ready to take the card. The card shoe and the card have been removed from @pose: they exist only in @base. Give {her} in @base that pose. Take only {her} pose from @pose, never its camera, framing or background.",
+        "Keep from @base exactly, at the same pixels and the same size: the camera, the 16:9 framing and crop, the black card shoe exactly as it is in @base, with the plain yellow card in its opening, the table's front edge where {her} jacket ends, and the flat uniform bright green background. {She} sits where {she} sits in @base, at the same size and distance from the camera, with the same face, hair, expression, clothes and tattoos, and {she} looks down at the table, not at the camera.",
+        "{Her} left hand stays at the yellow card in the shoe's opening as in @base, the fingertips on the card. {Her} right arm reaches across in front of {her} body, and {her} right hand rests flat and relaxed on the green table top just in front of the card shoe, beside its opening. Both hands are small and slender, the same size as {her} left hand in @base{handMarks?, with the same tattoos}. {Her} jacket reaches all the way down to the table's front edge. No shadows on the green, no other objects or cards."
+      ]
+    },
+    "basis": "antaget",
+    "source": "Agentens, 2026-11-19, efter Jakobs ord om de fria proven: den vilande högerarmen (till vänster i bild) är 'fortfarande fixerad, och kanske i onaturlig vinkel'; i ankaret spelaren-redo-3.png står armbågen långt ut, underarmen snett in och handen platt vid bordskanten, och första och sista bilden låser den ställningen. Två tydligt olika förslag (huvudagentens): arm-a med underarmen närmare kroppen och lätt böjda fingrar, arm-b med handen längre in på filten och avslappnad handled. Modellen är ställningens (Nano Banana Pro 2K, steps[0]), som enligt docs/production.md håller geometrin; Sunburst flyttade bord och sko och Ideogram ritade om ansiktet. Bilden läggs bara in inom region (ankare.ts variant-ta-emot): 'vilande-arm' är dealerns vilande sida under axlarna utan mitten, med mjuk kant, så att ansiktet, givhanden, skon och kortet står kvar bildpunkt för bildpunkt. a2-3 (huvudagentens tillägg samma dag): REDO i tvåhandsställningen, det Jakob kallar A2.3, genom vår kamera; skälet är att Jakobs anmärkning gäller en arm som bara ligger, och i tvåhandsställningen arbetar den. Förebilden för kroppen är gamla Dealers bild i dess egen lins och ruta (reference/paulina-a2-3-forebild.png, införd med ursprung), given som @pose med orden att bara ställningen tas därifrån; docs/production.md varnar för att Nano Banana kopierar uppställningen ur en referensbild med bord och sko. Hela kroppen ändras, så region är hela: bildmodellens bild används hel, och skon, kortet, bordskanten och det gröna mäts mot originalet. Mätt med a2-3: ställningen kom, men skon och kortet ritades om efter förebilden och flyttade 48 och 34 bp (skons silhuett 0,742 mot originalets). a2-3-b ger därför förebilden utan sko och kort (reference/paulina-a2-3-forebild-utan-sko.png, målad i output/work/friprov/utan-sko.ts) och säger att skon bara finns i @base. Mätt 2026-11-19 mot spelaren-redo-3.png (20 krediter var): arm-a och arm-b har inget ändrat utanför området (0 bp), skon, kortet och det gröna orörda och ingen glipa; den vilande handen är 1,10 (a) och 1,59 (b) gånger originalets hudyta, b alltså större än ankarets hand. a2-3-b har skon kvar (2 bp, silhuetten 0,929) men kortet 17 bp från sitt läge, kroppen flyttad mot skon, och högerhanden 2,06 gånger den vilande handens yta i originalet (sett i full storlek: båda händerna större än ankarets)."
+  },
   "limits": {
+    "utanforOmradet": { "what": "variant: bildpunkter utanför variantens område som skiljer från originalet", "unit": "bp", "most": 0, "source": "agentens, 2026-11-19: en variant ändrar bara sitt område (ankare.ts variant-ta-emot), så ansiktet, givhanden, skon, kortet och det gröna utanför står kvar bildpunkt för bildpunkt" },
+    "vilandeHandenMotOriginal": { "what": "variant: den vilande handens hudyta mot originalets (den största huddelen i området närmast dockans vilande hand)", "unit": "gånger", "least": 0.8, "most": 1.25, "source": "agentens, 2026-11-19: händerna ska ha dockans storlek (docs/production.md, Regler), och bildmodellerna ritar dem större; originalets hand är krympt till dockans. En hand som läggs annorlunda visar mer eller mindre av handryggen, så gränsen är vid" },
     "skon": { "what": "skons mörka ruta mot underlagets, största kantavvikelse", "unit": "bp", "most": 3, "source": "spelaren-redo-2: 1 bp (mätt); ställningen höll skon inom 4 bp (docs/production.md)" },
     "skonOverlapp": { "what": "skons silhuett (det som inte är grönt i skons ruta, utom kring givhanden) mot underlagets, skärning genom förening", "unit": "", "least": 0.9, "source": "granskaren av spelaren-redo-2: silhuetten 0,96 (output/work/granskning-ankare-2/sko-silhuett.ts)" },
     "kortet": { "what": "det gula kortet i mynningen mot underlagets, största kantavvikelse", "unit": "bp", "most": 3, "source": "spelaren-redo-2: 1 bp (mätt)" },
