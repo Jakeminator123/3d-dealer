@@ -272,7 +272,9 @@ function Row({ seat, columns, nodes }: { seat: number; columns: number[]; nodes:
 function Node({ node, first }: { node: MapNode; first: boolean }) {
   const body = (
     <>
-      <b>{node.name}</b>
+      <b>
+        {node.name} {node.step && <span className={`stepbadge s${node.step}`}>steg {node.step}</span>}
+      </b>
       <span className="word">
         {node.state}
         {node.take !== null && node.state !== 'saknas' ? ` · t${node.take}` : ''}

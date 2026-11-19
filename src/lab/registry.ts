@@ -19,6 +19,8 @@ export type Asset = {
   seconds?: number;
   fps?: number;
   source?: Record<string, unknown>;
+  /** Filmens steg för ett klipp, som servern räknar det (filmStep): 2 följer dockan, 3 är gjord utan henne. */
+  step?: 2 | 3;
   [field: string]: unknown;
 };
 

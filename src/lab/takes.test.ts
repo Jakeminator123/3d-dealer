@@ -2,7 +2,7 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { groupTakes, nodeOf, sentWords, type SeriesCard, type Take, type Waiting } from './takes.ts';
+import { fackOrder, fackTakes, groupTakes, nodeOf, sentWords, type SeriesCard, type Take, type Waiting } from './takes.ts';
 
 const ANCHOR = 'dealers/prova/anchors/vy-redo-2.png';
 const OLD = 'dealers/prova/anchors/vy-redo.png';
@@ -11,7 +11,7 @@ function take(id: string, fields: Partial<Take>): Take {
   return {
     id, file: `dealers/prova/clips/${id}.mp4`, title: id, dealer: 'prova', view: { kind: 'spelaren' }, seat: 2, index: 0, action: 'deal', take: 1, move: 'rorelse', anchor: ANCHOR,
     status: 'att granska', statusBy: null, statusAt: null, comment: null, reply: null, present: true, archived: null, files: [], bytes: null, film: null, soundInDownload: null,
-    times: null, judged: null, variant: null, reference: null, sent: { kind: 'docka', role: 'referenceVideos', asset: null, frames: 72, fps: 24, seconds: 3 }, request: { model: null, resolution: null, duration: null, ratio: null, made: null }, order: null, eye: null, shoe: null, place: null, lands: null,
+    times: null, judged: null, variant: null, reference: null, sent: { kind: 'docka', role: 'referenceVideos', asset: null, frames: 72, fps: 24, seconds: 3 }, step: 2, request: { model: null, resolution: null, duration: null, ratio: null, made: null }, order: null, eye: null, shoe: null, place: null, lands: null,
     ...fields,
   };
 }
@@ -53,4 +53,25 @@ test('vad som skickades som film sägs i ord', () => {
   assert.equal(sentWords(sent('klipp')), 'klippet p2-t1.mp4, som rörelsereferens i stället för dockans film');
   assert.match(sentWords(sent('klipp', 'referenceVideo')), /video till video/);
   assert.equal(sentWords(sent('ingen', null)), 'ingen film: bara första och sista bilden och texten');
+});
+
+test('steget Klipp sorteras i fack efter filmens steg, med det underkända och arkiverade för sig', () => {
+  const takes = [
+    take('e-p4', { seat: 4, status: 'godkänd' }),
+    take('e-p1', { seat: 1, status: 'godkänd' }),
+    take('tva-p4', { seat: 4, move: 'tva-hander' }),
+    take('fri-p4', { seat: 4, step: 3, status: 'godkänd', variant: 'fri' }),
+    take('ref-p4', { seat: 4, step: 3, status: 'utgår', variant: 'klippref' }),
+    take('fri-arm-p4', { seat: 4, step: 3, variant: 'fri-arm' }),
+    take('e-p2-gammal', { seat: 2, status: 'utgår', present: false, archived: { at: null, why: 'fälld' } }),
+  ];
+  const facks = fackTakes(takes, new Set([ANCHOR]));
+  assert.deepEqual(
+    facks.map((fack) => [fack.step, fack.groups.map((group) => [group.move, group.takes.map((one) => one.id)]), fack.aside.map((one) => one.id)]),
+    [
+      [2, [['rorelse', ['e-p1', 'e-p4']], ['tva-hander', ['tva-p4']]], ['e-p2-gammal']],
+      [3, [['rorelse', ['fri-p4', 'fri-arm-p4']]], ['ref-p4']],
+    ],
+  );
+  assert.deepEqual(fackOrder(facks).map((one) => one.id), ['e-p1', 'e-p4', 'tva-p4', 'e-p2-gammal', 'fri-p4', 'fri-arm-p4', 'ref-p4']);
 });

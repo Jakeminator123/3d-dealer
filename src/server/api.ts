@@ -17,7 +17,7 @@ import { pathInside, sendFile, sendJson, sendText } from './files.ts';
 import { createGame, dealRound, type GameOptions } from '../game/game.ts';
 import { createPreparing, type Preparer } from './forbered.ts';
 import { listMoves, measureMove, MoveError, saveMove } from './rorelser.ts';
-import { listTakes, takeFile } from './tagningar.ts';
+import { listTakes, takeFile, withSteps } from './tagningar.ts';
 import { canThumbnail, thumbnail } from './thumbs.ts';
 
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
@@ -145,7 +145,7 @@ export function createApi(root: string, now: () => string = stamp, gameOptions: 
     const reading = request.method === 'GET' || request.method === 'HEAD';
 
     if (path === '/api/registry' && reading) {
-      sendJson(response, 200, viewRegistry(root));
+      sendJson(response, 200, withSteps(viewRegistry(root)));
     } else if (path === '/api/dealers' && reading) {
       // Dealerna med en fil i content/dealers/ och var var och en står (src/pipeline/dealer.ts): Labbets steg Dealer.
       // Utan dealermallen (content/dealer.json) finns inga dealers att visa.
@@ -167,14 +167,14 @@ export function createApi(root: string, now: () => string = stamp, gameOptions: 
       const body = (await readJson(request)) as { file?: unknown; status?: unknown };
       if (typeof body?.file !== 'string' || typeof body?.status !== 'string') throw new RequestError('Förfrågan ska bära file och status');
       setStatus(root, body.file, body.status, `Jakob i Labbet ${now().slice(0, 10)}`, now());
-      sendJson(response, 200, viewRegistry(root));
+      sendJson(response, 200, withSteps(viewRegistry(root)));
     } else if (path === '/api/registry/comment' && request.method === 'POST') {
       // Jakobs egna ord om en fil, skrivna i Labbet.
       if (!sentByOwnPage(request)) return sendText(response, 403, 'Ändringar tas bara emot från Labbets egen sida');
       const body = (await readJson(request)) as { file?: unknown; comment?: unknown };
       if (typeof body?.file !== 'string' || typeof body?.comment !== 'string') throw new RequestError('Förfrågan ska bära file och comment');
       setWords(root, body.file, 'comment', body.comment, now());
-      sendJson(response, 200, viewRegistry(root));
+      sendJson(response, 200, withSteps(viewRegistry(root)));
     } else if (path === '/api/rorelser' && reading) {
       // Dockans rörelser i content/moves/, med vad som är gjort med dem och vilka som inte får skrivas över (rorelser.ts).
       sendJson(response, 200, { moves: listMoves(root) });

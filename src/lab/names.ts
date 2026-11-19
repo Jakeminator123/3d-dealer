@@ -90,3 +90,17 @@ export function cycleLabel(move: string | null, about: string | undefined): stri
 
 /** Kortet i en adress till steget Dockan: plats-kort i data, med handlingen efter när den inte är deal: 4-0, d-1-hole. */
 export const cardKey = (seat: Seat | null, index: number | null, action: string): string => `${seat === 'D' ? 'd' : (seat ?? 4)}-${index ?? 0}${action === 'deal' ? '' : `-${action}`}`;
+
+/**
+ * Filmens tre steg på vägen till slutfilmen (docs/architecture.md, Orden). Vilket steg ett klipp hör till räknar servern
+ * ur klippets post (filmStep i src/server/tagningar.ts); här står bara vad stegen heter och betyder.
+ */
+export const FILM_STEPS = [
+  { step: 1, name: 'Dockan', line: 'Dockans film: förlagan i varje paket, som klippen görs efter och mäts mot.' },
+  { step: 2, name: 'Prototypen', line: 'Följer dockans film: rätt kort och rörelser, men inte naturlig. Duger som referens.' },
+  { step: 3, name: 'Slutfilmen', line: 'Gjord utan dockans film: fri rörelse, eller ett klipp som referens. Den som ska synas i spelet.' },
+] as const;
+export type FilmStep = (typeof FILM_STEPS)[number]['step'];
+
+/** Stegets namn: "Steg 2 · Prototypen". */
+export const stepName = (step: FilmStep): string => `Steg ${step} · ${FILM_STEPS[step - 1]!.name}`;

@@ -4,7 +4,7 @@
 // Tagningarna och paketens filer kommer från servern (/api/tagningar och /tagning/, src/server/tagningar.ts). Steget
 // skriver bara omdömet och orden, genom servern som Granska.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { readScene, type SceneDescription } from '../scene/description.ts';
 import { fetchContent } from './content.ts';
 import { NumberGroup } from './NumberGroup.tsx';
@@ -13,8 +13,8 @@ import { fetchRegistry, saveComment, saveStatus, sectionsOf, type Registry } fro
 import { Verdict, type Judge } from './Verdict.tsx';
 import { Words, type Say } from './Words.tsx';
 import { routeTo } from './route.ts';
-import { anchorName, cardKey, cardName, cardWords, cycleLabel, framesOf, viewLabel, viewWord } from './names.ts';
-import { clipUrl, fetchTakes, groupTakes, sentWords, takeUrl, type Take, type TakeGroup, type Takes } from './takes.ts';
+import { anchorName, cardKey, cardName, cardWords, cycleLabel, FILM_STEPS, framesOf, stepName, viewLabel, viewWord } from './names.ts';
+import { clipUrl, fackOrder, fackTakes, fetchTakes, sentWords, takeUrl, type Take, type TakeGroup, type Takes } from './takes.ts';
 import './clip.css';
 
 const STEP = 'klipp';
@@ -76,8 +76,8 @@ export default function ClipStep({ route }: { route: string[] }) {
   const judge = useCallback<Judge>((file, status) => keep(saveStatus(file, status)), [keep]);
   const say = useCallback<Say>((file, comment) => keep(saveComment(file, comment)), [keep]);
 
-  const groups = useMemo(() => (data ? groupTakes(data.takes.takes, data.current) : []), [data]);
-  const ordered = useMemo(() => groups.flatMap((group) => group.takes), [groups]);
+  const facks = useMemo(() => (data ? fackTakes(data.takes.takes, data.current) : []), [data]);
+  const ordered = useMemo(() => fackOrder(facks), [facks]);
   const review = useMemo(() => {
     const where = new Map<string, string>();
     if (data) for (const section of sectionsOf(data.registry)) for (const item of section.items) where.set(item.asset.file, routeTo('granska', item.section, item.number));
@@ -102,7 +102,9 @@ export default function ClipStep({ route }: { route: string[] }) {
   const previous = ordered[(at - 1 + ordered.length) % ordered.length]!;
   const next = ordered[(at + 1) % ordered.length]!;
   const cycle = (move: string | null) => cycleLabel(move, move ? data.abouts[move] : undefined);
-  const groupName = (group: TakeGroup) => `${viewLabel(group.view)} · ${anchorName(group.anchor)} · ${cycle(group.move)}${group.current ? '' : ' (äldre ankare)'}`;
+  // Steg 2 följer dockans cykel, så gruppen säger vilken; steg 3 är gjord utan den.
+  const groupName = (group: TakeGroup, step: 2 | 3) => `${viewLabel(group.view)} · ${anchorName(group.anchor)}${step === 2 ? ` · ${cycle(group.move)}` : ''}${group.current ? '' : ' (äldre ankare)'}`;
+  const takeLabel = (one: Take) => `${cardName(one.seat, one.index, one.action)} t${one.take ?? '?'}${one.variant ? ` ${one.variant}` : ''}`;
   const to = (id: string) => routeTo(STEP, ...(numbers ? [TAL] : []), id);
   const picker = (
     <div className="picker">
@@ -110,14 +112,27 @@ export default function ClipStep({ route }: { route: string[] }) {
         ‹
       </a>
       <select className="select" aria-label="Välj tagning" value={take.id} onChange={(event) => void (window.location.hash = to(event.currentTarget.value))}>
-        {groups.map((group) => (
-          <optgroup key={group.key} label={groupName(group)}>
-            {group.takes.map((one) => (
-              <option key={one.id} value={one.id}>
-                {`${cardName(one.seat, one.index, one.action)} t${one.take ?? '?'}${one.variant ? ` ${one.variant}` : ''} · ${statusWord(one.status)}${one.archived ? ', arkiverad' : ''}`}
-              </option>
+        {facks.map((fack) => (
+          <Fragment key={fack.step}>
+            {fack.groups.map((group) => (
+              <optgroup key={group.key} label={`${stepName(fack.step)}: ${groupName(group, fack.step)}`}>
+                {group.takes.map((one) => (
+                  <option key={one.id} value={one.id}>
+                    {`${takeLabel(one)} · ${statusWord(one.status)}`}
+                  </option>
+                ))}
+              </optgroup>
             ))}
-          </optgroup>
+            {fack.aside.length > 0 && (
+              <optgroup label={`${stepName(fack.step)}: utgår och arkiverade`}>
+                {fack.aside.map((one) => (
+                  <option key={one.id} value={one.id}>
+                    {`${takeLabel(one)} · ${statusWord(one.status)}${one.archived ? ', arkiverad' : ''}`}
+                  </option>
+                ))}
+              </optgroup>
+            )}
+          </Fragment>
         ))}
       </select>
       <a className="btn icon" href={to(next.id)} aria-label="Nästa tagning">
@@ -132,17 +147,41 @@ export default function ClipStep({ route }: { route: string[] }) {
   return (
     <div className="clipstep">
       <aside className="side takelist" aria-label="Tagningarna">
-        {groups.map((group) => (
-          <section key={group.key}>
-            <h3>{groupName(group)}</h3>
-            {group.takes.map((one) => (
-              <a key={one.id} className="section" href={to(one.id)} aria-current={one.id === take.id ? 'page' : undefined}>
-                {cardName(one.seat, one.index, one.action)} t{one.take ?? '?'}{one.variant ? ` ${one.variant}` : ''}
-                <span className={`badge ${statusClass(one.status)}`}>{statusWord(one.status)}</span>
-              </a>
+        <nav className="fackjump" aria-label="Facken">
+          {facks.map((fack) => (
+            <button key={fack.step} type="button" className="btn small" onClick={(event) => event.currentTarget.closest('.takelist')?.querySelector(`.fack.s${fack.step}`)?.scrollIntoView({ block: 'start', behavior: 'smooth' })}>
+              {stepName(fack.step)} <b>{fack.groups.reduce((sum, group) => sum + group.takes.length, 0) + fack.aside.length}</b>
+            </button>
+          ))}
+        </nav>
+        {facks.map((fack) => (
+          <section key={fack.step} className={`fack s${fack.step}`}>
+            <header>
+              <span className={`stepbadge s${fack.step}`}>Steg {fack.step}</span>
+              <b>{FILM_STEPS[fack.step - 1]!.name}</b>
+              <small>{FILM_STEPS[fack.step - 1]!.line}</small>
+            </header>
+            {fack.groups.map((group) => (
+              <div key={group.key}>
+                <h3>{groupName(group, fack.step)}</h3>
+                {group.takes.map((one) => (
+                  <TakeLink key={one.id} take={one} label={takeLabel(one)} href={to(one.id)} current={one.id === take.id} />
+                ))}
+              </div>
             ))}
+            {fack.aside.length > 0 && (
+              <details className="aside" open={fack.aside.includes(take) || undefined}>
+                <summary>Utgår och arkiverade ({fack.aside.length})</summary>
+                {fack.aside.map((one) => (
+                  <TakeLink key={one.id} take={one} label={takeLabel(one)} href={to(one.id)} current={one.id === take.id} />
+                ))}
+              </details>
+            )}
           </section>
         ))}
+        <p className="hint stepone">
+          <span className="stepbadge s1">Steg 1</span> {FILM_STEPS[0].line} Den står till höger om varje klipp.
+        </p>
       </aside>
       <main className="main">
         <nav className="tabs" aria-label="Klipp">
@@ -168,6 +207,19 @@ export default function ClipStep({ route }: { route: string[] }) {
   );
 }
 
+/** En tagning i listan: kortet, tagningen och varianten, och omdömet. */
+function TakeLink({ take, label, href, current }: { take: Take; label: string; href: string; current: boolean }) {
+  return (
+    <a className="section" href={href} aria-current={current ? 'page' : undefined}>
+      {label}
+      <span className={`badge ${statusClass(take.status)}`}>
+        {statusWord(take.status)}
+        {take.archived ? ', arkiv' : ''}
+      </span>
+    </a>
+  );
+}
+
 // ---------------------------------------------------------------------------------------------------------------------
 // Filmen och dockan i samma takt
 
@@ -187,12 +239,12 @@ function Compare({ take, rate, setRate }: { take: Take; rate: number; setRate: (
   const doll = right === 'klipp' && sentClip ? takeUrl(take.id, 'referensklipp.mp4') : take.files.includes('referens.mp4') ? takeUrl(take.id, 'referens.mp4') : null;
   const rightWords =
     right === 'klipp' && sentClip
-      ? 'Referensklippet, som skickades i stället för dockans film'
+      ? 'Referensklippet, som skickades i stället för dockans film (steg 3 bygger på det)'
       : take.sent.kind === 'docka'
-        ? 'Dockans film, som skickades som rörelsereferens'
+        ? 'Steg 1 · Dockans film, som skickades som rörelsereferens'
         : take.sent.kind === 'klipp'
-          ? 'Dockans film: skickades inte, ett klipp var referens'
-          : 'Dockans film: skickades inte, ingen film var referens';
+          ? 'Steg 1 · Dockans film: skickades inte, ett klipp var referens'
+          : 'Steg 1 · Dockans film: skickades inte, ingen film var referens';
 
   const frameOf = (t: number): number => {
     const k = Math.floor(t * fps + 0.001);
@@ -378,6 +430,9 @@ function Facts({ take, cycle, review, registry, onJudge, onSay }: { take: Take; 
           {cardName(take.seat, take.index, take.action)} t{take.take ?? '?'}{take.variant ? ` · variant ${take.variant}` : ''}
         </h2>
         <span className={`badge ${statusClass(take.status)}`}>{statusWord(take.status)}</span>
+        <span className={`stepbadge s${take.step}`} title={FILM_STEPS[take.step - 1]!.line}>
+          {stepName(take.step)}
+        </span>
       </div>
       <p className="dim">
         {cardWords(take.seat, take.index, take.action)}; cykel {cycle(take.move)}, ur {viewLabel(view)}, ankaret {anchorName(take.anchor)}

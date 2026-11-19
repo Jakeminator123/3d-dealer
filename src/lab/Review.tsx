@@ -14,7 +14,7 @@ import {
   type Registry,
 } from './registry.ts';
 import { routeTo } from './route.ts';
-import { shownText } from './names.ts';
+import { FILM_STEPS, shownText, stepName } from './names.ts';
 import { capitalize, Verdict, type Judge } from './Verdict.tsx';
 import { Words, type Say } from './Words.tsx';
 
@@ -187,6 +187,11 @@ function Card({ item, registry, href, onJudge, onSay }: CardProps) {
       </a>
       <div className="caption">
         <div className="title">{shownText(asset.title)}</div>
+        {asset.step && (
+          <span className={`stepbadge s${asset.step}`} title={FILM_STEPS[asset.step - 1]!.line}>
+            {stepName(asset.step)}
+          </span>
+        )}
         <div className="file">
           {asset.file.slice(asset.file.lastIndexOf('/') + 1)} · {facts.join(' · ')}
         </div>

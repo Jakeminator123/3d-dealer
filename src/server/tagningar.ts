@@ -68,6 +68,8 @@ export type Take = {
   judged: { inside: number; total: number; shown: Judged[] } | null;
   /** Dockans film i paketet (referens.mp4), skickad eller inte: bestallning.json, doll.film, annars inputs.referenceVideos. */
   reference: { frames: number | null; fps: number | null; seconds: number | null } | null;
+  /** Filmens steg (filmStep): 2 följer dockans film, 3 är gjord utan den. */
+  step: 2 | 3;
   /** Det som skickades till filmmodellen som film (sentOf). */
   sent: Sent;
   /** Det paketet beställde: modell, upplösning, längd och bildformat. */
@@ -120,6 +122,28 @@ function archivedPath(root: string, place: unknown): string | null {
   if (typeof place !== 'string' || !place.startsWith(`${ARCHIVE}/`)) return null;
   const path = pathInside(join(root, ARCHIVE), place.slice(ARCHIVE.length + 1));
   return path && existsSync(path) ? path : null;
+}
+
+/**
+ * Filmens steg på vägen till slutfilmen (docs/architecture.md, Orden): 1 är dockans film, 2 ett klipp gjort med dockans
+ * film som rörelsereferens (prototypen, som följer dockan), 3 ett klipp gjort utan den: fritt, utan referensfilm, eller
+ * med ett färdigt klipp som referens (slutfilmen). Det enda stället regeln står: servern räknar steget ur klippets post i
+ * registret, dess `source.references` (filerna som skickades med, som ta-emot skrev dem; samma fält som rundan läser
+ * ankaret ur), och Labbet visar det som servern ger det (`step` i /api/tagningar och /api/registry). Ett klipp i
+ * registret är aldrig steg 1: dockans film ligger i paketet.
+ */
+export type FilmStep = 1 | 2 | 3;
+// En referensfilm som är ett klipp: ett klipp i registret, eller paketets kopia av det.
+const CLIP_SENT = /dealers\/[a-z0-9-]+\/clips\/[^\s:()]+\.mp4|referensklipp\.mp4/;
+export function filmStep(entry: { source?: unknown; [field: string]: unknown }): 2 | 3 {
+  const references = (entry.source as { references?: unknown } | undefined)?.references;
+  const videos = (Array.isArray(references) ? references : []).filter((one) => /^referenceVideo/.test(String((one as { role?: unknown })?.role ?? '')));
+  return videos.some((one) => !CLIP_SENT.test(String((one as { what?: unknown }).what ?? ''))) ? 2 : 3;
+}
+
+/** Registret så som Labbet får det, med varje klipps steg (filmStep). */
+export function withSteps<T extends { assets: (RegistryEntry & { present?: boolean })[] }>(registry: T): T {
+  return { ...registry, assets: registry.assets.map((entry) => (entry.group === 'clips' ? { ...entry, step: filmStep(entry) } : entry)) };
 }
 
 /** Det paketet skickar som film (Sent): ur inputs, och klippets namn ur filen eller motionFrom. */
@@ -194,6 +218,7 @@ function takeOf(root: string, pkg: Package, entry: RegistryEntry & { present?: b
       : null,
     reference: dollFilmOf(pkg.order),
     sent: sentOf(pkg.order),
+    step: filmStep(entry),
     request: { model: text(pkg.order.model), resolution: text(pkg.order.resolution), duration: count(pkg.order.duration), ratio: text(pkg.order.ratio), made: text(pkg.order.made) },
     order: order
       ? { at: text(order.at), model: String(order.model), credits: count(order.credits), basis: String(order.basis ?? ''), seconds: durationOf(order.inputs), received: String(order.note ?? '').includes('togs emot') }

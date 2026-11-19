@@ -1490,3 +1490,38 @@ a.holding:hover {
   margin: 0;
   font-size: 18px;
 }
+
+/* Filmens steg som en liten etikett: 1 dockans film, 2 prototypen, 3 slutfilmen. Kantad, så att den inte förväxlas med
+   omdömets fyllda märke. */
+
+.stepbadge {
+  display: inline-block;
+  padding: 0 7px;
+  border: 1px solid var(--s);
+  border-radius: 6px;
+  color: var(--s);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 18px;
+  white-space: nowrap;
+}
+
+.stepbadge.s1 {
+  --s: #9aa3b5;
+}
+
+.stepbadge.s2 {
+  --s: #b49af0;
+}
+
+.stepbadge.s3 {
+  --s: #5cc8d6;
+}
+
+.dealercard .stepshead {
+  margin: 14px 0 8px;
+}
+
+.journey.steps {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}

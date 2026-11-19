@@ -1,7 +1,7 @@
 // En fil i full storlek, med allt registret vet om den bredvid.
 
 import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react';
-import { shownText } from './names.ts';
+import { FILM_STEPS, shownText, stepName } from './names.ts';
 import { formatBytes, mediaUrl, type Asset, type Item, type Registry, type Section } from './registry.ts';
 import { Verdict, type Judge } from './Verdict.tsx';
 import { Words, type Say } from './Words.tsx';
@@ -215,6 +215,11 @@ function Info({ asset, registry, onJudge, onSay }: InfoProps) {
   return (
     <aside className="info">
       <h2>{shownText(asset.title)}</h2>
+      {asset.step && (
+        <p>
+          <span className={`stepbadge s${asset.step}`}>{stepName(asset.step)}</span> <span className="meaning">{FILM_STEPS[asset.step - 1]!.line}</span>
+        </p>
+      )}
       <Verdict registry={registry} asset={asset} onJudge={onJudge} />
       <p className="meaning">
         {registry.statuses[asset.status] ?? asset.status}

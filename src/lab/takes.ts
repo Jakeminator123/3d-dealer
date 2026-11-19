@@ -39,6 +39,8 @@ export type Take = {
   /** Dockans film i paketet, skickad eller inte. */
   reference: { frames: number | null; fps: number | null; seconds: number | null } | null;
   sent: Sent;
+  /** Filmens steg, som servern räknar det (filmStep i src/server/tagningar.ts): 2 följer dockan, 3 är gjord utan henne. */
+  step: 2 | 3;
   request: { model: string | null; resolution: string | null; duration: number | null; ratio: string | null; made: string | null };
   order: { at: string | null; model: string; credits: number | null; basis: string; seconds: number | null; received: boolean } | null;
   eye: unknown;
@@ -60,6 +62,9 @@ export const takeUrl = (id: string, name: TakeFile): string => `/tagning/${encod
 /** Klippet: ur assets/ när det står där, annars det arkiverade ur paketets väg. Null när inget av dem finns. */
 export const clipUrl = (take: Take): string | null => (take.present ? mediaUrl(take.file) : take.files.includes('klippet.mp4') ? takeUrl(take.id, 'klippet.mp4') : null);
 
+/** Efter kort (plats, C1–C3, dealerns kort), sedan tagning, sedan variant. */
+const takeOrder = (a: Take, b: Take): number => cardOrder(a, b) || (a.take ?? 0) - (b.take ?? 0) || String(a.variant ?? '').localeCompare(String(b.variant ?? ''));
+
 const SEAT_ORDER = (seat: Seat | null): number => (seat === 'D' ? 8 : (seat ?? 9));
 /** Dealerns kort i kartans ordning: öppet kort, hålkort, vändning, extrakorten, väntan sist. */
 export const dealerOrder = (index: number | null, action: string): number => (action === 'wait' ? 99 : action === 'hole' ? 1 : action === 'flip' ? 2 : (index ?? 0) === 0 ? 0 : 2 + (index ?? 0));
@@ -73,16 +78,16 @@ export type TakeGroup = { key: string; view: string; anchor: string | null; move
  * dealers fil pekar ut för vyn i dag (`current`, ankarnas registernamn), sedan de med flest tagningar. I en grupp efter
  * plats, kort och tagning.
  */
-export function groupTakes(takes: Take[], current: Set<string>): TakeGroup[] {
+export function groupTakes(takes: Take[], current: Set<string>, byMove = true): TakeGroup[] {
   const groups = new Map<string, TakeGroup>();
   for (const take of takes) {
     const view = viewWord(take.view);
-    const key = `${view}|${take.anchor ?? ''}|${take.move ?? ''}`;
+    const key = `${view}|${take.anchor ?? ''}|${byMove ? (take.move ?? '') : ''}`;
     const group = groups.get(key) ?? { key, view, anchor: take.anchor, move: take.move, current: take.anchor !== null && current.has(take.anchor), takes: [] };
     group.takes.push(take);
     groups.set(key, group);
   }
-  for (const group of groups.values()) group.takes.sort((a, b) => cardOrder(a, b) || (a.take ?? 0) - (b.take ?? 0));
+  for (const group of groups.values()) group.takes.sort(takeOrder);
   return [...groups.values()].sort(
     (a, b) =>
       Number(a.view !== 'spelaren') - Number(b.view !== 'spelaren') ||
@@ -93,6 +98,28 @@ export function groupTakes(takes: Take[], current: Set<string>): TakeGroup[] {
   );
 }
 
+/**
+ * Ett fack i steget Klipp: filmerna i ett av filmens steg (2 prototypen, 3 slutfilmen), i grupper efter vy och ankare,
+ * och i steg 2 också efter cykel, eftersom den följer dockans rörelse; steg 3 är gjord utan den. Det som har `utgår` och
+ * det arkiverade står för sig, efter kort och tagning, så att det inte skymmer facket.
+ */
+export type Fack = { step: 2 | 3; groups: TakeGroup[]; aside: Take[] };
+
+/** Ligger vid sidan av facket: underkänt eller arkiverat. */
+export const isAside = (take: Take): boolean => take.status === 'utgår' || take.archived !== null;
+
+export function fackTakes(takes: Take[], current: Set<string>): Fack[] {
+  return ([2, 3] as const)
+    .map((step) => {
+      const mine = takes.filter((take) => take.step === step);
+      return { step, groups: groupTakes(mine.filter((take) => !isAside(take)), current, step === 2), aside: mine.filter(isAside).sort(takeOrder) };
+    })
+    .filter((fack) => fack.groups.length > 0 || fack.aside.length > 0);
+}
+
+/** Tagningarna i den ordning steget Klipp visar dem: fack för fack, grupperna och sedan det som ligger vid sidan. */
+export const fackOrder = (facks: Fack[]): Take[] => facks.flatMap((fack) => [...fack.groups.flatMap((group) => group.takes), ...fack.aside]);
+
 // ---------------------------------------------------------------------------------------------------------------------
 // Kartan: läget för ett kort i serien
 
@@ -101,7 +128,8 @@ export const NODE_STATES: NodeState[] = ['godkänd', 'att granska', 'underkänd'
 
 /** Ett kort i serien så som /api/dealers ger det (CardState i src/pipeline/dealer.ts). */
 export type SeriesCard = { seat: Seat; index: number; action: string; first: boolean; label: string; clip: { file: string; status: string; take: number | null } | null; others: number };
-export type MapNode = { name: string; words: string; state: NodeState; take: number | null; open: string | null; note: string | null };
+/** Ett kort i kartan. `step` är filmens steg för klippet som visas, eller null när inget klipp finns. */
+export type MapNode = { name: string; words: string; state: NodeState; take: number | null; open: string | null; note: string | null; step: 2 | 3 | null };
 
 const sameCard = (one: { seat: Seat | null; index: number | null; action: string }, card: SeriesCard): boolean => one.seat === card.seat && one.index === card.index && one.action === card.action;
 
@@ -119,14 +147,15 @@ export function nodeOf(view: string, anchor: string | null, card: SeriesCard, ta
   if (card.clip) {
     const approved = card.clip.status === 'godkänd';
     const notes = [card.clip.status === 'granska igen' ? 'Jakob vill ha den sedd igen' : null, !approved && rejected.length > 0 ? `${rejected.map((one) => `t${one.take ?? '?'}`).join(', ')} underkänd` : null].filter(Boolean);
-    return { ...base, state: approved ? 'godkänd' : 'att granska', take: card.clip.take, open: takes.find((take) => take.file === card.clip!.file)?.id ?? null, note: notes.length ? notes.join('; ') : null };
+    const shown = takes.find((take) => take.file === card.clip!.file);
+    return { ...base, state: approved ? 'godkänd' : 'att granska', take: card.clip.take, open: shown?.id ?? null, note: notes.length ? notes.join('; ') : null, step: shown?.step ?? null };
   }
   if (rejected.length > 0) {
     const last = rejected[0]!;
-    return { ...base, state: 'underkänd', take: last.take, open: last.id, note: queuedWords ? `tas om: ${queuedWords}` : last.archived ? 'arkiverad, tas om' : 'inte arkiverad än' };
+    return { ...base, state: 'underkänd', take: last.take, open: last.id, note: queuedWords ? `tas om: ${queuedWords}` : last.archived ? 'arkiverad, tas om' : 'inte arkiverad än', step: last.step };
   }
-  if (queued.length > 0) return { ...base, state: 'paket väntar', take: queued[0]!.take, open: null, note: queuedWords };
-  return { ...base, state: 'saknas', take: null, open: null, note: null };
+  if (queued.length > 0) return { ...base, state: 'paket väntar', take: queued[0]!.take, open: null, note: queuedWords, step: null };
+  return { ...base, state: 'saknas', take: null, open: null, note: null, step: null };
 }
 
 /** Vad som skickades som film med första och sista bilden, i ord. */

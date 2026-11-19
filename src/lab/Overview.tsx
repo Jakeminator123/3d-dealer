@@ -3,13 +3,13 @@
 
 import { useEffect, useState, type CSSProperties } from 'react';
 import { fetchDealers, type DealerState, type DealerView } from './dealers.ts';
-import { anchorName, shownText, viewLabel } from './names.ts';
+import { anchorName, cardName, FILM_STEPS, shownText, stepName, viewLabel, viewWord, type FilmStep } from './names.ts';
 import { fetchRegistry, type Registry } from './registry.ts';
 import { fetchMoves, type MoveInfo } from './rorelser.ts';
 import { routeTo } from './route.ts';
 import { holdingsOf, needsOf, repliesOf, type Need } from './situation.ts';
 import { PATH, STEPS, type Stage } from './steps.ts';
-import { fetchTakes, nodeOf, type Takes } from './takes.ts';
+import { fetchTakes, isAside, nodeOf, type Take, type Takes } from './takes.ts';
 
 type Loaded = { registry: Registry; takes: Takes | null; dealers: DealerState[]; moves: MoveInfo[] };
 
@@ -71,7 +71,7 @@ export function Overview() {
           <pre className="command">node src/pipeline/identitet.ts ny &lt;id&gt; "&lt;Namn&gt;" &lt;bild&gt;</pre>
         </div>
       ) : (
-        dealers.map((dealer) => <DealerCard key={dealer.id} dealer={dealer} takes={takes} />)
+        dealers.map((dealer) => <DealerCard key={dealer.id} dealer={dealer} takes={takes} cycles={cycles.length} />)
       )}
 
       <h2>
@@ -182,7 +182,37 @@ function seriesOf(view: DealerView, takes: Takes | null): { approved: number; to
 }
 
 /** En dealer på produktionens väg: identitet, ankare, film, granska och spela, med var hon står i varje. */
-function DealerCard({ dealer, takes }: { dealer: DealerState; takes: Takes | null }) {
+/**
+ * Hur långt filmens tre steg har kommit för dealern: dockans film i paketen (steg 1), seriens kort med ett godkänt klipp
+ * som följer dockan ur vyns ankare (steg 2), och korten med ett godkänt klipp utan dockans film (steg 3). Det underkända
+ * och arkiverade räknas inte.
+ */
+function stepsOf(dealer: DealerState, takes: Takes | null, cycles: number): { step: FilmStep; head: string; more: string }[] {
+  const own = takes ? takes.takes.filter((take) => take.dealer === dealer.id) : [];
+  const waiting = takes ? takes.waiting.filter((one) => one.dealer === dealer.id) : [];
+  const live = own.filter((take) => take.present && !isAside(take));
+  const same = (take: Take, card: DealerView['cards'][number]): boolean => take.seat === card.seat && take.index === card.index && take.action === card.action;
+  const prototype = dealer.views
+    .filter((view) => view.anchor)
+    .map((view) => {
+      const covered = view.cards.filter((card) => live.some((take) => take.step === 2 && take.status === 'godkänd' && viewWord(take.view) === view.view && take.anchor === view.anchor!.file && same(take, card))).length;
+      return `${viewLabel(view.view)}: ${covered} av ${view.cards.length} kort`;
+    });
+  const finals = live.filter((take) => take.step === 3);
+  const approved = [...new Set(finals.filter((take) => take.status === 'godkänd').map((take) => cardName(take.seat, take.index, take.action)))];
+  const judging = finals.filter((take) => take.status === 'att granska' || take.status === 'granska igen').length;
+  return [
+    { step: 1, head: `${cycles} ${cycles === 1 ? 'cykel' : 'cykler'} i content/moves/`, more: `dockans film i ${own.length + waiting.length} paket` },
+    { step: 2, head: prototype.join('; ') || 'ingen vy med ankare', more: 'godkända klipp som följer dockan, ur vyns ankare' },
+    {
+      step: 3,
+      head: approved.length > 0 ? `godkänt till ${approved.join(', ')}` : 'inget godkänt än',
+      more: `${finals.length} ${finals.length === 1 ? 'klipp' : 'klipp'} utan dockans film${judging > 0 ? `, ${judging} väntar på omdöme` : ''}`,
+    },
+  ];
+}
+
+function DealerCard({ dealer, takes, cycles }: { dealer: DealerState; takes: Takes | null; cycles: number }) {
   const needed = dealer.identity.filter((one) => one.need);
   const identityOk = needed.filter((one) => one.image?.status === 'godkänd').length;
   const anchored = dealer.views.filter((view) => view.anchor?.status === 'godkänd');
@@ -229,11 +259,11 @@ function DealerCard({ dealer, takes }: { dealer: DealerState; takes: Takes | nul
           <a href={routeTo('klipp')} style={{ '--c': tone(series.length > 0 && series.every((one) => one.approved === one.total && one.laterApproved === one.later), series.some((one) => one.approved > 0)) } as CSSProperties}>
             <span className="jstage">Film</span>
             <b>{series.map((one) => `${viewLabel(one.view.view)}: ${one.approved} av ${one.total} kort${one.later > 0 ? `, senare ${one.laterApproved} av ${one.later}` : ''}`).join('; ') || 'ingen serie'}</b>
-            <small>ett godkänt klipp per kort i serien</small>
+            <small>ett godkänt klipp per kort i serien, i steg 2 eller 3</small>
           </a>
         </li>
         <li>
-          <a href={routeTo('granska', 'clips-filmer')} style={{ '--c': tone(toJudge === 0, true) } as CSSProperties}>
+          <a href={routeTo('granska', 'clips')} style={{ '--c': tone(toJudge === 0, true) } as CSSProperties}>
             <span className="jstage">Granska</span>
             <b>{toJudge === 0 ? 'inga klipp väntar' : `${toJudge} klipp väntar på omdöme`}</b>
             <small>{ownClips.length} klipp i registret</small>
@@ -246,6 +276,18 @@ function DealerCard({ dealer, takes }: { dealer: DealerState; takes: Takes | nul
             <small>en runda mot spelkärnan</small>
           </a>
         </li>
+      </ol>
+      <h4 className="label stepshead">Filmens tre steg</h4>
+      <ol className="journey steps">
+        {stepsOf(dealer, takes, cycles).map((one) => (
+          <li key={one.step}>
+            <a href={one.step === 1 ? routeTo('docka') : routeTo('klipp')} style={{ '--c': one.step === 1 ? '#9aa3b5' : one.step === 2 ? '#b49af0' : '#5cc8d6' } as CSSProperties} title={FILM_STEPS[one.step - 1]!.line}>
+              <span className="jstage">{stepName(one.step)}</span>
+              <b>{one.head}</b>
+              <small>{one.more}</small>
+            </a>
+          </li>
+        ))}
       </ol>
       {next && (
         <div className="nextstep">
